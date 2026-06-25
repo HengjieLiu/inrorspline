@@ -162,6 +162,24 @@ def parse_case_ranks(text: str) -> List[int]:
     return out
 
 
+def case_ranks_short_label(case_ranks: Sequence[int]) -> str:
+    ranks = [int(rank) for rank in case_ranks]
+    if ranks == list(range(10)):
+        return "first10"
+    if ranks and ranks == list(range(ranks[0], ranks[-1] + 1)):
+        return f"preliminary ranks {ranks[0]:03d}-{ranks[-1]:03d}"
+    return "preliminary ranks " + ",".join(f"{rank:03d}" for rank in ranks)
+
+
+def case_ranks_report_label(case_ranks: Sequence[int]) -> str:
+    ranks = [int(rank) for rank in case_ranks]
+    if ranks == list(range(10)):
+        return "First10"
+    if ranks and ranks == list(range(ranks[0], ranks[-1] + 1)):
+        return f"Preliminary Ranks {ranks[0]:03d}-{ranks[-1]:03d}"
+    return "Preliminary Ranks " + ",".join(f"{rank:03d}" for rank in ranks)
+
+
 def as_float(value: object) -> float:
     try:
         return float(value)
@@ -221,6 +239,14 @@ def collect_summaries(out_root: Path) -> List[Dict[str, object]]:
         rows.append(row)
     rows.sort(key=lambda r: (int(as_float(r.get("case_rank"))), str(r.get("method_key")), as_float(r.get("alpha"))))
     return rows
+
+
+def filter_summaries_by_case_rank(
+    rows: Sequence[Dict[str, object]],
+    case_ranks: Sequence[int],
+) -> List[Dict[str, object]]:
+    allowed = {int(rank) for rank in case_ranks}
+    return [row for row in rows if int(as_float(row.get("case_rank"))) in allowed]
 
 
 def required_artifact_errors(row: Mapping[str, object]) -> List[str]:
@@ -673,8 +699,9 @@ def write_report(
     case_ranks: Sequence[int],
     skip_history: bool,
 ) -> None:
+    scope_label = case_ranks_report_label(case_ranks)
     lines = [
-        "# OASIS Seed-3 First10 Alpha Sweep Review",
+        f"# OASIS Seed-3 {scope_label} Alpha Sweep Review",
         "",
         f"- Generated: `{c.now_text()}`",
         f"- Large output root: `{out_root}`",
@@ -682,7 +709,7 @@ def write_report(
         f"- Expected runs: `{len(case_ranks) * 24}`",
         f"- Completed summaries: `{len(summary_rows)}`",
         f"- Case ranks: `{','.join(str(rank) for rank in case_ranks)}`",
-        "- Split: seed-3 shuffled `pair_test_200`, first10 after shuffle.",
+        "- Split: seed-3 shuffled `pair_test_200`; selected ranks are from the first10-after-shuffle protocol.",
         "- Population ARC convention: aggregate each method/alpha across cases first, then draw the Pareto/front curves.",
         "- Native analytic regularity: IDIR uses coordinate-autograd BE/diffusion; spline methods use B-spline analytic BE/diffusion.",
         "- Contact sheets plot native analytic BE/diffusion; spline-only analytic columns remain in CSV/JSON for audit.",
@@ -739,7 +766,8 @@ def write_csv_stream(path: Path, rows: Sequence[Dict[str, object]]) -> None:
 def main() -> None:
     args = parse_args()
     case_ranks = parse_case_ranks(str(args.case_ranks))
-    summary_rows = collect_summaries(Path(args.out_root))
+    scope_label = case_ranks_short_label(case_ranks)
+    summary_rows = filter_summaries_by_case_rank(collect_summaries(Path(args.out_root)), case_ranks)
     errors = check_expected(summary_rows, args)
     if errors and not args.allow_incomplete:
         c.write_json(Path(args.review_root) / "aggregation_errors.json", errors)
@@ -765,12 +793,12 @@ def main() -> None:
     plot_population_grid(
         pop_rows,
         args.review_root / "population_pareto_contact_sheet.pdf",
-        "OASIS seed-3 first10: population accuracy vs foreground regularity",
+        f"OASIS seed-3 {scope_label}: population accuracy vs foreground regularity",
     )
     plot_primary_arc(
         pop_rows,
         args.review_root / "population_arc_primary.pdf",
-        "OASIS seed-3 first10: primary population ARC curves",
+        f"OASIS seed-3 {scope_label}: primary population ARC curves",
     )
 
     if not args.skip_history:

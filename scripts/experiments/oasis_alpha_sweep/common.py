@@ -186,7 +186,7 @@ def load_oasis_case(
         "fixed_seg_positive_fraction": float(fixed_seg_mask.mean()),
         "fixed_image_positive_minus_seg_positive_voxels": int(fixed_image_mask.sum() - fixed_seg_mask.sum()),
         "foreground_rule": "fixed raw image > 0",
-        "segmentation_mask_role": "label metrics only",
+        "segmentation_mask_role": "dice_hd95_asd_only",
     }
     return {
         "moving": torch.from_numpy(moving).to(device=device, dtype=torch.float32),

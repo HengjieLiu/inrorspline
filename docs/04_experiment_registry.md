@@ -43,7 +43,8 @@ Next decision:
 
 ### P1: OASIS Seed-3 First10 Main Pareto
 
-- Status: planned; implementation prepared, launch gated pending user review.
+- Status: completed; full launch started and completed 2026-06-25 on shenggpu9
+  after dry-run and smoke checks passed.
 - Methods: IDIR original, SINR cps4, SINR cps2, DirectCP cps4.
 - Purpose: main brain Pareto result.
 - Dataset: OASIS BrainMR seed-3 shuffled ranks `0-9`, original sorted indices
@@ -58,8 +59,30 @@ Next decision:
   per-case rows, and report population means/spread across cases.
 - Output root: `/database/inrorspline/runs/oasis_seed3_first10_alpha_sweep_be_2500e_v1`.
 - Review root: `experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/`.
-- Required before launch: final user approval after code audit; Docker
-  `py310sitreg_v1_test1`; smallest smoke/dry-run check.
+- Launch environment: Docker container
+  `inrorspline_oasis_seed3_first10_run_20260625`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1_251008`; dry-run and 24-job smoke passed.
+
+### P1c: OASIS Seed-3 First10 DirectCP cps2 Preliminary Overlay
+
+- Status: completed; add-on launch ran 2026-06-25 11:34-11:57 Pacific after
+  P1 completion and DirectCP cps2 smoke passed. Overlay aggregation completed
+  2026-06-25 11:58 Pacific.
+- Purpose: preliminary check of DirectCP cps2 against the completed first10
+  Pareto curves without overwriting P1 reports.
+- Dataset: OASIS BrainMR seed-3 shuffled ranks `0-9`, original sorted indices
+  `158,62,14,69,47,137,110,6,116,88`.
+- Method: DirectCP cps2 with cubic B-spline analytic BE/diffusion.
+- Grid: alpha `100,1000,10000`; 2500 epochs; seed `1`; eval interval `250`.
+- LR: `1e-3`, matching the DirectCP cps4 setting except for `cps=2`.
+- Output root: `/database/inrorspline/runs/oasis_seed3_first10_direct_cp_cps2_prelim_a100_1000_10000_v1`.
+- Overlay review root:
+  `experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/direct_cp_cps2_prelim_overlay/`.
+- Launch environment: Docker container
+  `inrorspline_oasis_seed3_first10_run_20260625`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1_251008`; requested GPUs `1,2,3`.
+- Known limitation: preliminary 3-alpha subset only; do not interpret as a full
+  six-alpha DirectCP cps2 Pareto sweep.
 
 ### P1a: OASIS Seed-3 Case-0 Alpha Pre-Run
 

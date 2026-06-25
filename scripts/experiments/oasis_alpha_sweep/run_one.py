@@ -26,6 +26,7 @@ METHODS = [
     "sinr_cps4_be_bspline_analytic",
     "sinr_cps2_be_bspline_analytic",
     "direct_cp_cps4_be_bspline_analytic",
+    "direct_cp_cps2_be_bspline_analytic",
 ]
 
 
@@ -67,7 +68,7 @@ def method_key(args: argparse.Namespace) -> str:
 
 
 def method_cps(method: str) -> Optional[int]:
-    if method == "sinr_cps2_be_bspline_analytic":
+    if method in {"sinr_cps2_be_bspline_analytic", "direct_cp_cps2_be_bspline_analytic"}:
         return 2
     if method in {"sinr_cps4_be_bspline_analytic", "direct_cp_cps4_be_bspline_analytic"}:
         return 4
@@ -75,7 +76,7 @@ def method_cps(method: str) -> Optional[int]:
 
 
 def default_lr(method: str) -> float:
-    if method == "direct_cp_cps4_be_bspline_analytic":
+    if method.startswith("direct_cp_"):
         return 1e-3
     return 1e-4
 
@@ -231,7 +232,7 @@ def build_spline_generator(
     args: argparse.Namespace,
     control_shape: Tuple[int, int, int],
 ) -> torch.nn.Module:
-    if args.method == "direct_cp_cps4_be_bspline_analytic":
+    if args.method.startswith("direct_cp_"):
         return c.DirectCPGenerator(control_shape)
     return c.NetworkGenerator(c.build_siren(args.hidden_dim, args.hidden_layers, args.spline_omega))
 
@@ -417,7 +418,7 @@ def write_outputs(
         "eval_interval": int(args.eval_interval),
         "hidden_dim": int(args.hidden_dim),
         "hidden_layers": int(args.hidden_layers),
-        "activation": "Siren" if args.method != "direct_cp_cps4_be_bspline_analytic" else "direct_control_points",
+        "activation": "direct_control_points" if args.method.startswith("direct_cp_") else "Siren",
         "omega": float(args.idir_omega if is_idir else args.spline_omega),
         "lr": float(lr),
         "alpha": float(args.alpha),

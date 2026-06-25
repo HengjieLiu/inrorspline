@@ -2,9 +2,11 @@
 
 ## Status
 
-- Code prepared for review.
-- No first10 training jobs launched.
-- Launch remains gated on user approval.
+- Full first10 launch started 2026-06-25 07:54 Pacific on shenggpu9.
+- Launch container: `inrorspline_oasis_seed3_first10_run_20260625`.
+- Docker image: `hengjieliu96/dl_dir:py310sitreg_v1_251008`.
+- Preflight passed: dry-run manifest, 24-job smoke, CUDA visibility, OASIS data
+  checks, and output disk check.
 
 ## Known Limitations Before Launch
 
@@ -37,3 +39,22 @@
   native analytic BE/diffusion.
 - Population ARC curves must aggregate cases by method/alpha before plotting
   the Pareto/front curves.
+
+## DirectCP cps2 Preliminary Add-On
+
+- Requested 2026-06-25 after the completed P1 first10 run.
+- Launch started 2026-06-25 11:34 Pacific via `nohup docker exec` in
+  `inrorspline_oasis_seed3_first10_run_20260625` after a 2-epoch smoke job
+  passed.
+- Launch completed 2026-06-25 11:57 Pacific with `30/30` summaries and
+  `failures=[]`; overlay report and figures completed 2026-06-25 11:58 Pacific.
+- Scope: DirectCP cps2 only, alpha `100,1000,10000`, 2500 epochs, seed `1`,
+  eval interval `250`, lr `1e-3`.
+- Purpose: preliminary overlay against the completed P1 Pareto curves.
+- Output root:
+  `/database/inrorspline/runs/oasis_seed3_first10_direct_cp_cps2_prelim_a100_1000_10000_v1`.
+- Overlay review root:
+  `experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/direct_cp_cps2_prelim_overlay/`.
+- This is a three-alpha preliminary subset, not a full six-alpha DirectCP cps2
+  sweep. Original P1 report/figure files must remain unchanged; overlay outputs
+  use suffixed filenames under the add-on review subdirectory.
