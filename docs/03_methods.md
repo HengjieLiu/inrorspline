@@ -57,4 +57,19 @@ Use a consistent posthoc metric pipeline where possible:
 - folding percentage / `J <= 0`
 - NDV as supplementary, not the sole regularity endpoint
 
+IDIR bending-energy training loss preserves the public original IDIR scale. In
+that implementation, coordinate-second-derivative terms are averaged and then
+divided again by the sampled coordinate batch size. With the default IDIR batch
+size of 10,000, the reported training BE is therefore downscaled by 10,000
+relative to the pre-divide mean BE. Keep this behavior for `idir_original`
+comparability, but do not compare raw IDIR alpha values directly against
+SINR/DirectCP alpha values. Prefer `alpha * training_reg_loss` and common
+posthoc regularity metrics when comparing regularization strength.
+
+For reporting, use native analytic BE and diffusion by default. For IDIR this
+means coordinate-autograd derivatives of the dense coordinate network: Hessian
+BE and Jacobian diffusion. For SINR and DirectCP spline variants this means
+cubic B-spline analytic derivatives sampled at voxel centers: second
+derivatives for BE and first derivatives for diffusion.
+
 For LungCT, report TRE in physical mm and keep snap/sub-voxel conventions explicit.

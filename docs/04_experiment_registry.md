@@ -49,6 +49,44 @@ Next decision:
 - Required before launch: `docs/standards/oasis_brainmr_protocol.md`,
   pair list manifest, metric script audit, alpha/LR grid lock.
 
+### P1a: OASIS Seed-3 Case-0 Alpha Pre-Run
+
+- Status: completed; aggregation passed with 12/12 runs and no acceptance errors.
+- Date planned: 2026-06-25.
+- Dataset: OASIS BrainMR seed-3 shuffled rank `0`, original sorted index `158`,
+  fixed/moving `(0333, 0115)`.
+- Methods: IDIR original, SINR cps4, SINR cps2, DirectCP cps4.
+- Grid: IDIR alpha `0.01,0.1,1`; spline alpha `100,1000,10000`; 1000 epochs.
+- Docker: `py310sitreg_v1_test1`, image `hengjieliu96/dl_dir:py310sitreg_v1`.
+- Output root: `/database/inrorspline/runs/oasis_seed3_case0_prerun_be_1000e_v1`.
+- Review root: `experiments/2026-06-25_oasis_seed3_case0_prerun/`.
+- Actual launcher elapsed: 504.5 seconds; large output size: 1.1 GB; review
+  artifact size: 4.6 MB.
+- Notes: native analytic regularity means IDIR coordinate-autograd Hessian BE
+  and Jacobian diffusion; spline methods use cubic B-spline analytic BE and
+  diffusion.
+- Next decision: user reviews pre-run Pareto/contact-sheet outputs before full
+  overnight first10 launch.
+
+### P1b: OASIS Original Sorted Case-0 Alpha Pre-Run
+
+- Status: completed; aggregation passed with 12/12 runs and no acceptance errors.
+- Date planned: 2026-06-25.
+- Dataset: OASIS BrainMR original sorted `pair_test_200.txt` row `0`,
+  fixed/moving `(0004, 0236)`.
+- Methods: IDIR original, SINR cps4, SINR cps2, DirectCP cps4.
+- Grid: IDIR alpha `0.01,0.1,1`; spline alpha `100,1000,10000`; 1000 epochs.
+- Docker: `py310sitreg_v1_test1`, image `hengjieliu96/dl_dir:py310sitreg_v1`.
+- Output root: `/database/inrorspline/runs/oasis_sorted_case0_prerun_be_1000e_v1`.
+- Review root: `experiments/2026-06-25_oasis_sorted_case0_prerun/`.
+- Actual launcher elapsed: 504.5 seconds; large output size: 1.1 GB; review
+  artifact size: 4.6 MB.
+- Notes: native analytic regularity means IDIR coordinate-autograd Hessian BE
+  and Jacobian diffusion; spline methods use cubic B-spline analytic BE and
+  diffusion.
+- Next decision: compare original sorted case-0 and seed-3 shuffled case-0
+  curves before choosing first10 full-run alpha ranges.
+
 ### P2: OASIS Seed-3 First10 Deformation-Regime Stats
 
 - Status: planned.

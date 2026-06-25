@@ -1,0 +1,1378 @@
+#!/usr/bin/env python
+"""Shared utilities for repo-local OASIS alpha sweeps."""
+
+from __future__ import annotations
+
+import csv
+import json
+import math
+import os
+import re
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+
+import nibabel as nib
+import numpy as np
+import scipy.ndimage
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+try:
+    from surface_distance import metrics as surface_distance_metrics
+except Exception:  # pragma: no cover - dependency is checked at runtime.
+    surface_distance_metrics = None
+
+
+THIS_DIR = Path(__file__).resolve().parent
+REPO_ROOT = THIS_DIR.parents[2]
+
+DEFAULT_OASIS_ROOT = Path(
+    os.environ.get(
+        "INRORSPLINE_OASIS_ROOT",
+        os.environ.get(
+            "OASIS_ROOT",
+            "/database/wavereg/datasets/OASIS/OASIS_official/oasis_organized/split_v1",
+        ),
+    )
+)
+DEFAULT_PAIR_FILE = REPO_ROOT / "configs/splits/oasis/pair_test_200_shuffled_seed000003.txt"
+DEFAULT_RUN_ROOT = Path("/database/inrorspline/runs/oasis_seed3_case0_prerun_be_1000e_v1")
+DEFAULT_REVIEW_ROOT = REPO_ROOT / "experiments/2026-06-25_oasis_seed3_case0_prerun"
+
+IMAGE_SHAPE: Tuple[int, int, int] = (160, 224, 192)
+OASIS_LABELS = list(range(1, 36))
+
+
+@dataclass(frozen=True)
+class CaseInfo:
+    rank: int
+    original_case_index: int
+    fixed_id: str
+    moving_id: str
+    pair_file: str
+    sorted_pair_file: str
+
+
+def format_float(value: float) -> str:
+    return f"{value:g}".replace(".", "p").replace("-", "m").replace("+", "")
+
+
+def now_text() -> str:
+    return time.strftime("%Y-%m-%d %H:%M:%S %z")
+
+
+def write_json(path: Path, payload: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, allow_nan=True, default=str) + "\n")
+
+
+def read_json(path: Path) -> object:
+    return json.loads(path.read_text())
+
+
+def write_csv(path: Path, rows: Iterable[Dict[str, object]]) -> None:
+    rows = list(rows)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not rows:
+        path.write_text("")
+        return
+    fieldnames: List[str] = []
+    for row in rows:
+        for key, value in row.items():
+            if key not in fieldnames and not isinstance(value, (list, dict)):
+                fieldnames.append(key)
+    with path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({key: row.get(key, "") for key in fieldnames})
+
+
+def read_csv(path: Path) -> List[Dict[str, str]]:
+    with path.open(newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def parse_pair_file(path: Path) -> List[Tuple[str, str]]:
+    pairs: List[Tuple[str, str]] = []
+    pattern = re.compile(r"\((\d+)\s*,\s*(\d+)\)")
+    for line in path.read_text().splitlines():
+        match = pattern.search(line)
+        if match:
+            pairs.append((match.group(1), match.group(2)))
+    if not pairs:
+        raise ValueError(f"No pairs found in {path}")
+    return pairs
+
+
+def resolve_case(
+    *,
+    rank: int,
+    pair_file: Path = DEFAULT_PAIR_FILE,
+    oasis_root: Path = DEFAULT_OASIS_ROOT,
+) -> CaseInfo:
+    pair_file = Path(pair_file)
+    pairs = parse_pair_file(pair_file)
+    if rank < 0 or rank >= len(pairs):
+        raise IndexError(f"Case rank {rank} outside pair file length {len(pairs)}")
+    fixed_id, moving_id = pairs[rank]
+    sorted_pair_file = Path(oasis_root) / "pair_test_200.txt"
+    sorted_pairs = parse_pair_file(sorted_pair_file)
+    try:
+        original_index = sorted_pairs.index((fixed_id, moving_id))
+    except ValueError as exc:
+        raise ValueError(
+            f"Pair ({fixed_id}, {moving_id}) from {pair_file} is absent from {sorted_pair_file}"
+        ) from exc
+    return CaseInfo(
+        rank=int(rank),
+        original_case_index=int(original_index),
+        fixed_id=fixed_id,
+        moving_id=moving_id,
+        pair_file=str(pair_file),
+        sorted_pair_file=str(sorted_pair_file),
+    )
+
+
+def reorient_lia_to_ras(array: np.ndarray) -> np.ndarray:
+    """Match the legacy OASIS loader orientation used by prior task9 runs."""
+
+    out = np.transpose(array, [0, 2, 1])
+    out = np.flip(out, 0)
+    out = np.flip(out, 2)
+    return np.ascontiguousarray(out)
+
+
+def load_nifti_reoriented(path: Path, *, dtype: np.dtype) -> np.ndarray:
+    arr = np.asarray(nib.load(str(path)).get_fdata(dtype=np.float32))
+    arr = reorient_lia_to_ras(arr)
+    return np.ascontiguousarray(arr.astype(dtype, copy=False))
+
+
+def pair_minmax_normalize(moving: np.ndarray, fixed: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    lo = float(min(np.nanmin(moving), np.nanmin(fixed)))
+    hi = float(max(np.nanmax(moving), np.nanmax(fixed)))
+    denom = hi - lo + 1e-12
+    return ((moving - lo) / denom).astype(np.float32), ((fixed - lo) / denom).astype(np.float32)
+
+
+def load_oasis_case(
+    *,
+    rank: int,
+    device: torch.device,
+    oasis_root: Path = DEFAULT_OASIS_ROOT,
+    pair_file: Path = DEFAULT_PAIR_FILE,
+) -> Dict[str, torch.Tensor | str | int | Dict[str, object]]:
+    case = resolve_case(rank=rank, pair_file=pair_file, oasis_root=oasis_root)
+    test_root = Path(oasis_root) / "test"
+    fixed_raw = load_nifti_reoriented(test_root / f"img{case.fixed_id}.nii.gz", dtype=np.float32)
+    moving_raw = load_nifti_reoriented(test_root / f"img{case.moving_id}.nii.gz", dtype=np.float32)
+    fixed_seg = load_nifti_reoriented(test_root / f"seg{case.fixed_id}.nii.gz", dtype=np.float32).astype(np.int16)
+    moving_seg = load_nifti_reoriented(test_root / f"seg{case.moving_id}.nii.gz", dtype=np.float32).astype(np.int16)
+    if fixed_raw.shape != IMAGE_SHAPE:
+        raise ValueError(f"Unexpected OASIS shape after reorientation: {fixed_raw.shape}, expected {IMAGE_SHAPE}")
+    moving, fixed = pair_minmax_normalize(moving_raw, fixed_raw)
+    fixed_image_mask = fixed_raw > 0
+    moving_image_mask = moving_raw > 0
+    fixed_seg_mask = fixed_seg > 0
+    mask_audit = {
+        "fixed_image_positive_voxels": int(fixed_image_mask.sum()),
+        "moving_image_positive_voxels": int(moving_image_mask.sum()),
+        "fixed_seg_positive_voxels": int(fixed_seg_mask.sum()),
+        "fixed_image_positive_fraction": float(fixed_image_mask.mean()),
+        "fixed_seg_positive_fraction": float(fixed_seg_mask.mean()),
+        "fixed_image_positive_minus_seg_positive_voxels": int(fixed_image_mask.sum() - fixed_seg_mask.sum()),
+        "foreground_rule": "fixed raw image > 0",
+        "segmentation_mask_role": "label metrics only",
+    }
+    return {
+        "moving": torch.from_numpy(moving).to(device=device, dtype=torch.float32),
+        "fixed": torch.from_numpy(fixed).to(device=device, dtype=torch.float32),
+        "moving_seg": torch.from_numpy(moving_seg.astype(np.float32)).to(device=device),
+        "fixed_seg": torch.from_numpy(fixed_seg.astype(np.float32)).to(device=device),
+        "moving_image_mask": torch.from_numpy(moving_image_mask.astype(np.float32)).to(device=device),
+        "fixed_image_mask": torch.from_numpy(fixed_image_mask.astype(np.float32)).to(device=device),
+        "fixed_seg_mask": torch.from_numpy(fixed_seg_mask.astype(np.float32)).to(device=device),
+        "fixed_mask": torch.from_numpy(fixed_image_mask.astype(np.float32)).to(device=device),
+        "moving_id": case.moving_id,
+        "fixed_id": case.fixed_id,
+        "case_rank": case.rank,
+        "original_case_index": case.original_case_index,
+        "pair_file": case.pair_file,
+        "sorted_pair_file": case.sorted_pair_file,
+        "mask_audit": mask_audit,
+    }
+
+
+def set_cuda_device(gpu: str) -> torch.device:
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
+    torch.backends.cudnn.deterministic = False
+    torch.backends.cudnn.benchmark = True
+    if not torch.cuda.is_available():
+        raise RuntimeError("CUDA is required for this runner.")
+    torch.cuda.set_device(0)
+    return torch.device("cuda")
+
+
+def make_coordinate_tensor(shape: Tuple[int, int, int], device: torch.device) -> torch.Tensor:
+    vectors = [torch.linspace(-1.0, 1.0, int(s), device=device) for s in shape]
+    grid = torch.meshgrid(*vectors, indexing="ij")
+    stacked = torch.stack((grid[2], grid[1], grid[0]), dim=-1)
+    return stacked.reshape(-1, 3)
+
+
+def make_coordinate_grid(shape: Tuple[int, int, int], device: torch.device) -> torch.Tensor:
+    return make_coordinate_tensor(shape, device).reshape(*shape, 3)
+
+
+def sample_volume(volume: torch.Tensor, coords: torch.Tensor, mode: str = "bilinear") -> torch.Tensor:
+    sampled = F.grid_sample(
+        volume[None, None],
+        coords[None, None, None],
+        mode=mode,
+        align_corners=True,
+    )
+    return sampled.squeeze()
+
+
+def warp_full(volume: torch.Tensor, dense_coords: torch.Tensor, mode: str = "bilinear") -> torch.Tensor:
+    warped = F.grid_sample(
+        volume[None, None],
+        dense_coords[None],
+        mode=mode,
+        align_corners=True,
+    )
+    return warped.squeeze()
+
+
+class StableStd(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, tensor: torch.Tensor) -> torch.Tensor:
+        ctx.tensor = tensor.detach()
+        result = torch.std(tensor).detach()
+        ctx.result = result.detach()
+        return result
+
+    @staticmethod
+    def backward(ctx, grad_output: torch.Tensor) -> Tuple[torch.Tensor]:
+        tensor = ctx.tensor.detach()
+        result = ctx.result.detach()
+        eps = 1e-6
+        grad = (
+            (2.0 / (tensor.numel() - 1.0))
+            * (grad_output.detach() / (result.detach() * 2 + eps))
+            * (tensor.detach() - tensor.mean().detach())
+        )
+        return (grad,)
+
+
+def ncc_loss(x1: torch.Tensor, x2: torch.Tensor, eps: float = 1e-10) -> torch.Tensor:
+    if x1.shape != x2.shape:
+        raise ValueError(f"NCC shape mismatch: {tuple(x1.shape)} vs {tuple(x2.shape)}")
+    cc = ((x1 - x1.mean()) * (x2 - x2.mean())).mean()
+    std = StableStd.apply(x1) * StableStd.apply(x2)
+    return -(cc / (std + eps)).mean()
+
+
+def coordinate_gradient(
+    input_coords: torch.Tensor,
+    output: torch.Tensor,
+    *,
+    create_graph: bool = True,
+) -> torch.Tensor:
+    return torch.autograd.grad(
+        output,
+        [input_coords],
+        grad_outputs=torch.ones_like(output),
+        create_graph=create_graph,
+        retain_graph=True,
+        only_inputs=True,
+    )[0]
+
+
+def voxel_scale_xyz(device: torch.device, dtype: torch.dtype) -> torch.Tensor:
+    d, h, w = IMAGE_SHAPE
+    return torch.tensor([(w - 1) / 2.0, (h - 1) / 2.0, (d - 1) / 2.0], dtype=dtype, device=device)
+
+
+class Siren(nn.Module):
+    def __init__(self, layers: Sequence[int], *, omega: float = 30.0, weight_init: bool = True):
+        super().__init__()
+        self.omega = float(omega)
+        modules: List[nn.Module] = []
+        for i in range(len(layers) - 1):
+            layer = nn.Linear(int(layers[i]), int(layers[i + 1]))
+            if weight_init:
+                with torch.no_grad():
+                    if i == 0:
+                        layer.weight.uniform_(-1.0 / layers[i], 1.0 / layers[i])
+                    else:
+                        bound = math.sqrt(6.0 / layers[i]) / self.omega
+                        layer.weight.uniform_(-bound, bound)
+            modules.append(layer)
+        self.layers = nn.Sequential(*modules)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        for layer in self.layers[:-1]:
+            x = torch.sin(self.omega * layer(x))
+        return self.layers[-1](x)
+
+
+class DirectCPGenerator(nn.Module):
+    def __init__(self, control_shape: Tuple[int, int, int]):
+        super().__init__()
+        self.delta = nn.Parameter(torch.zeros(*control_shape, 3))
+
+    def forward(self, coords: torch.Tensor, control_shape: Tuple[int, int, int]) -> torch.Tensor:
+        del coords, control_shape
+        return self.delta.reshape(-1, 3)
+
+
+class NetworkGenerator(nn.Module):
+    def __init__(self, model: nn.Module):
+        super().__init__()
+        self.model = model
+
+    def forward(self, coords: torch.Tensor, control_shape: Tuple[int, int, int]) -> torch.Tensor:
+        del control_shape
+        return self.model(coords)
+
+
+def build_siren(hidden_dim: int, hidden_layers: int, omega: float, input_dim: int = 3) -> Siren:
+    layers = [int(input_dim)] + [int(hidden_dim)] * int(hidden_layers) + [3]
+    return Siren(layers, omega=float(omega), weight_init=True)
+
+
+def cubic_bspline_value(x: float, derivative: int = 0) -> float:
+    t = abs(float(x))
+    if derivative == 0:
+        if t < 1:
+            return (2.0 / 3.0) + 0.5 * t**3 - t**2
+        if t < 2:
+            return ((2 - t) ** 3) / 6.0
+        return 0.0
+    if derivative == 1:
+        if t < 1:
+            return (1.5 * t - 2.0) * x
+        if x < 0:
+            return 0.5 * (t - 2) ** 2
+        return -0.5 * (t - 2) ** 2
+    if derivative == 2:
+        if t < 1:
+            return 3.0 * t - 2.0
+        if t < 2:
+            return -t + 2.0
+        return 0.0
+    raise ValueError(f"Unsupported derivative: {derivative}")
+
+
+def cubic_bspline1d(stride: int, derivative: int = 0, dtype=None, device=None) -> torch.Tensor:
+    if dtype is None:
+        dtype = torch.float32
+    kernel = torch.ones(4 * int(stride) - 1, dtype=dtype)
+    radius = kernel.shape[0] // 2
+    for i in range(kernel.shape[0]):
+        kernel[i] = cubic_bspline_value((i - radius) / float(stride), derivative=derivative)
+    return kernel.to(device=device)
+
+
+def conv1d(
+    data: torch.Tensor,
+    *,
+    kernel: torch.Tensor,
+    dim: int,
+    stride: int = 1,
+    dilation: int = 1,
+    padding: int = 0,
+    transpose: bool = False,
+) -> torch.Tensor:
+    result = data.type(kernel.dtype)
+    result = result.transpose(dim, -1)
+    shape = result.size()
+    groups = int(np.prod(shape[1:-1]))
+    weight = kernel.expand(groups, 1, kernel.shape[-1])
+    result = result.reshape(shape[0], groups, shape[-1])
+    conv_fn = F.conv_transpose1d if transpose else F.conv1d
+    result = conv_fn(
+        result,
+        weight,
+        stride=stride,
+        dilation=dilation,
+        padding=padding,
+        groups=groups,
+    )
+    result = result.reshape(shape[0:-1] + result.shape[-1:])
+    return result.transpose(-1, dim)
+
+
+def bspline_control_shape(image_shape: Tuple[int, int, int], cps: int) -> Tuple[int, int, int]:
+    kernel_len = 4 * int(cps) - 1
+    pad = (kernel_len - 1) // 2
+    padded_shape = tuple(int(s) + 2 * pad for s in image_shape)
+    start = int(cps) // 2
+    return tuple(len(torch.arange(start, s, step=int(cps))) for s in padded_shape)
+
+
+def bspline_control_coords(
+    image_shape: Tuple[int, int, int],
+    cps: int,
+    device: torch.device,
+) -> Tuple[torch.Tensor, Tuple[int, int, int]]:
+    kernel_len = 4 * int(cps) - 1
+    pad = (kernel_len - 1) // 2
+    padded_shape = tuple(int(s) + 2 * pad for s in image_shape)
+    start = int(cps) // 2
+    full_coords = make_coordinate_grid(padded_shape, device)
+    indices = [torch.arange(start, s, step=int(cps), device=device) for s in padded_shape]
+    control_grid = full_coords[indices[0]][:, indices[1]][:, :, indices[2]]
+    control_shape = tuple(int(v) for v in control_grid.shape[:3])
+    return control_grid.reshape(-1, 3), control_shape
+
+
+def expand_bspline_controls(
+    control_values: torch.Tensor,
+    control_shape: Tuple[int, int, int],
+    image_shape: Tuple[int, int, int],
+    cps: int,
+) -> torch.Tensor:
+    field = control_values.reshape(*control_shape, 3).permute(3, 0, 1, 2).unsqueeze(0)
+    for dim in range(3):
+        kernel = cubic_bspline1d(cps, derivative=0, dtype=field.dtype, device=field.device)
+        padding = (kernel.shape[0] - 1) // 2
+        field = conv1d(
+            field,
+            dim=dim + 2,
+            kernel=kernel,
+            stride=int(cps),
+            padding=padding,
+            transpose=True,
+        )
+    slicer = (slice(None), slice(None)) + tuple(slice(cps, cps + image_shape[i]) for i in range(3))
+    field = field[slicer]
+    return field.squeeze(0).permute(1, 2, 3, 0).contiguous()
+
+
+def as_tensor(x: torch.Tensor | np.ndarray, *, device: Optional[torch.device] = None) -> torch.Tensor:
+    if isinstance(x, torch.Tensor):
+        return x.to(device=device) if device is not None else x
+    return torch.as_tensor(x, dtype=torch.float32, device=device)
+
+
+def dhw3_to_ncdhw(disp_dhw3: torch.Tensor | np.ndarray, *, device: Optional[torch.device] = None) -> torch.Tensor:
+    disp = as_tensor(disp_dhw3, device=device).float()
+    if disp.ndim != 4 or disp.shape[-1] != 3:
+        raise ValueError(f"Expected [D,H,W,3], got {tuple(disp.shape)}")
+    return disp.permute(3, 0, 1, 2).unsqueeze(0).contiguous()
+
+
+def mask_to_dhw(mask: torch.Tensor | np.ndarray, *, device: Optional[torch.device] = None) -> torch.Tensor:
+    mask_t = as_tensor(mask, device=device).bool()
+    if mask_t.ndim != 3:
+        raise ValueError(f"Expected [D,H,W] mask, got {tuple(mask_t.shape)}")
+    return mask_t
+
+
+def norm_grid_dhw3_to_voxel_dhw3(
+    disp_norm: torch.Tensor | np.ndarray,
+    image_shape: Optional[Tuple[int, int, int]] = None,
+) -> torch.Tensor:
+    disp = as_tensor(disp_norm).float()
+    if image_shape is None:
+        d, h, w = (int(v) for v in disp.shape[:3])
+    else:
+        d, h, w = (int(v) for v in image_shape)
+    factors = torch.tensor(
+        [(w - 1) / 2.0, (h - 1) / 2.0, (d - 1) / 2.0],
+        dtype=disp.dtype,
+        device=disp.device,
+    )
+    return disp * factors.view(1, 1, 1, 3)
+
+
+def _finite_diff_neumann(x: torch.Tensor, dim: int) -> torch.Tensor:
+    ndim = x.ndim - 2
+    sizes = x.shape[2:]
+    paddings = [[0, 0] for _ in range(ndim)]
+    paddings[dim][1] = 1
+    paddings.reverse()
+    flat_pads = [p for pair in paddings for p in pair]
+    x_pad = F.pad(x, flat_pads, mode="replicate")
+    index_next = torch.arange(1, sizes[dim] + 1, device=x.device)
+    index_here = torch.arange(0, sizes[dim], device=x.device)
+    return x_pad.index_select(dim + 2, index_next) - x_pad.index_select(dim + 2, index_here)
+
+
+def _density_from_terms(
+    terms: Sequence[Tuple[torch.Tensor, float]],
+    component_reduction: str,
+) -> torch.Tensor:
+    density: Optional[torch.Tensor] = None
+    for term, weight in terms:
+        sq = float(weight) * term.square()
+        reduced = sq.sum(dim=1) if component_reduction == "sum" else sq.mean(dim=1)
+        density = reduced if density is None else density + reduced
+    if density is None:
+        raise ValueError("No regularity terms were provided")
+    return density
+
+
+def _masked_density_mean(density: torch.Tensor, mask: Optional[torch.Tensor]) -> torch.Tensor:
+    if mask is None:
+        return density.mean()
+    mask_t = mask.to(device=density.device).bool()
+    selected = density[..., mask_t]
+    if selected.numel() == 0:
+        return torch.as_tensor(float("nan"), dtype=density.dtype, device=density.device)
+    return selected.mean()
+
+
+def _term_mean(term: torch.Tensor, mask: Optional[torch.Tensor], component_reduction: str = "mean") -> torch.Tensor:
+    if component_reduction == "sum":
+        density = term.square().sum(dim=1)
+        return _masked_density_mean(density, mask)
+    if mask is None:
+        return term.square().mean()
+    mask_t = mask.to(device=term.device).bool()
+    selected = term.square()[..., mask_t]
+    if selected.numel() == 0:
+        return torch.as_tensor(float("nan"), dtype=term.dtype, device=term.device)
+    return selected.mean()
+
+
+def forward_valid_be(
+    disp_ncdhw: torch.Tensor,
+    mask: Optional[torch.Tensor | np.ndarray] = None,
+    *,
+    component_reduction: str = "mean",
+) -> torch.Tensor:
+    disp = disp_ncdhw.float()
+    dz = disp[:, :, 1:, :, :] - disp[:, :, :-1, :, :]
+    dy = disp[:, :, :, 1:, :] - disp[:, :, :, :-1, :]
+    dx = disp[:, :, :, :, 1:] - disp[:, :, :, :, :-1]
+    terms = [
+        (dz[:, :, 1:, :, :] - dz[:, :, :-1, :, :], 1.0, "dzz"),
+        (dy[:, :, :, 1:, :] - dy[:, :, :, :-1, :], 1.0, "dyy"),
+        (dx[:, :, :, :, 1:] - dx[:, :, :, :, :-1], 1.0, "dxx"),
+        (dz[:, :, :, 1:, :] - dz[:, :, :, :-1, :], 2.0, "dzy"),
+        (dz[:, :, :, :, 1:] - dz[:, :, :, :, :-1], 2.0, "dzx"),
+        (dy[:, :, :, :, 1:] - dy[:, :, :, :, :-1], 2.0, "dyx"),
+    ]
+    if mask is None:
+        masks = {name: None for _, _, name in terms}
+    else:
+        m = mask_to_dhw(mask, device=disp.device)
+        masks = {
+            "dzz": m[2:, :, :] & m[1:-1, :, :] & m[:-2, :, :],
+            "dyy": m[:, 2:, :] & m[:, 1:-1, :] & m[:, :-2, :],
+            "dxx": m[:, :, 2:] & m[:, :, 1:-1] & m[:, :, :-2],
+            "dzy": m[1:, 1:, :] & m[:-1, 1:, :] & m[1:, :-1, :] & m[:-1, :-1, :],
+            "dzx": m[1:, :, 1:] & m[:-1, :, 1:] & m[1:, :, :-1] & m[:-1, :, :-1],
+            "dyx": m[:, 1:, 1:] & m[:, :-1, 1:] & m[:, 1:, :-1] & m[:, :-1, :-1],
+        }
+    total = torch.zeros((), dtype=disp.dtype, device=disp.device)
+    for term, weight, name in terms:
+        total = total + float(weight) * _term_mean(term, masks[name], component_reduction)
+    return total
+
+
+def forward_valid_diffusion(
+    disp_ncdhw: torch.Tensor,
+    mask: Optional[torch.Tensor | np.ndarray] = None,
+) -> torch.Tensor:
+    disp = disp_ncdhw.float()
+    dz = disp[:, :, 1:, :, :] - disp[:, :, :-1, :, :]
+    dy = disp[:, :, :, 1:, :] - disp[:, :, :, :-1, :]
+    dx = disp[:, :, :, :, 1:] - disp[:, :, :, :, :-1]
+    if mask is None:
+        return (dz.square().mean() + dy.square().mean() + dx.square().mean()) / 3.0
+    m = mask_to_dhw(mask, device=disp.device)
+    mz = m[1:, :, :] & m[:-1, :, :]
+    my = m[:, 1:, :] & m[:, :-1, :]
+    mx = m[:, :, 1:] & m[:, :, :-1]
+    return (_term_mean(dz, mz) + _term_mean(dy, my) + _term_mean(dx, mx)) / 3.0
+
+
+def expand_cubic_bspline_derivative(
+    control_disp_dhw3: torch.Tensor | np.ndarray,
+    image_shape: Tuple[int, int, int],
+    cps: int,
+    derivative_orders: Sequence[int],
+) -> torch.Tensor:
+    field = dhw3_to_ncdhw(control_disp_dhw3).float()
+    for dim, order in enumerate(derivative_orders):
+        kernel = cubic_bspline1d(cps, derivative=int(order), dtype=field.dtype, device=field.device)
+        if order:
+            kernel = kernel * (1.0 / float(cps)) ** int(order)
+        padding = (kernel.shape[0] - 1) // 2
+        field = conv1d(
+            field,
+            dim=dim + 2,
+            kernel=kernel,
+            stride=int(cps),
+            padding=padding,
+            transpose=True,
+        )
+    slicer = (slice(None), slice(None)) + tuple(slice(cps, cps + int(image_shape[i])) for i in range(3))
+    return field[slicer].contiguous()
+
+
+def analytic_bspline_sampled_be(
+    control_disp_dhw3: torch.Tensor | np.ndarray,
+    image_shape: Tuple[int, int, int],
+    cps: int,
+    mask: Optional[torch.Tensor | np.ndarray] = None,
+    *,
+    component_reduction: str = "mean",
+) -> torch.Tensor:
+    terms = [
+        (expand_cubic_bspline_derivative(control_disp_dhw3, image_shape, cps, (2, 0, 0)), 1.0),
+        (expand_cubic_bspline_derivative(control_disp_dhw3, image_shape, cps, (0, 2, 0)), 1.0),
+        (expand_cubic_bspline_derivative(control_disp_dhw3, image_shape, cps, (0, 0, 2)), 1.0),
+        (expand_cubic_bspline_derivative(control_disp_dhw3, image_shape, cps, (1, 1, 0)), 2.0),
+        (expand_cubic_bspline_derivative(control_disp_dhw3, image_shape, cps, (1, 0, 1)), 2.0),
+        (expand_cubic_bspline_derivative(control_disp_dhw3, image_shape, cps, (0, 1, 1)), 2.0),
+    ]
+    density = _density_from_terms(terms, component_reduction=component_reduction)
+    mask_t = None if mask is None else mask_to_dhw(mask, device=density.device)
+    return _masked_density_mean(density, mask_t)
+
+
+def analytic_bspline_sampled_diffusion(
+    control_disp_dhw3: torch.Tensor | np.ndarray,
+    image_shape: Tuple[int, int, int],
+    cps: int,
+    mask: Optional[torch.Tensor | np.ndarray] = None,
+) -> torch.Tensor:
+    terms = [
+        expand_cubic_bspline_derivative(control_disp_dhw3, image_shape, cps, (1, 0, 0)),
+        expand_cubic_bspline_derivative(control_disp_dhw3, image_shape, cps, (0, 1, 0)),
+        expand_cubic_bspline_derivative(control_disp_dhw3, image_shape, cps, (0, 0, 1)),
+    ]
+    density = sum(term.square().mean(dim=1) for term in terms) / 3.0
+    mask_t = None if mask is None else mask_to_dhw(mask, device=density.device)
+    return _masked_density_mean(density, mask_t)
+
+
+def be_rows_to_columns(rows: Sequence[Dict[str, object]]) -> Dict[str, float]:
+    formula_map = {
+        "forward_valid": "be_fd_forward",
+        "analytic_bspline_sampled": "be_bspline_analytic",
+    }
+    out: Dict[str, float] = {}
+    for row in rows:
+        formula = str(row.get("formula"))
+        if formula not in formula_map:
+            continue
+        if str(row.get("component_reduction")) != "mean":
+            continue
+        key = f"{formula_map[formula]}_{row['region']}_{row['unit']}"
+        out[key] = float(row["value"])
+    return out
+
+
+def diffusion_rows_to_columns(rows: Sequence[Dict[str, object]]) -> Dict[str, float]:
+    formula_map = {
+        "forward_valid": "diffusion_fd_forward",
+        "analytic_bspline_sampled": "diffusion_bspline_analytic",
+        "idir_autograd": "diffusion_idir_autograd",
+    }
+    out: Dict[str, float] = {}
+    for row in rows:
+        formula = str(row.get("formula"))
+        if formula not in formula_map:
+            continue
+        if str(row.get("component_reduction")) != "mean":
+            continue
+        key = f"{formula_map[formula]}_{row['region']}_{row['unit']}"
+        out[key] = float(row["value"])
+    return out
+
+
+def add_native_analytic_columns(
+    reg: Dict[str, object],
+    *,
+    prefix: str,
+    sources: Sequence[str],
+) -> None:
+    for region in ("full", "fixed_fg"):
+        for unit in ("voxel", "normalized_grid"):
+            native_key = f"{prefix}_native_analytic_{region}_{unit}"
+            for source in sources:
+                source_key = f"{source}_{region}_{unit}"
+                if source_key in reg:
+                    reg[native_key] = reg[source_key]
+                    break
+
+
+def add_native_analytic_be_columns(reg: Dict[str, object]) -> None:
+    add_native_analytic_columns(reg, prefix="be", sources=("be_idir_autograd", "be_bspline_analytic"))
+
+
+def add_native_analytic_diffusion_columns(reg: Dict[str, object]) -> None:
+    add_native_analytic_columns(
+        reg,
+        prefix="diffusion",
+        sources=("diffusion_idir_autograd", "diffusion_bspline_analytic"),
+    )
+
+
+def idir_autograd_be_density(
+    model: nn.Module,
+    coords: torch.Tensor,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    coords = coords.detach().requires_grad_(True)
+    output = model(coords)
+    scale = voxel_scale_xyz(output.device, output.dtype)
+    norm_density = output.new_zeros(coords.shape[0])
+    voxel_density = output.new_zeros(coords.shape[0])
+    term_specs = [
+        (0, 0, 1.0),
+        (1, 1, 1.0),
+        (2, 2, 1.0),
+        (0, 1, 2.0),
+        (0, 2, 2.0),
+        (1, 2, 2.0),
+    ]
+    for component in range(3):
+        grad_c = coordinate_gradient(coords, output[:, component], create_graph=True)
+        second_by_first_axis = [
+            coordinate_gradient(coords, grad_c[:, axis], create_graph=False) for axis in range(3)
+        ]
+        for first_axis, second_axis, weight in term_specs:
+            second_norm = second_by_first_axis[first_axis][:, second_axis]
+            factor = scale[component] / (scale[first_axis] * scale[second_axis])
+            norm_density = norm_density + float(weight) * second_norm.square()
+            voxel_density = voxel_density + float(weight) * (second_norm * factor).square()
+    return norm_density / 3.0, voxel_density / 3.0
+
+
+def idir_autograd_diffusion_density(
+    model: nn.Module,
+    coords: torch.Tensor,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    coords = coords.detach().requires_grad_(True)
+    output = model(coords)
+    scale = voxel_scale_xyz(output.device, output.dtype)
+    norm_density = output.new_zeros(coords.shape[0])
+    voxel_density = output.new_zeros(coords.shape[0])
+    for component in range(3):
+        grad_c = coordinate_gradient(coords, output[:, component], create_graph=False)
+        for axis in range(3):
+            factor = scale[component] / scale[axis]
+            norm_density = norm_density + grad_c[:, axis].square()
+            voxel_density = voxel_density + (grad_c[:, axis] * factor).square()
+    return norm_density / 9.0, voxel_density / 9.0
+
+
+def idir_autograd_be_metric_rows(
+    model: nn.Module,
+    fixed_mask: torch.Tensor,
+    device: torch.device,
+    chunk_size: int,
+) -> List[Dict[str, object]]:
+    chunk_size = max(1, int(chunk_size))
+    old_states = [param.requires_grad for param in model.parameters()]
+    for param in model.parameters():
+        param.requires_grad_(False)
+    model.eval()
+    coords_all = make_coordinate_tensor(IMAGE_SHAPE, device)
+    mask_flat = fixed_mask.detach().reshape(-1).to(device=device).bool()
+    sums = {
+        "normalized_grid_full": 0.0,
+        "normalized_grid_fixed_fg": 0.0,
+        "voxel_full": 0.0,
+        "voxel_fixed_fg": 0.0,
+    }
+    counts = {"full": 0, "fixed_fg": 0}
+    try:
+        for start in range(0, coords_all.shape[0], chunk_size):
+            stop = min(start + chunk_size, coords_all.shape[0])
+            norm_density, voxel_density = idir_autograd_be_density(model, coords_all[start:stop])
+            fg = mask_flat[start:stop]
+            sums["normalized_grid_full"] += float(norm_density.detach().double().sum().cpu())
+            sums["voxel_full"] += float(voxel_density.detach().double().sum().cpu())
+            counts["full"] += int(norm_density.numel())
+            if bool(fg.any()):
+                sums["normalized_grid_fixed_fg"] += float(norm_density[fg].detach().double().sum().cpu())
+                sums["voxel_fixed_fg"] += float(voxel_density[fg].detach().double().sum().cpu())
+                counts["fixed_fg"] += int(fg.sum().detach().cpu())
+            del norm_density, voxel_density
+    finally:
+        for param, requires_grad in zip(model.parameters(), old_states):
+            param.requires_grad_(requires_grad)
+
+    rows: List[Dict[str, object]] = []
+    for unit in ("normalized_grid", "voxel"):
+        for region in ("full", "fixed_fg"):
+            count = counts[region]
+            rows.append(
+                {
+                    "unit": unit,
+                    "formula": "idir_autograd",
+                    "region": region,
+                    "component_reduction": "mean",
+                    "value": sums[f"{unit}_{region}"] / count if count else float("nan"),
+                    "notes": "IDIR dense-SIREN coordinate-autograd Hessian BE sampled at all voxel centers.",
+                }
+            )
+    return rows
+
+
+def idir_autograd_diffusion_metric_rows(
+    model: nn.Module,
+    fixed_mask: torch.Tensor,
+    device: torch.device,
+    chunk_size: int,
+) -> List[Dict[str, object]]:
+    chunk_size = max(1, int(chunk_size))
+    old_states = [param.requires_grad for param in model.parameters()]
+    for param in model.parameters():
+        param.requires_grad_(False)
+    model.eval()
+    coords_all = make_coordinate_tensor(IMAGE_SHAPE, device)
+    mask_flat = fixed_mask.detach().reshape(-1).to(device=device).bool()
+    sums = {
+        "normalized_grid_full": 0.0,
+        "normalized_grid_fixed_fg": 0.0,
+        "voxel_full": 0.0,
+        "voxel_fixed_fg": 0.0,
+    }
+    counts = {"full": 0, "fixed_fg": 0}
+    try:
+        for start in range(0, coords_all.shape[0], chunk_size):
+            stop = min(start + chunk_size, coords_all.shape[0])
+            norm_density, voxel_density = idir_autograd_diffusion_density(model, coords_all[start:stop])
+            fg = mask_flat[start:stop]
+            sums["normalized_grid_full"] += float(norm_density.detach().double().sum().cpu())
+            sums["voxel_full"] += float(voxel_density.detach().double().sum().cpu())
+            counts["full"] += int(norm_density.numel())
+            if bool(fg.any()):
+                sums["normalized_grid_fixed_fg"] += float(norm_density[fg].detach().double().sum().cpu())
+                sums["voxel_fixed_fg"] += float(voxel_density[fg].detach().double().sum().cpu())
+                counts["fixed_fg"] += int(fg.sum().detach().cpu())
+            del norm_density, voxel_density
+    finally:
+        for param, requires_grad in zip(model.parameters(), old_states):
+            param.requires_grad_(requires_grad)
+
+    rows: List[Dict[str, object]] = []
+    for unit in ("normalized_grid", "voxel"):
+        for region in ("full", "fixed_fg"):
+            count = counts[region]
+            rows.append(
+                {
+                    "unit": unit,
+                    "formula": "idir_autograd",
+                    "region": region,
+                    "component_reduction": "mean",
+                    "value": sums[f"{unit}_{region}"] / count if count else float("nan"),
+                    "notes": "IDIR dense-SIREN coordinate-autograd Jacobian diffusion sampled at all voxel centers.",
+                }
+            )
+    return rows
+
+
+def idir_autograd_be_rows_to_columns(rows: Sequence[Dict[str, object]]) -> Dict[str, float]:
+    out: Dict[str, float] = {}
+    for row in rows:
+        if str(row.get("formula")) != "idir_autograd":
+            continue
+        if str(row.get("component_reduction")) != "mean":
+            continue
+        key = f"be_idir_autograd_{row['region']}_{row['unit']}"
+        out[key] = float(row["value"])
+    return out
+
+
+def idir_autograd_diffusion_rows_to_columns(rows: Sequence[Dict[str, object]]) -> Dict[str, float]:
+    out: Dict[str, float] = {}
+    for row in rows:
+        if str(row.get("formula")) != "idir_autograd":
+            continue
+        if str(row.get("component_reduction")) != "mean":
+            continue
+        key = f"diffusion_idir_autograd_{row['region']}_{row['unit']}"
+        out[key] = float(row["value"])
+    return out
+
+
+def compute_be_metric_rows(
+    dense_disp_norm_dhw3: torch.Tensor | np.ndarray,
+    fixed_mask: torch.Tensor | np.ndarray,
+    *,
+    control_disp_norm_dhw3: Optional[torch.Tensor | np.ndarray] = None,
+    image_shape: Tuple[int, int, int] = IMAGE_SHAPE,
+    cps: Optional[int] = None,
+) -> List[Dict[str, object]]:
+    disp_norm_ch = dhw3_to_ncdhw(dense_disp_norm_dhw3)
+    disp_vox_ch = dhw3_to_ncdhw(norm_grid_dhw3_to_voxel_dhw3(dense_disp_norm_dhw3, image_shape))
+    mask_t = mask_to_dhw(fixed_mask)
+    rows: List[Dict[str, object]] = []
+    for unit, disp_ch in [("normalized_grid", disp_norm_ch), ("voxel", disp_vox_ch)]:
+        for region, mask in [("full", None), ("fixed_fg", mask_t)]:
+            rows.append(
+                {
+                    "unit": unit,
+                    "formula": "forward_valid",
+                    "region": region,
+                    "component_reduction": "mean",
+                    "value": float(forward_valid_be(disp_ch, mask, component_reduction="mean").detach().cpu()),
+                    "notes": "Valid forward second differences.",
+                }
+            )
+    if control_disp_norm_dhw3 is not None:
+        if cps is None:
+            raise ValueError("cps is required for analytic B-spline BE")
+        control_norm = as_tensor(control_disp_norm_dhw3).float()
+        control_vox = norm_grid_dhw3_to_voxel_dhw3(control_norm, image_shape)
+        for unit, control in [("normalized_grid", control_norm), ("voxel", control_vox)]:
+            for region, mask in [("full", None), ("fixed_fg", mask_t)]:
+                rows.append(
+                    {
+                        "unit": unit,
+                        "formula": "analytic_bspline_sampled",
+                        "region": region,
+                        "component_reduction": "mean",
+                        "value": float(
+                            analytic_bspline_sampled_be(
+                                control,
+                                image_shape,
+                                cps,
+                                mask,
+                                component_reduction="mean",
+                            )
+                            .detach()
+                            .cpu()
+                        ),
+                        "notes": "Cubic B-spline second derivatives sampled at voxel centers.",
+                    }
+                )
+    return rows
+
+
+def compute_diffusion_metric_rows(
+    dense_disp_norm_dhw3: torch.Tensor | np.ndarray,
+    fixed_mask: torch.Tensor | np.ndarray,
+    *,
+    control_disp_norm_dhw3: Optional[torch.Tensor | np.ndarray] = None,
+    image_shape: Tuple[int, int, int] = IMAGE_SHAPE,
+    cps: Optional[int] = None,
+) -> List[Dict[str, object]]:
+    disp_norm_ch = dhw3_to_ncdhw(dense_disp_norm_dhw3)
+    disp_vox_ch = dhw3_to_ncdhw(norm_grid_dhw3_to_voxel_dhw3(dense_disp_norm_dhw3, image_shape))
+    mask_t = mask_to_dhw(fixed_mask)
+    rows: List[Dict[str, object]] = []
+    for unit, disp_ch in [("normalized_grid", disp_norm_ch), ("voxel", disp_vox_ch)]:
+        for region, mask in [("full", None), ("fixed_fg", mask_t)]:
+            rows.append(
+                {
+                    "unit": unit,
+                    "formula": "forward_valid",
+                    "region": region,
+                    "component_reduction": "mean",
+                    "value": float(forward_valid_diffusion(disp_ch, mask).detach().cpu()),
+                    "notes": "Valid forward first differences.",
+                }
+            )
+    if control_disp_norm_dhw3 is not None:
+        if cps is None:
+            raise ValueError("cps is required for analytic B-spline diffusion")
+        control_norm = as_tensor(control_disp_norm_dhw3).float()
+        control_vox = norm_grid_dhw3_to_voxel_dhw3(control_norm, image_shape)
+        for unit, control in [("normalized_grid", control_norm), ("voxel", control_vox)]:
+            for region, mask in [("full", None), ("fixed_fg", mask_t)]:
+                rows.append(
+                    {
+                        "unit": unit,
+                        "formula": "analytic_bspline_sampled",
+                        "region": region,
+                        "component_reduction": "mean",
+                        "value": float(
+                            analytic_bspline_sampled_diffusion(control, image_shape, cps, mask).detach().cpu()
+                        ),
+                        "notes": "Cubic B-spline first derivatives sampled at voxel centers.",
+                    }
+                )
+    return rows
+
+
+def dhw3_norm_to_zyx_voxel_ncdhw(disp_norm_dhw3: torch.Tensor | np.ndarray) -> np.ndarray:
+    disp = np.asarray(as_tensor(disp_norm_dhw3).detach().cpu(), dtype=np.float32)
+    d, h, w, _ = disp.shape
+    out = np.empty((1, 3, d, h, w), dtype=np.float32)
+    out[0, 0] = disp[..., 2] * ((d - 1) / 2.0)
+    out[0, 1] = disp[..., 1] * ((h - 1) / 2.0)
+    out[0, 2] = disp[..., 0] * ((w - 1) / 2.0)
+    return out
+
+
+def generate_voxel_coordinate_grid(
+    shape: Sequence[int],
+    device: torch.device,
+    dtype: Optional[torch.dtype] = None,
+) -> torch.Tensor:
+    axes = [
+        torch.linspace(start=0, end=int(dim_size) - 1, steps=int(dim_size), device=device, dtype=dtype)
+        for dim_size in shape
+    ]
+    return torch.stack(torch.meshgrid(axes, indexing="ij"), dim=0)[None]
+
+
+def optional_add_tensor(addable_1: Optional[torch.Tensor], addable_2: Optional[torch.Tensor]) -> Optional[torch.Tensor]:
+    if addable_1 is None:
+        return addable_2
+    if addable_2 is None:
+        return addable_1
+    return addable_1 + addable_2
+
+
+def calculate_jacobian_determinants(ddf: torch.Tensor) -> Mapping[str, torch.Tensor]:
+    if ddf.size(1) != 3 or ddf.ndim != 5:
+        raise ValueError(
+            "Currently only supports 3D deformation fields. "
+            "The input shape must be (batch_size, 3, dim_1, dim_2, dim_3)."
+        )
+
+    trans = ddf + generate_voxel_coordinate_grid(ddf.shape[2:], dtype=ddf.dtype, device=ddf.device)
+    kwargs = {"dtype": trans.dtype, "device": trans.device}
+    kernels = {
+        "D0x": torch.tensor([-0.5, 0, 0.5], **kwargs).view(1, 1, 3, 1, 1),
+        "D+x": torch.tensor([0, -1, 1], **kwargs).view(1, 1, 3, 1, 1),
+        "D-x": torch.tensor([-1, 1, 0], **kwargs).view(1, 1, 3, 1, 1),
+        "D0y": torch.tensor([-0.5, 0, 0.5], **kwargs).view(1, 1, 1, 3, 1),
+        "D+y": torch.tensor([0, -1, 1], **kwargs).view(1, 1, 1, 3, 1),
+        "D-y": torch.tensor([-1, 1, 0], **kwargs).view(1, 1, 1, 3, 1),
+        "D0z": torch.tensor([-0.5, 0, 0.5], **kwargs).view(1, 1, 1, 1, 3),
+        "D+z": torch.tensor([0, -1, 1], **kwargs).view(1, 1, 1, 1, 3),
+        "D-z": torch.tensor([-1, 1, 0], **kwargs).view(1, 1, 1, 1, 3),
+        "1*xy": torch.tensor([[1, 0, 0], [0, -1, 0], [0, 0, 0]], **kwargs).reshape(1, 1, 3, 3, 1),
+        "1*xz": torch.tensor([[1, 0, 0], [0, -1, 0], [0, 0, 0]], **kwargs).reshape(1, 1, 3, 1, 3),
+        "1*yz": torch.tensor([[1, 0, 0], [0, -1, 0], [0, 0, 0]], **kwargs).reshape(1, 1, 1, 3, 3),
+        "2*xy": torch.tensor([[0, 0, 0], [0, -1, 0], [0, 0, 1]], **kwargs).reshape(1, 1, 3, 3, 1),
+        "2*xz": torch.tensor([[0, 0, 0], [0, -1, 0], [0, 0, 1]], **kwargs).reshape(1, 1, 3, 1, 3),
+        "2*yz": torch.tensor([[0, 0, 0], [0, -1, 0], [0, 0, 1]], **kwargs).reshape(1, 1, 1, 3, 3),
+    }
+    weights = {
+        "x": torch.cat([kernels[key] for key in ["D0x", "D+x", "D-x"]] * 3, dim=0),
+        "y": torch.cat([kernels[key] for key in ["D0y", "D+y", "D-y"]] * 3, dim=0),
+        "z": torch.cat([kernels[key] for key in ["D0z", "D+z", "D-z"]] * 3, dim=0),
+        "*xy": torch.cat([kernels[key] for key in ["1*xy", "2*xy"]] * 3, dim=0),
+        "*xz": torch.cat([kernels[key] for key in ["1*xz", "2*xz"]] * 3, dim=0),
+        "*yz": torch.cat([kernels[key] for key in ["1*yz", "2*yz"]] * 3, dim=0),
+    }
+    partials = {
+        "x": F.conv3d(trans, weights["x"], groups=3)[:, :, :, 1:-1, 1:-1],
+        "y": F.conv3d(trans, weights["y"], groups=3)[:, :, 1:-1, :, 1:-1],
+        "z": F.conv3d(trans, weights["z"], groups=3)[:, :, 1:-1, 1:-1, :],
+        "*xy": F.conv3d(trans, weights["*xy"], groups=3)[:, :, :, :, 1:-1],
+        "*xz": F.conv3d(trans, weights["*xz"], groups=3)[:, :, :, 1:-1, :],
+        "*yz": F.conv3d(trans, weights["*yz"], groups=3)[:, :, 1:-1, :, :],
+    }
+    jacobians = {
+        "000": torch.stack((partials["x"][:, ::3], partials["y"][:, ::3], partials["z"][:, ::3]), dim=-1).permute(0, 2, 3, 4, 1, 5),
+        "+++": torch.stack((partials["x"][:, 1::3], partials["y"][:, 1::3], partials["z"][:, 1::3]), dim=-1).permute(0, 2, 3, 4, 1, 5),
+        "++-": torch.stack((partials["x"][:, 1::3], partials["y"][:, 1::3], partials["z"][:, 2::3]), dim=-1).permute(0, 2, 3, 4, 1, 5),
+        "+-+": torch.stack((partials["x"][:, 1::3], partials["y"][:, 2::3], partials["z"][:, 1::3]), dim=-1).permute(0, 2, 3, 4, 1, 5),
+        "+--": torch.stack((partials["x"][:, 1::3], partials["y"][:, 2::3], partials["z"][:, 2::3]), dim=-1).permute(0, 2, 3, 4, 1, 5),
+        "-++": torch.stack((partials["x"][:, 2::3], partials["y"][:, 1::3], partials["z"][:, 1::3]), dim=-1).permute(0, 2, 3, 4, 1, 5),
+        "-+-": torch.stack((partials["x"][:, 2::3], partials["y"][:, 1::3], partials["z"][:, 2::3]), dim=-1).permute(0, 2, 3, 4, 1, 5),
+        "--+": torch.stack((partials["x"][:, 2::3], partials["y"][:, 2::3], partials["z"][:, 1::3]), dim=-1).permute(0, 2, 3, 4, 1, 5),
+        "---": torch.stack((partials["x"][:, 2::3], partials["y"][:, 2::3], partials["z"][:, 2::3]), dim=-1).permute(0, 2, 3, 4, 1, 5),
+        "j1*": torch.stack((partials["*xy"][:, 0::2], partials["*xz"][:, 0::2], partials["*yz"][:, 0::2]), dim=-1).permute(0, 2, 3, 4, 1, 5),
+        "j2*": torch.stack((partials["*xy"][:, 1::2], partials["*yz"][:, 1::2], partials["*xz"][:, 1::2]), dim=-1).permute(0, 2, 3, 4, 1, 5),
+    }
+    return {key: torch.linalg.det(value) for key, value in jacobians.items()}
+
+
+def calculate_non_diffeomorphic_volume(
+    jacobian_determinants: Mapping[str, torch.Tensor],
+    mask: Optional[torch.Tensor] = None,
+    threshold: float = 0.0,
+) -> torch.Tensor:
+    return calculate_non_diffeomorphic_volume_map(jacobian_determinants, mask=mask, threshold=threshold).sum()
+
+
+def calculate_non_diffeomorphic_volume_map(
+    jacobian_determinants: Mapping[str, torch.Tensor],
+    mask: Optional[torch.Tensor] = None,
+    threshold: float = 0.0,
+) -> torch.Tensor:
+    if mask is not None:
+        mask = mask[..., 1:-1, 1:-1, 1:-1]
+    non_diff_volume_map: Optional[torch.Tensor] = None
+    for diff_direction in ["+++", "++-", "+-+", "+--", "j1*", "j2*", "-++", "-+-", "--+", "---"]:
+        volume_map = -0.5 * jacobian_determinants[diff_direction].clamp(max=threshold) / 6.0
+        if mask is not None:
+            volume_map = volume_map * mask
+        non_diff_volume_map = optional_add_tensor(non_diff_volume_map, volume_map)
+    if non_diff_volume_map is None:
+        raise RuntimeError("No NDV map terms were computed")
+    return non_diff_volume_map
+
+
+def ndv_metrics_voxel(disp_zyx: np.ndarray, fixed_mask: np.ndarray, device: torch.device) -> Dict[str, float]:
+    ddf = torch.from_numpy(disp_zyx).float().to(device)
+    mask_t = torch.from_numpy(fixed_mask[None].astype(np.float32)).to(device)
+    with torch.no_grad():
+        jacdets = calculate_jacobian_determinants(ddf)
+        ndv_full = calculate_non_diffeomorphic_volume(jacdets).detach()
+        ndv_fg = calculate_non_diffeomorphic_volume(jacdets, mask=mask_t).detach()
+        denom_full = float(np.prod(tuple(int(v) for v in jacdets["+++"].shape[1:])))
+        denom_fg = float(mask_t[..., 1:-1, 1:-1, 1:-1].sum().detach().cpu())
+    return {
+        "ndv_full": float(ndv_full.cpu()),
+        "ndv_fg": float(ndv_fg.cpu()),
+        "ndv_frac_full": float(ndv_full.cpu()) / denom_full if denom_full else float("nan"),
+        "ndv_frac_fg": float(ndv_fg.cpu()) / denom_fg if denom_fg else float("nan"),
+    }
+
+
+def diffusion_loss_voxel(disp_zyx: np.ndarray, mask: Optional[np.ndarray] = None) -> float:
+    dz = disp_zyx[:, :, 1:, :, :] - disp_zyx[:, :, :-1, :, :]
+    dy = disp_zyx[:, :, :, 1:, :] - disp_zyx[:, :, :, :-1, :]
+    dx = disp_zyx[:, :, :, :, 1:] - disp_zyx[:, :, :, :, :-1]
+    if mask is None:
+        return float((np.mean(dz**2) + np.mean(dy**2) + np.mean(dx**2)) / 3.0)
+    mz = mask[1:, :, :] & mask[:-1, :, :]
+    my = mask[:, 1:, :] & mask[:, :-1, :]
+    mx = mask[:, :, 1:] & mask[:, :, :-1]
+
+    def masked_mean_sq(arr: np.ndarray, m: np.ndarray) -> float:
+        if not np.any(m):
+            return float("nan")
+        vals = arr[..., m]
+        return float(np.mean(vals**2)) if vals.size else float("nan")
+
+    return float((masked_mean_sq(dz, mz) + masked_mean_sq(dy, my) + masked_mean_sq(dx, mx)) / 3.0)
+
+
+def jacobian_determinant_zyx(disp_zyx: np.ndarray) -> np.ndarray:
+    gradx = np.array([-0.5, 0, 0.5]).reshape(1, 3, 1, 1)
+    grady = np.array([-0.5, 0, 0.5]).reshape(1, 1, 3, 1)
+    gradz = np.array([-0.5, 0, 0.5]).reshape(1, 1, 1, 3)
+    gradx_disp = np.stack(
+        [scipy.ndimage.correlate(disp_zyx[:, i], gradx, mode="constant", cval=0.0) for i in range(3)],
+        axis=1,
+    )
+    grady_disp = np.stack(
+        [scipy.ndimage.correlate(disp_zyx[:, i], grady, mode="constant", cval=0.0) for i in range(3)],
+        axis=1,
+    )
+    gradz_disp = np.stack(
+        [scipy.ndimage.correlate(disp_zyx[:, i], gradz, mode="constant", cval=0.0) for i in range(3)],
+        axis=1,
+    )
+    grad_disp = np.concatenate([gradx_disp, grady_disp, gradz_disp], 0)
+    jac = grad_disp + np.eye(3, 3).reshape(3, 3, 1, 1, 1)
+    jac = jac[:, :, 2:-2, 2:-2, 2:-2]
+    return (
+        jac[0, 0] * (jac[1, 1] * jac[2, 2] - jac[1, 2] * jac[2, 1])
+        - jac[1, 0] * (jac[0, 1] * jac[2, 2] - jac[0, 2] * jac[2, 1])
+        + jac[2, 0] * (jac[0, 1] * jac[1, 2] - jac[0, 2] * jac[1, 1])
+    )
+
+
+def log_std_positive(values: np.ndarray) -> float:
+    pos = values[values > 0]
+    if pos.size == 0:
+        return float("nan")
+    return float(np.std(np.log(pos)))
+
+
+def jacobian_metrics_voxel(disp_zyx: np.ndarray, fixed_mask: np.ndarray) -> Dict[str, float]:
+    jdet = jacobian_determinant_zyx(disp_zyx.astype(np.float64, copy=False))
+    mask_crop = fixed_mask[2:-2, 2:-2, 2:-2]
+    fg = jdet[mask_crop]
+    return {
+        "jdet_lumir_shape_d": float(jdet.shape[0]),
+        "jdet_le0_pct_full": float(np.mean(jdet <= 0) * 100.0),
+        "jdet_le0_pct_fg": float(np.mean(fg <= 0) * 100.0) if fg.size else float("nan"),
+        "log_jdet_std_full": log_std_positive(jdet),
+        "log_jdet_std_fg": log_std_positive(fg) if fg.size else float("nan"),
+        "log_jdet_pos_frac_full": float(np.mean(jdet > 0)),
+        "log_jdet_pos_frac_fg": float(np.mean(fg > 0)) if fg.size else float("nan"),
+        "jdet_mean_full": float(np.mean(jdet)),
+        "jdet_mean_fg": float(np.mean(fg)) if fg.size else float("nan"),
+    }
+
+
+def regularity_metrics(
+    dense_disp_norm: torch.Tensor,
+    fixed_mask: torch.Tensor,
+    *,
+    control_disp_norm: Optional[torch.Tensor] = None,
+    cps: Optional[int] = None,
+) -> Tuple[Dict[str, object], List[Dict[str, object]], List[Dict[str, object]]]:
+    fixed_mask_np = fixed_mask.detach().cpu().bool().numpy()
+    dense_disp_eval = dense_disp_norm.detach()
+    disp_zyx = dhw3_norm_to_zyx_voxel_ncdhw(dense_disp_eval.cpu())
+    reg: Dict[str, object] = {
+        "diffusion_l2_full": diffusion_loss_voxel(disp_zyx),
+        "diffusion_l2_fg": diffusion_loss_voxel(disp_zyx, fixed_mask_np),
+    }
+    reg.update(jacobian_metrics_voxel(disp_zyx, fixed_mask_np))
+    reg.update(ndv_metrics_voxel(disp_zyx, fixed_mask_np, dense_disp_eval.device))
+    be_rows = compute_be_metric_rows(
+        dense_disp_eval,
+        fixed_mask.detach().bool(),
+        control_disp_norm_dhw3=None if control_disp_norm is None else control_disp_norm.detach(),
+        image_shape=IMAGE_SHAPE,
+        cps=cps,
+    )
+    diffusion_rows = compute_diffusion_metric_rows(
+        dense_disp_eval,
+        fixed_mask.detach().bool(),
+        control_disp_norm_dhw3=None if control_disp_norm is None else control_disp_norm.detach(),
+        image_shape=IMAGE_SHAPE,
+        cps=cps,
+    )
+    reg.update(be_rows_to_columns(be_rows))
+    add_native_analytic_be_columns(reg)
+    reg.update(diffusion_rows_to_columns(diffusion_rows))
+    add_native_analytic_diffusion_columns(reg)
+    return reg, be_rows, diffusion_rows
+
+
+def dice_per_label(warped_seg: torch.Tensor, fixed_seg: torch.Tensor) -> List[float]:
+    warped_np = warped_seg.detach().cpu().numpy()
+    fixed_np = fixed_seg.detach().cpu().numpy()
+    out: List[float] = []
+    for label in OASIS_LABELS:
+        pred = warped_np == label
+        true = fixed_np == label
+        denom = int(pred.sum()) + int(true.sum())
+        out.append(float((2.0 * np.logical_and(pred, true).sum()) / (denom + 1e-5)))
+    return out
+
+
+def surface_metrics_per_label(
+    warped_seg: torch.Tensor,
+    fixed_seg: torch.Tensor,
+    moving_seg: torch.Tensor,
+) -> Dict[str, object]:
+    if surface_distance_metrics is None:
+        raise RuntimeError("surface_distance is required for HD95/ASD metrics")
+    warped_np = warped_seg.detach().cpu().numpy()
+    fixed_np = fixed_seg.detach().cpu().numpy()
+    moving_np = moving_seg.detach().cpu().numpy()
+    hd95: List[float] = []
+    asd_warped_to_fixed: List[float] = []
+    asd_fixed_to_warped: List[float] = []
+    asd_symmetric: List[float] = []
+    for label in OASIS_LABELS:
+        if not ((fixed_np == label).any() and (moving_np == label).any() and (warped_np == label).any()):
+            hd95.append(float("nan"))
+            asd_warped_to_fixed.append(float("nan"))
+            asd_fixed_to_warped.append(float("nan"))
+            asd_symmetric.append(float("nan"))
+            continue
+        try:
+            distances = surface_distance_metrics.compute_surface_distances(
+                mask_gt=(fixed_np == label),
+                mask_pred=(warped_np == label),
+                spacing_mm=(1.0, 1.0, 1.0),
+            )
+            hd95.append(float(surface_distance_metrics.compute_robust_hausdorff(distances, 95.0)))
+            fixed_to_warped_value, warped_to_fixed_value = (
+                surface_distance_metrics.compute_average_surface_distance(distances)
+            )
+            gt_areas = distances["surfel_areas_gt"]
+            pred_areas = distances["surfel_areas_pred"]
+            denom = float(np.sum(gt_areas) + np.sum(pred_areas))
+            symmetric = (
+                float(
+                    np.sum(distances["distances_gt_to_pred"] * gt_areas)
+                    + np.sum(distances["distances_pred_to_gt"] * pred_areas)
+                )
+                / denom
+                if denom > 0
+                else float("nan")
+            )
+        except Exception:
+            hd95.append(float("nan"))
+            asd_warped_to_fixed.append(float("nan"))
+            asd_fixed_to_warped.append(float("nan"))
+            asd_symmetric.append(float("nan"))
+            continue
+        asd_warped_to_fixed.append(float(warped_to_fixed_value))
+        asd_fixed_to_warped.append(float(fixed_to_warped_value))
+        asd_symmetric.append(float(symmetric))
+    return {
+        "hd95": hd95,
+        "hd95_mean": safe_nanmean(hd95),
+        "asd_backend": "google_deepmind_surface_distance_area_weighted",
+        "asd_warped_to_fixed": asd_warped_to_fixed,
+        "asd_fixed_to_warped": asd_fixed_to_warped,
+        "asd_symmetric": asd_symmetric,
+        "asd_warped_to_fixed_mean": safe_nanmean(asd_warped_to_fixed),
+        "asd_fixed_to_warped_mean": safe_nanmean(asd_fixed_to_warped),
+        "asd_symmetric_mean": safe_nanmean(asd_symmetric),
+    }
+
+
+def safe_nanmean(values: Sequence[float]) -> float:
+    arr = np.asarray(values, dtype=np.float64)
+    finite = arr[np.isfinite(arr)]
+    return float(np.mean(finite)) if finite.size else float("nan")
+
+
+def evaluate_from_dense_coords(
+    dense_coords: torch.Tensor,
+    batch: Dict[str, torch.Tensor | str | int | Dict[str, object]],
+) -> Dict[str, object]:
+    moving = batch["moving"]
+    fixed = batch["fixed"]
+    moving_seg = batch["moving_seg"]
+    fixed_seg = batch["fixed_seg"]
+    assert isinstance(moving, torch.Tensor)
+    assert isinstance(fixed, torch.Tensor)
+    assert isinstance(moving_seg, torch.Tensor)
+    assert isinstance(fixed_seg, torch.Tensor)
+    warped = warp_full(moving, dense_coords, mode="bilinear")
+    warped_seg = warp_full(moving_seg, dense_coords, mode="nearest")
+    dice = dice_per_label(warped_seg, fixed_seg)
+    surface = surface_metrics_per_label(warped_seg, fixed_seg, moving_seg)
+    metrics: Dict[str, object] = {
+        "image_loss": float(ncc_loss(fixed[None, None], warped[None, None]).detach().cpu()),
+        "dice": dice,
+        "dice_mean": safe_nanmean(dice),
+        "dense_coords": dense_coords,
+        "warped_seg": warped_seg,
+    }
+    metrics.update(surface)
+    return metrics
+
+
+def accuracy_row(metrics: Dict[str, object], fixed_id: str, moving_id: str) -> Dict[str, object]:
+    row: Dict[str, object] = {
+        "fixed_id": fixed_id,
+        "moving_id": moving_id,
+        "dice_mean": metrics["dice_mean"],
+        "hd95_mean": metrics["hd95_mean"],
+        "asd_backend": metrics["asd_backend"],
+        "asd_warped_to_fixed_mean": metrics["asd_warped_to_fixed_mean"],
+        "asd_fixed_to_warped_mean": metrics["asd_fixed_to_warped_mean"],
+        "asd_symmetric_mean": metrics["asd_symmetric_mean"],
+    }
+    for label, value in zip(OASIS_LABELS, metrics["dice"]):  # type: ignore[arg-type]
+        row[f"dice_label_{label:02d}"] = value
+    for label, value in zip(OASIS_LABELS, metrics["hd95"]):  # type: ignore[arg-type]
+        row[f"hd95_label_{label:02d}"] = value
+    for key in ["asd_warped_to_fixed", "asd_fixed_to_warped", "asd_symmetric"]:
+        for label, value in zip(OASIS_LABELS, metrics[key]):  # type: ignore[index]
+            row[f"{key}_label_{label:02d}"] = value
+    return row
+
+
+def save_dense_disp(path: Path, dense_coords: torch.Tensor) -> None:
+    id_grid = make_coordinate_grid(IMAGE_SHAPE, dense_coords.device)
+    disp = (dense_coords - id_grid).detach().cpu().numpy().astype(np.float32)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.save(path, disp)
+
+
+def count_trainable_params(module: nn.Module) -> int:
+    return int(sum(param.numel() for param in module.parameters() if param.requires_grad))

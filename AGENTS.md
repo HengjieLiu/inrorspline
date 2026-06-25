@@ -54,6 +54,7 @@ PROJECT_OBJECT = {
 Use these bracket commands in prompts:
 
 ```text
+[use plan mode]              # do not edit files, stop jobs, launch jobs, remove artifacts, or run destructive commands. Convert the request into a concrete plan, summarize assumptions and risks, recommend defaults, list files likely to change, identify verification steps, ask concise clarifying questions if needed, suggest recommendations if any, and wait for explicit approval before acting. This command should not be superceded.
 [adapt project]              # adapt instructions/docs when assumptions change; plan first
 [adapt AGENTS.md]            # revise AGENTS.md after classifying legacy rules
 [agents sync]                # propose AGENTS.md updates from current repo/conversation context
@@ -242,6 +243,18 @@ Inside this container, use the legacy path mapping:
 /data/hengjie  -> /database
 ```
 
+Large `inrorspline` experiment artifacts, checkpoints, dense fields, and
+per-run logs should default to:
+
+```text
+host:   /data/hengjie/inrorspline
+docker: /database/inrorspline
+```
+
+Only large data and run artifacts belong there. Small review figures, CSV
+summaries, and reports may stay under the repo/homebase when they are intended
+for immediate inspection or later documentation.
+
 Do not use the native Python environment for preprocessing, mask generation,
 image-loading audits, notebooks, or dependency-sensitive data work unless the
 user explicitly requests it. Native shell commands remain allowed for repo
@@ -303,6 +316,11 @@ Do not commit raw data, checkpoints, generated outputs, Docker image archives, p
 ## LungCT Interpretation Rule
 
 Do not treat original IDIR, pTVReg, SINR, and DirectCP LungCT rows as clean method-only comparisons unless preprocessing, crop, mask, metric, interpolation, regularization scale, and evaluation convention are matched or explicitly tagged. Read `docs/reports/protocol_warnings/` first.
+
+For native/full-volume LungCT IDIR-style runs, the lung-mask optimization
+convention is fixed/T00 mask only. Moving/T50 masks may exist for QA or paired
+mask audits, but they are not part of the original/native IDIR optimization
+domain unless a run is explicitly tagged as a non-standard variant.
 
 ## OASIS BrainMR Split And Foreground Rule
 

@@ -29,12 +29,19 @@ method_family: idir | sinr | directcp | ptvreg | other
 variant: method-specific short name
 ```
 
+For IDIR-style LungCT rows, `fixed_t00_lung_mask` means the fixed/inspiration
+`T00` lung mask only. The original/native IDIR convention samples training
+coordinates from the fixed-image mask and does not use a moving/expiration `T50`
+mask for optimization. Moving masks may still exist for QA, paired-mask audits,
+or explicitly tagged non-IDIR variants.
+
 ## Standard Protocol Handles
 
 Use these handles unless a run needs a more specific one:
 
 - `native_full_lungmask_idir`: native full-volume IDIR-style run with fixed/T00
-  lung-mask sampling.
+  lung-mask sampling. This handle uses only the fixed/T00 mask for optimization;
+  any moving/T50 mask is QA-only unless a variant explicitly says otherwise.
 - `ptv_landmark_crop_1mm_no_lungmask`: pTVReg-style landmark crop, 1 mm
   resampling, CT clipping/scaling, no lung-mask optimization.
 - `ptv_landmark_crop_1mm_with_lungmask`: pTV-style crop and resampling with an
@@ -48,9 +55,15 @@ Use these handles unless a run needs a more specific one:
 
 Legacy task4 pTV-prep and pTV-domain outputs are audit inputs, not canonical
 processed data. Do not launch new claims from copied legacy pTV-prep,
-DirectCP/SINR pTV-domain, or `isoptv_torch` outputs until the preprocessing
-audit is complete and the preprocessing is regenerated under the current
-protocol tags.
+DirectCP/SINR pTV-domain, or `isoptv_torch` outputs.
+
+The current regenerated 4DCT pTV-prep handle is
+`ptvreg_landmark_crop_1mm_trilinear_v1`, stored under the processed LungCT data
+tree at `processed/preprocessing/ptvprep/`. It uses pTVReg fixed/moving,
+intensity, crop-index, and target-shape conventions, with intentional PyTorch
+trilinear image resampling. The transformed T00/T50 lung masks in this artifact
+are QA/preprocessed-data companions, not evidence that official pTVReg used lung
+masks for optimization.
 
 ## Interpretation Rule
 

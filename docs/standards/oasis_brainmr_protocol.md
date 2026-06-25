@@ -63,6 +63,25 @@ foreground can be used for label-overlap metrics and visual/comparison audits,
 but any use of `seg > 0` as a foreground/domain mask must be documented as an
 explicit protocol override.
 
+## Method Training Domain Rule
+
+For OASIS/BrainMR:
+
+- IDIR uses sampled training coordinates from the fixed raw image-positive mask:
+  `fixed_image > 0`.
+- IDIR uses native analytic regularity by default. For IDIR, native analytic
+  means coordinate-autograd derivatives in the original dense coordinate-network
+  parameterization: Hessian BE and Jacobian diffusion, not cubic B-spline
+  analytic regularity.
+- SINR and DirectCP spline variants use cubic B-spline analytic regularity by
+  default: second derivatives for BE and first derivatives for diffusion.
+- SINR and DirectCP use full-image/crop `sinr_ncc` training by default and do
+  not use a foreground mask in the image loss.
+- Foreground-scoped regularity metrics for all methods use the same fixed raw
+  image-positive mask: `fixed_image > 0`.
+- Segmentation masks are for Dice/HD95/ASD and visual comparison, not default
+  training-domain or regularity foreground masks.
+
 ## Required Checks
 
 - Use the repo split file as the source of pair order for first10/first20 runs.
@@ -71,6 +90,9 @@ explicit protocol override.
   second element is moving.
 - Use raw `image > 0` as the default OASIS foreground mask; treat `seg > 0` as
   a label/comparison mask unless an override is explicitly documented.
+- For OASIS method training domains, use `fixed_image > 0` for IDIR coordinate
+  sampling, and no training mask for SINR/DirectCP full-image NCC unless a run
+  explicitly documents a protocol override.
 - Use one metric pipeline across IDIR, SINR, DirectCP, learned baselines, and
   Greedy references whenever possible.
 - Report deformation regularity beside overlap metrics, not as an afterthought.
