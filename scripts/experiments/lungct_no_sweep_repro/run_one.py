@@ -15,11 +15,19 @@ import torch
 import common as c
 
 
+METHOD_IDIR = "idir_be_default_lungmask"
+METHOD_SINR_CPS4_PTV = "sinr_cps4_ptv_lcc_isotv"
+METHOD_DIRECT_CP_CPS4_PTV = "direct_cp_cps4_ptv_lcc_isotv"
+METHOD_DIRECT_CP_32_PTV = "direct_cp_32_16_8_4_ptv_lcc_isotv"
+METHOD_DIRECT_CP_32_GLOBAL_NCC_BE = "direct_cp_32_16_8_4_global_ncc_bspline_be"
+METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE = "direct_cp_32_16_8_4_global_ncc_fd_be"
 METHODS = [
-    "idir_be_default_lungmask",
-    "sinr_cps4_ptv_lcc_isotv",
-    "direct_cp_cps4_ptv_lcc_isotv",
-    "direct_cp_32_16_8_4_ptv_lcc_isotv",
+    METHOD_IDIR,
+    METHOD_SINR_CPS4_PTV,
+    METHOD_DIRECT_CP_CPS4_PTV,
+    METHOD_DIRECT_CP_32_PTV,
+    METHOD_DIRECT_CP_32_GLOBAL_NCC_BE,
+    METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE,
 ]
 
 
@@ -48,6 +56,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--idir-omega", type=float, default=32.0)
     parser.add_argument("--spline-omega", type=float, default=50.0)
     parser.add_argument("--alpha-bending", type=float, default=10.0)
+    parser.add_argument("--alpha", type=float, default=100.0)
     parser.add_argument("--cps", type=int, default=4)
 
     parser.add_argument("--border-mask-voxels", type=int, default=5)
@@ -67,13 +76,18 @@ def parse_args() -> argparse.Namespace:
 
 
 def default_epochs(method: str) -> int:
-    if method == "direct_cp_32_16_8_4_ptv_lcc_isotv":
+    if method in {METHOD_DIRECT_CP_32_PTV, METHOD_DIRECT_CP_32_GLOBAL_NCC_BE, METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE}:
         raise ValueError("Multistage method uses --stage-epochs, not --epochs.")
     return 2500
 
 
 def default_lr(method: str) -> float:
-    if method in {"direct_cp_cps4_ptv_lcc_isotv", "direct_cp_32_16_8_4_ptv_lcc_isotv"}:
+    if method in {
+        METHOD_DIRECT_CP_CPS4_PTV,
+        METHOD_DIRECT_CP_32_PTV,
+        METHOD_DIRECT_CP_32_GLOBAL_NCC_BE,
+        METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE,
+    }:
         return 1e-3
     return 1e-4
 
@@ -81,14 +95,26 @@ def default_lr(method: str) -> float:
 def run_name(args: argparse.Namespace, method: str, lr: float) -> str:
     if args.run_name:
         return args.run_name
-    if method == "direct_cp_32_16_8_4_ptv_lcc_isotv":
+    if method == METHOD_DIRECT_CP_32_PTV:
         epoch_name = args.stage_epochs.replace(",", "-")
         return (
             f"{method}_case{args.case_id:02d}_sched32-16-8-4_ds8-4-2-1_"
             f"e{epoch_name}_lr{c.format_float(lr)}_w{c.format_float(args.ptv_isotv_weight)}_seed{args.seed}"
         )
+    if method == METHOD_DIRECT_CP_32_GLOBAL_NCC_BE:
+        epoch_name = args.stage_epochs.replace(",", "-")
+        return (
+            f"{method}_case{args.case_id:02d}_sched32-16-8-4_ds8-4-2-1_"
+            f"e{epoch_name}_lr{c.format_float(lr)}_a{c.format_float(args.alpha)}_seed{args.seed}"
+        )
+    if method == METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE:
+        epoch_name = args.stage_epochs.replace(",", "-")
+        return (
+            f"{method}_case{args.case_id:02d}_sched32-16-8-4_ds8-4-2-1_"
+            f"e{epoch_name}_lr{c.format_float(lr)}_a{c.format_float(args.alpha)}_seed{args.seed}"
+        )
     epochs = int(args.epochs if args.epochs is not None else default_epochs(method))
-    extra = f"bend{c.format_float(args.alpha_bending)}" if method == "idir_be_default_lungmask" else f"w{c.format_float(args.ptv_isotv_weight)}"
+    extra = f"bend{c.format_float(args.alpha_bending)}" if method == METHOD_IDIR else f"w{c.format_float(args.ptv_isotv_weight)}"
     return f"{method}_case{args.case_id:02d}_e{epochs}_lr{c.format_float(lr)}_{extra}_seed{args.seed}"
 
 
@@ -331,18 +357,27 @@ def optimize_stage(
     moving_l, _sigma_m, _kernel_m = c.make_loss_volume(
         moving_t, downsample, args.antialias_sigma_scale, args.antialias_radius_sigma
     )
-    mask_l = c.make_loss_mask(full_border_mask, downsample, args.antialias_sigma_scale, args.antialias_radius_sigma)
+    is_analytic_be_loss = str(args.method) == METHOD_DIRECT_CP_32_GLOBAL_NCC_BE
+    is_fd_be_loss = str(args.method) == METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE
+    is_be_loss = is_analytic_be_loss or is_fd_be_loss
+    mask_l = (
+        None
+        if is_be_loss
+        else c.make_loss_mask(full_border_mask, downsample, args.antialias_sigma_scale, args.antialias_radius_sigma)
+    )
     eval_shape = tuple(int(v) for v in fixed_l.shape)
     cur_pix_zyx = c.stage_pix_zyx((1.0, 1.0, 1.0), fixed_t.shape, eval_shape)
     id_grid = c.make_coordinate_grid(eval_shape, fixed_t.device).detach()
     domain_cps = c.domain_cps_from_full(full_cps, downsample)
-    ptv_cache = c.make_ptv_lcc_fixed_cache(
-        fixed_l,
-        cur_pix_zyx,
-        args.ptv_lcc_sigma_mm,
-        args.ptv_lcc_radius_sigma,
-        args.ptv_lcc_sigma_floor_pix,
-    )
+    ptv_cache = None
+    if not is_be_loss:
+        ptv_cache = c.make_ptv_lcc_fixed_cache(
+            fixed_l,
+            cur_pix_zyx,
+            args.ptv_lcc_sigma_mm,
+            args.ptv_lcc_radius_sigma,
+            args.ptv_lcc_sigma_floor_pix,
+        )
     optimizer = torch.optim.Adam([control], lr=lr)
     rows: List[Dict[str, object]] = []
     start = time.time()
@@ -365,9 +400,27 @@ def optimize_stage(
     for epoch in range(1, int(epochs) + 1):
         dense_disp = c.expand_on_shape(control, control_shape, full_cps, eval_shape, downsample)
         warped = c.warp_full(moving_l, id_grid + dense_disp, mode="bilinear")
-        data_loss = c.ptv_local_cc_loss_with_cache(warped, mask_l, ptv_cache, cur_pix_zyx, args.ptv_lcc_radius_sigma)
-        reg_loss = c.isotv_control_loss(control, control_shape, eval_shape, cur_pix_zyx, domain_cps, args.ptv_csqrt)
-        loss = data_loss + float(args.ptv_isotv_weight) * reg_loss
+        if is_be_loss:
+            data_loss = c.ncc_loss(fixed_l[None, None], warped[None, None])
+            reg_weight = float(args.alpha)
+            if abs(reg_weight) <= 1e-12:
+                reg_loss = torch.zeros((), dtype=data_loss.dtype, device=data_loss.device)
+            elif is_analytic_be_loss:
+                reg_loss = c.analytic_bspline_sampled_be(
+                    control,
+                    control_shape,
+                    eval_shape,
+                    domain_cps,
+                    component_reduction="mean",
+                )
+            else:
+                reg_loss = c.dense_forward_difference_be(dense_disp, component_reduction="mean")
+        else:
+            assert ptv_cache is not None
+            data_loss = c.ptv_local_cc_loss_with_cache(warped, mask_l, ptv_cache, cur_pix_zyx, args.ptv_lcc_radius_sigma)
+            reg_loss = c.isotv_control_loss(control, control_shape, eval_shape, cur_pix_zyx, domain_cps, args.ptv_csqrt)
+            reg_weight = float(args.ptv_isotv_weight)
+        loss = data_loss + reg_weight * reg_loss
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
@@ -380,7 +433,8 @@ def optimize_stage(
             "loss": float(loss.detach().cpu()),
             "data_loss": float(data_loss.detach().cpu()),
             "reg_loss": float(reg_loss.detach().cpu()),
-            "reg_weight": float(args.ptv_isotv_weight),
+            "reg_weight": float(reg_weight),
+            "alpha": float(args.alpha) if is_be_loss else float("nan"),
             "lr": float(lr),
         }
         rows.append(row)
@@ -401,9 +455,16 @@ def optimize_stage(
         "n_control": int(np.prod(control_shape)),
         "epochs": int(epochs),
         "lr": float(lr),
-        "reg_weight": float(args.ptv_isotv_weight),
-        "loss_mode": "ptv_lcc_isotv",
-        "border_mask_voxels": int(args.border_mask_voxels),
+        "reg_weight": float(args.alpha if is_be_loss else args.ptv_isotv_weight),
+        "alpha": float(args.alpha) if is_be_loss else None,
+        "loss_mode": (
+            "global_ncc_bspline_be"
+            if is_analytic_be_loss
+            else "global_ncc_fd_be"
+            if is_fd_be_loss
+            else "ptv_lcc_isotv"
+        ),
+        "border_mask_voxels": 0 if is_be_loss else int(args.border_mask_voxels),
         "antialias_sigma": float(blur_sigma),
         "antialias_kernel_size": int(blur_kernel),
         "elapsed_sec": float(elapsed),
@@ -436,6 +497,9 @@ def train_multistage(args: argparse.Namespace, case: c.LungCTCase, device: torch
     prev_shape: Optional[Tuple[int, int, int]] = None
     prev_dense_full: Optional[torch.Tensor] = None
     final_dense: Optional[torch.Tensor] = None
+    final_control: Optional[torch.Tensor] = None
+    final_control_shape: Optional[Tuple[int, int, int]] = None
+    final_domain_cps: Optional[int] = None
     if device.type == "cuda":
         torch.cuda.empty_cache()
         torch.cuda.reset_peak_memory_stats()
@@ -476,6 +540,9 @@ def train_multistage(args: argparse.Namespace, case: c.LungCTCase, device: torch
         prev_shape = control_shape
         prev_dense_full = dense_full
         final_dense = dense_full
+        final_control = control.detach()
+        final_control_shape = control_shape
+        final_domain_cps = int(full_cps)
         stage_summaries.append(summary)
         history.extend(rows)
     if final_dense is None:
@@ -486,22 +553,61 @@ def train_multistage(args: argparse.Namespace, case: c.LungCTCase, device: torch
     peak = torch.cuda.max_memory_allocated() / (1024**3) if device.type == "cuda" else 0.0
     c.write_csv(out_dir / "stage_history.csv", history)
     c.write_csv(out_dir / "prolongation_metrics.csv", prolong_rows)
+    analytic_regularity: Dict[str, float] = {}
+    if str(args.method) == METHOD_DIRECT_CP_32_GLOBAL_NCC_BE and final_control is not None and final_control_shape is not None:
+        mask_t = torch.from_numpy(case.fixed_mask.astype(np.bool_)).to(device=device)
+        cps = int(final_domain_cps if final_domain_cps is not None else stage_cps[-1])
+        analytic_regularity = {
+            "be_bspline_analytic_full_norm": float(
+                c.analytic_bspline_sampled_be(final_control, final_control_shape, image_shape, cps).detach().cpu()
+            ),
+            "be_bspline_analytic_fg_norm": float(
+                c.analytic_bspline_sampled_be(final_control, final_control_shape, image_shape, cps, mask_t).detach().cpu()
+            ),
+            "diffusion_bspline_analytic_full_norm": float(
+                c.analytic_bspline_sampled_diffusion(final_control, final_control_shape, image_shape, cps).detach().cpu()
+            ),
+            "diffusion_bspline_analytic_fg_norm": float(
+                c.analytic_bspline_sampled_diffusion(final_control, final_control_shape, image_shape, cps, mask_t).detach().cpu()
+            ),
+            "final_control_cps": float(cps),
+        }
+    is_analytic_be_loss = str(args.method) == METHOD_DIRECT_CP_32_GLOBAL_NCC_BE
+    is_fd_be_loss = str(args.method) == METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE
+    is_be_loss = is_analytic_be_loss or is_fd_be_loss
+    regularizer_name = (
+        "analytic_cubic_bspline_be"
+        if is_analytic_be_loss
+        else "dense_forward_difference_be"
+        if is_fd_be_loss
+        else "ptv_isotv"
+    )
     return {
         "dense_disp_norm_xyz": final_dense.detach(),
         "history_tail": history[-10:],
         "stage_summaries": stage_summaries,
         "prolongation_diagnostics": prolong_rows,
+        "analytic_bspline_regularity_fg_registration_crop": analytic_regularity,
         "training": {
             "stage_full_cps": stage_cps,
             "stage_downsample": stage_downsample,
             "stage_epochs": stage_epochs,
             "stage_lr": stage_lr,
             "optimizer": "Adam",
-            "loss": "pTV-style LCC + isoTV",
-            "ptv_lcc_sigma_mm": float(args.ptv_lcc_sigma_mm),
-            "ptv_isotv_weight": float(args.ptv_isotv_weight),
-            "ptv_csqrt": float(args.ptv_csqrt),
-            "border_mask_voxels": int(args.border_mask_voxels),
+            "loss": (
+                "full-crop global NCC + analytic cubic B-spline BE"
+                if is_analytic_be_loss
+                else "full-crop global NCC + dense forward-difference BE"
+                if is_fd_be_loss
+                else "pTV-style LCC + isoTV"
+            ),
+            "image_loss": "full_crop_global_ncc" if is_be_loss else "ptv_lcc",
+            "regularizer": regularizer_name,
+            "alpha": float(args.alpha) if is_be_loss else None,
+            "ptv_lcc_sigma_mm": None if is_be_loss else float(args.ptv_lcc_sigma_mm),
+            "ptv_isotv_weight": None if is_be_loss else float(args.ptv_isotv_weight),
+            "ptv_csqrt": None if is_be_loss else float(args.ptv_csqrt),
+            "border_mask_voxels": 0 if is_be_loss else int(args.border_mask_voxels),
             "prolongation": "exact crop-aligned cubic B-spline dyadic knot insertion",
             "seed": int(args.seed),
             "nested_control_shapes_zyx": {str(k): list(v) for k, v in nested_shapes.items()},
@@ -536,18 +642,42 @@ def main() -> None:
 
     device = c.set_cuda_device(args.gpu)
     case = c.load_case(args.data_root, args.case_id)
-    if method == "idir_be_default_lungmask":
+    if method == METHOD_IDIR:
         result = train_idir(args, case, device, out_dir)
         protocol_tag = "ptv_landmark_crop_1mm_with_idir_fixed_t00_lungmask_sampling"
-    elif method == "sinr_cps4_ptv_lcc_isotv":
+        mask_rule = "fixed_t00_lung_mask_sampling_and_metric"
+        loss_domain = "fixed_t00_lung_mask_sampled"
+    elif method == METHOD_SINR_CPS4_PTV:
         result = train_single_stage_spline(args, case, device, out_dir, direct_cp=False)
         protocol_tag = "ptv_landmark_crop_1mm_no_lungmask+fixed_t00_lung_mask_metric"
-    elif method == "direct_cp_cps4_ptv_lcc_isotv":
+        mask_rule = "fixed_t00_lung_mask_metric_only"
+        loss_domain = "border_masked_crop"
+    elif method == METHOD_DIRECT_CP_CPS4_PTV:
         result = train_single_stage_spline(args, case, device, out_dir, direct_cp=True)
         protocol_tag = "ptv_landmark_crop_1mm_no_lungmask+fixed_t00_lung_mask_metric"
-    elif method == "direct_cp_32_16_8_4_ptv_lcc_isotv":
+        mask_rule = "fixed_t00_lung_mask_metric_only"
+        loss_domain = "border_masked_crop"
+    elif method == METHOD_DIRECT_CP_32_PTV:
         result = train_multistage(args, case, device, out_dir)
         protocol_tag = "ptv_directcp_multistage+ptv_landmark_crop_1mm_no_lungmask+fixed_t00_lung_mask_metric"
+        mask_rule = "fixed_t00_lung_mask_metric_only"
+        loss_domain = "border_masked_crop"
+    elif method == METHOD_DIRECT_CP_32_GLOBAL_NCC_BE:
+        result = train_multistage(args, case, device, out_dir)
+        protocol_tag = (
+            "ptv_directcp_multistage+ptv_landmark_crop_1mm_no_lungmask+"
+            "full_crop_global_ncc_bspline_be+fixed_t00_lung_mask_metric"
+        )
+        mask_rule = "fixed_t00_lung_mask_metric_only"
+        loss_domain = "full_crop_global_ncc"
+    elif method == METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE:
+        result = train_multistage(args, case, device, out_dir)
+        protocol_tag = (
+            "ptv_directcp_multistage+ptv_landmark_crop_1mm_no_lungmask+"
+            "full_crop_global_ncc_dense_fd_be+fixed_t00_lung_mask_metric"
+        )
+        mask_rule = "fixed_t00_lung_mask_metric_only"
+        loss_domain = "full_crop_global_ncc"
     else:
         raise ValueError(f"Unknown method: {method}")
 
@@ -572,8 +702,8 @@ def main() -> None:
         "spacing": "isotropic_1mm",
         "fixed_phase": "T00",
         "moving_phase": "T50",
-        "mask_rule": "fixed_t00_lung_mask_metric_only" if method != "idir_be_default_lungmask" else "fixed_t00_lung_mask_sampling_and_metric",
-        "loss_domain": "border_masked_crop" if method != "idir_be_default_lungmask" else "fixed_t00_lung_mask_sampled",
+        "mask_rule": mask_rule,
+        "loss_domain": loss_domain,
         "protocol_tag": protocol_tag,
         "input_shape_zyx": list(case.shape_zyx),
         "fixed_lung_mask_voxels": int(case.fixed_mask.sum()),
@@ -585,12 +715,22 @@ def main() -> None:
         "history_tail": result.get("history_tail", []),
         "notes": [
             "Inputs are canonical regenerated pTV-prep cropped 1mm arrays.",
-            "pTV loss methods use border-mask loss weighting, not lung-mask loss weighting.",
+            (
+                "This method uses full-crop global NCC with no border-mask or lung-mask loss weighting."
+                if method in {METHOD_DIRECT_CP_32_GLOBAL_NCC_BE, METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE}
+                else "pTV loss methods use border-mask loss weighting, not lung-mask loss weighting."
+            ),
             "Foreground regularity metrics use the fixed T00 lung mask on the cropped 1mm grid.",
             "TRE is measured directly in cropped 1mm landmark coordinates.",
         ],
     }
-    summary.update({k: v for k, v in result.items() if k in ("stage_summaries", "prolongation_diagnostics")})
+    summary.update(
+        {
+            k: v
+            for k, v in result.items()
+            if k in ("stage_summaries", "prolongation_diagnostics", "analytic_bspline_regularity_fg_registration_crop")
+        }
+    )
     summary.update(metrics)
     c.write_json(summary_path, summary)
     print(

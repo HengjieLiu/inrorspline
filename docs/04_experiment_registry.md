@@ -164,7 +164,8 @@ Next decision:
 
 ### P2b: LungCT pTV-Prep IDIR + DirectCP 32-16-8-4 Regularization Sweep
 
-- Status: in progress.
+- Status: completed; 80/80 nonbaseline jobs completed with return code 0 and
+  aggregation passed with 100 case rows and 10 mean rows.
 - Date planned: 2026-06-25.
 - Dataset: DIR-Lab 4DCT cases `01-10`, canonical regenerated pTVReg-style
   landmark crop resampled to 1mm.
@@ -187,8 +188,123 @@ Next decision:
 - Baseline root: `/database/inrorspline/runs/lungct_ptvprep_no_sweep_repro_v1`.
 - Sweep output root: `/database/inrorspline/runs/lungct_ptvprep_reg_sweep_idir_directcp32_v1`.
 - Review root: `experiments/2026-06-25_lungct_ptvprep_reg_sweep_idir_directcp32/`.
-- Required verification: dry-run queues exactly `80` jobs and smoke jobs pass
-  for case `01` at factors `0.01` and `100` for both methods.
+- Actual result, primary original snap TRE: IDIR factors
+  `0.01/0.1/1/10/100` gave `1.317/1.046/1.017/1.085/1.257` mm;
+  DirectCP factors `0.01/0.1/1/10/100` gave
+  `1.320/1.022/0.922/1.583/6.809` mm.
+- Best primary point: default `1e0` for both methods, IDIR
+  `alpha_bending=10` with original snap TRE `1.017` mm and DirectCP
+  `ptv_isotv_weight=0.11` with original snap TRE `0.922` mm.
+- Compute cost, default `1e0`: IDIR `2500` epochs, `2.63 +/- 0.17` min/case,
+  `4.14 +/- 0.06` GB peak memory; DirectCP 4-stage `200,400,800,1000`
+  stage epochs, `2400` total epochs, `3.90 +/- 0.71` min/case,
+  `5.48 +/- 1.07` GB peak memory.
+- Compute cost range, default `1e0`: IDIR `2.44-2.92` min/case and
+  `4.05-4.25` GB; DirectCP 4-stage `3.03-5.84` min/case and `3.64-7.45` GB.
+- Training-curve analysis: 50/50 planned IDIR histories confirm `lr=1e-4`;
+  50/50 planned DirectCP histories confirm stage LR `[1e-3,1e-3,1e-3,1e-3]`
+  and stage epochs `[200,400,800,1000]`. Objective curves support validating
+  IDIR `1500/2000` epochs against `2500`, and DirectCP shortened schedules
+  `200,400,300,650` and `200,200,200,400` against the current
+  `200,400,800,1000` before changing canonical runs.
+- Verification: dry-run queued exactly `80` nonbaseline jobs, smoke jobs passed
+  for case `01` at factors `0.01` and `100` for both methods, and aggregation
+  generated complete case/mean tables plus 8 method-specific Pareto plots and
+  4 combined method-comparison Pareto plots.
+- Refined DirectCP addendum: launched DirectCP-only factors `0.2,0.5,2,5` on
+  cases `01-10` using GPUs `0,1`; 40/40 jobs completed with return code 0.
+  These rows are aggregated in `directcp_refined_review.md` with non-overwriting
+  figures under `plots_refined_directcp/`. Refined DirectCP original-snap TRE
+  factors `0.2/0.5/1/2/5` gave `0.951/0.917/0.922/0.937/0.978` mm; best in
+  this refined grid is `0.5x` (`ptv_isotv_weight=0.055`), marginally better
+  than the original `1x` point.
+- Refined IDIR addendum: launched IDIR BE factors `1/30,1/3,3` on cases
+  `01-10` using GPUs `1,2,3`; 30/30 jobs completed with return code 0. These
+  rows are aggregated in `both_refined_roi_no_extremes_review.md` with
+  non-overwriting ROI figures under `plots_refined_both_roi_no_extremes/`.
+  Refined IDIR original-snap TRE for factors `0.033333/0.333333/1/3/10`
+  gave `1.244/1.028/1.017/1.037/1.085` mm; best remains `1x`
+  (`alpha_bending=10`).
+
+### P2c: LungCT DirectCP 32-16-8-4 Global NCC + Analytic BE Alpha Sweep
+
+- Status: planned; implementation and launch requested by user.
+- Date planned: 2026-06-25.
+- Dataset: DIR-Lab 4DCT cases `01` and `08`, canonical regenerated pTVReg-style
+  landmark crop resampled to 1mm.
+- Method: DirectCP multistage `32,16,8,4` with exact crop-aligned cubic
+  B-spline dyadic knot insertion.
+- Objective: full-crop global NCC plus `alpha *` analytic cubic B-spline
+  bending energy. No lung-mask or border-mask loss weighting.
+- Sweep: alpha values `0,0.1,1,10,100,1000`; absolute weights, not factors.
+- Fixed parameters: downsample schedule `8,4,2,1`, stage epochs
+  `200,400,800,1000`, `lr=1e-3`, seed `1`.
+- Mask convention: fixed T00 lung mask is used only for foreground regularity
+  metrics.
+- Primary metric: `original_snap` TRE. Track all four TREs:
+  `original_snap`, `original_subvoxel`, `reg1mm_snap`, and
+  `reg1mm_subvoxel`.
+- Docker: `py310sitreg_v1_test1`, image `hengjieliu96/dl_dir:py310sitreg_v1`.
+- Dataset root: `/database/datasets/lungCT/processed/preprocessing/ptvprep/ptvreg_landmark_crop_1mm_trilinear_v1`.
+- Output root: `/database/inrorspline/runs/lungct_directcp32_global_ncc_be_case01_case08_alpha_sweep_v1`.
+- Review root:
+  `experiments/2026-06-25_lungct_directcp32_global_ncc_be_case01_case08_alpha_sweep/`.
+- Planned command:
+  `docker exec py310sitreg_v1_test1 python /homebase/code_sync/inrorspline/scripts/experiments/lungct_no_sweep_repro/launch_directcp32_global_ncc_be_sweep.py --cases 1,8 --alphas 0,0.1,1,10,100,1000 --gpus 2,3`.
+- Known limitations: selected-case diagnostic only; global NCC + analytic BE is
+  not pTVReg-matched because pTVReg uses local CC and isoTV.
+- Next decision: inspect case-wise TRE/regularity curves before deciding whether
+  to expand to all 10 cases or refine alpha locally.
+
+### P2d: LungCT DirectCP 32-16-8-4 Global NCC + Dense FD-BE Alpha Sweep
+
+- Status: completed; initial 12/12 selected-case jobs completed with return
+  code 0, extension 6/6 larger-alpha jobs completed with return code 0, and
+  aggregation passed with 18 rows.
+- Date planned: 2026-06-25.
+- Dataset: DIR-Lab 4DCT cases `01` and `08`, canonical regenerated pTVReg-style
+  landmark crop resampled to 1mm.
+- Method: DirectCP multistage `32,16,8,4` with exact crop-aligned cubic
+  B-spline dyadic knot insertion.
+- Objective: full-crop global NCC plus `alpha *` dense forward-difference
+  bending energy on the dense displacement field. No lung-mask or border-mask
+  loss weighting.
+- Sweep: alpha values `0,0.1,1,10,100,1000,10000,100000,1000000`;
+  absolute weights, not factors.
+- Fixed parameters: downsample schedule `8,4,2,1`, stage epochs
+  `200,400,800,1000`, `lr=1e-3`, seed `1`.
+- Mask convention: fixed T00 lung mask is used only for foreground regularity
+  metrics.
+- Primary metric: `original_snap` TRE. Track all four TREs:
+  `original_snap`, `original_subvoxel`, `reg1mm_snap`, and
+  `reg1mm_subvoxel`.
+- Docker: `py310sitreg_v1_test1`, image `hengjieliu96/dl_dir:py310sitreg_v1`.
+- Dataset root: `/database/datasets/lungCT/processed/preprocessing/ptvprep/ptvreg_landmark_crop_1mm_trilinear_v1`.
+- Output root: `/database/inrorspline/runs/lungct_directcp32_global_ncc_fdbe_case01_case08_alpha_sweep_v1`.
+- Review root:
+  `experiments/2026-06-25_lungct_directcp32_global_ncc_fdbe_case01_case08_alpha_sweep/`.
+- Planned command:
+  `docker exec py310sitreg_v1_test1 python /homebase/code_sync/inrorspline/scripts/experiments/lungct_no_sweep_repro/launch_directcp32_global_ncc_fdbe_sweep.py --cases 1,8 --alphas 0,0.1,1,10,100,1000,10000,100000,1000000 --gpus 2,3`.
+- Actual result, primary original snap TRE: case `01` alphas
+  `0/0.1/1/10/100/1000/10000/100000/1000000` gave
+  `1.254/1.240/1.208/1.093/1.004/0.880/0.755/0.734/0.815` mm;
+  case `08` gave
+  `7.042/6.975/7.027/6.205/3.017/1.048/1.087/1.110/1.375` mm.
+- Best primary point in this extended selected-case grid: case `01` at alpha
+  `100000` with original snap TRE `0.734` mm and foreground stdLogJ/J<=0%
+  `0.071/0.0000%`; case `08` at alpha `1000` with original snap TRE
+  `1.048` mm and foreground stdLogJ/J<=0% `0.355/0.4173%`.
+- Verification: compile/import passed, loader audit passed for cases `01,08`,
+  launcher dry-runs queued exactly `12` initial jobs and `6` extension jobs over
+  GPUs `2,3`, smoke jobs passed for case `01` alphas `0` and `1000`, all
+  launched jobs completed with return code 0, and aggregation generated complete
+  case tables plus four per-case plots.
+- Known limitations: selected-case diagnostic only; dense FD-BE is not the same
+  regularizer as analytic cubic B-spline BE, and global NCC + FD-BE is not
+  pTVReg-matched because pTVReg uses local CC and isoTV.
+- Next decision: refine around case-specific optima, especially alpha
+  `10000-1000000` for case `01` and `1000-10000` for case `08`, before any
+  all-case expansion.
 
 ### P3: LungCT 4DCT Matched Pareto
 

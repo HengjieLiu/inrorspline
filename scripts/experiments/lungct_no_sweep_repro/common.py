@@ -371,16 +371,28 @@ def cubic_bspline_value(x: float, derivative: int = 0) -> float:
         if t < 2:
             return ((2.0 - t) ** 3) / 6.0
         return 0.0
+    if derivative == 1:
+        if t < 1:
+            return (1.5 * t - 2.0) * x
+        if x < 0:
+            return 0.5 * (t - 2.0) ** 2
+        return -0.5 * (t - 2.0) ** 2
+    if derivative == 2:
+        if t < 1:
+            return 3.0 * t - 2.0
+        if t < 2:
+            return -t + 2.0
+        return 0.0
     raise ValueError(f"Unsupported derivative: {derivative}")
 
 
-def cubic_bspline1d(stride: int, dtype=None, device=None) -> torch.Tensor:
+def cubic_bspline1d(stride: int, derivative: int = 0, dtype=None, device=None) -> torch.Tensor:
     if dtype is None:
         dtype = torch.float32
     kernel = torch.ones(4 * int(stride) - 1, dtype=dtype)
     radius = kernel.shape[0] // 2
     for i in range(kernel.shape[0]):
-        kernel[i] = cubic_bspline_value((i - radius) / float(stride), derivative=0)
+        kernel[i] = cubic_bspline_value((i - radius) / float(stride), derivative=derivative)
     return kernel.to(device=device)
 
 
@@ -436,6 +448,138 @@ def expand_bspline_controls(
     slicer = (slice(None), slice(None)) + tuple(slice(cps, cps + image_shape[i]) for i in range(3))
     field = field[slicer]
     return field.squeeze(0).permute(1, 2, 3, 0).contiguous()
+
+
+def expand_cubic_bspline_derivative(
+    control_values: torch.Tensor,
+    control_shape: Sequence[int],
+    image_shape: Sequence[int],
+    cps: int,
+    derivative_orders: Sequence[int],
+) -> torch.Tensor:
+    image_shape = tuple(int(v) for v in image_shape)
+    field = control_values.reshape(*tuple(int(v) for v in control_shape), 3).permute(3, 0, 1, 2).unsqueeze(0)
+    for dim, order in enumerate(int(v) for v in derivative_orders):
+        kernel = cubic_bspline1d(cps, derivative=order, dtype=field.dtype, device=field.device)
+        if order:
+            kernel = kernel * (1.0 / float(cps)) ** int(order)
+        padding = (kernel.shape[0] - 1) // 2
+        field = conv_transpose3d_axis(field, kernel=kernel, dim=dim, stride=int(cps), padding=padding)
+    slicer = (slice(None), slice(None)) + tuple(slice(cps, cps + image_shape[i]) for i in range(3))
+    return field[slicer].contiguous()
+
+
+def conv_transpose3d_axis(
+    field: torch.Tensor,
+    *,
+    kernel: torch.Tensor,
+    dim: int,
+    stride: int,
+    padding: int,
+) -> torch.Tensor:
+    if field.ndim != 5:
+        raise ValueError(f"Expected [N,C,D,H,W], got {tuple(field.shape)}")
+    channels = int(field.shape[1])
+    if dim == 0:
+        weight = kernel.view(1, 1, -1, 1, 1).repeat(channels, 1, 1, 1, 1)
+        stride_3d = (int(stride), 1, 1)
+        padding_3d = (int(padding), 0, 0)
+    elif dim == 1:
+        weight = kernel.view(1, 1, 1, -1, 1).repeat(channels, 1, 1, 1, 1)
+        stride_3d = (1, int(stride), 1)
+        padding_3d = (0, int(padding), 0)
+    elif dim == 2:
+        weight = kernel.view(1, 1, 1, 1, -1).repeat(channels, 1, 1, 1, 1)
+        stride_3d = (1, 1, int(stride))
+        padding_3d = (0, 0, int(padding))
+    else:
+        raise ValueError(f"Unsupported dim={dim}")
+    return F.conv_transpose3d(field, weight, stride=stride_3d, padding=padding_3d, groups=channels)
+
+
+def _density_from_terms(terms: Sequence[Tuple[torch.Tensor, float]], component_reduction: str) -> torch.Tensor:
+    density: Optional[torch.Tensor] = None
+    for term, weight in terms:
+        sq = float(weight) * term.square()
+        reduced = sq.sum(dim=1) if component_reduction == "sum" else sq.mean(dim=1)
+        density = reduced if density is None else density + reduced
+    if density is None:
+        raise ValueError("No regularity terms were provided")
+    return density
+
+
+def _masked_density_mean(density: torch.Tensor, mask: Optional[torch.Tensor]) -> torch.Tensor:
+    if mask is None:
+        return density.mean()
+    mask_t = mask.to(device=density.device).bool()
+    selected = density[..., mask_t]
+    if selected.numel() == 0:
+        return torch.as_tensor(float("nan"), dtype=density.dtype, device=density.device)
+    return selected.mean()
+
+
+def analytic_bspline_sampled_be(
+    control_values: torch.Tensor,
+    control_shape: Sequence[int],
+    image_shape: Sequence[int],
+    cps: int,
+    mask: Optional[torch.Tensor] = None,
+    *,
+    component_reduction: str = "mean",
+) -> torch.Tensor:
+    terms = [
+        (expand_cubic_bspline_derivative(control_values, control_shape, image_shape, cps, (2, 0, 0)), 1.0),
+        (expand_cubic_bspline_derivative(control_values, control_shape, image_shape, cps, (0, 2, 0)), 1.0),
+        (expand_cubic_bspline_derivative(control_values, control_shape, image_shape, cps, (0, 0, 2)), 1.0),
+        (expand_cubic_bspline_derivative(control_values, control_shape, image_shape, cps, (1, 1, 0)), 2.0),
+        (expand_cubic_bspline_derivative(control_values, control_shape, image_shape, cps, (1, 0, 1)), 2.0),
+        (expand_cubic_bspline_derivative(control_values, control_shape, image_shape, cps, (0, 1, 1)), 2.0),
+    ]
+    density = _density_from_terms(terms, component_reduction=component_reduction)
+    return _masked_density_mean(density, mask)
+
+
+def analytic_bspline_sampled_diffusion(
+    control_values: torch.Tensor,
+    control_shape: Sequence[int],
+    image_shape: Sequence[int],
+    cps: int,
+    mask: Optional[torch.Tensor] = None,
+) -> torch.Tensor:
+    terms = [
+        expand_cubic_bspline_derivative(control_values, control_shape, image_shape, cps, (1, 0, 0)),
+        expand_cubic_bspline_derivative(control_values, control_shape, image_shape, cps, (0, 1, 0)),
+        expand_cubic_bspline_derivative(control_values, control_shape, image_shape, cps, (0, 0, 1)),
+    ]
+    density = sum(term.square().mean(dim=1) for term in terms) / 3.0
+    return _masked_density_mean(density, mask)
+
+
+def dense_forward_difference_be(
+    disp_dhw3: torch.Tensor,
+    *,
+    component_reduction: str = "mean",
+) -> torch.Tensor:
+    if disp_dhw3.ndim != 4 or int(disp_dhw3.shape[-1]) != 3:
+        raise ValueError(f"Expected [D,H,W,3] displacement, got {tuple(disp_dhw3.shape)}")
+    disp = disp_dhw3.permute(3, 0, 1, 2).unsqueeze(0).contiguous()
+    dz = disp[:, :, 1:, :, :] - disp[:, :, :-1, :, :]
+    dy = disp[:, :, :, 1:, :] - disp[:, :, :, :-1, :]
+    dx = disp[:, :, :, :, 1:] - disp[:, :, :, :, :-1]
+    terms = [
+        (dz[:, :, 1:, :, :] - dz[:, :, :-1, :, :], 1.0),
+        (dy[:, :, :, 1:, :] - dy[:, :, :, :-1, :], 1.0),
+        (dx[:, :, :, :, 1:] - dx[:, :, :, :, :-1], 1.0),
+        (dz[:, :, :, 1:, :] - dz[:, :, :, :-1, :], 2.0),
+        (dz[:, :, :, :, 1:] - dz[:, :, :, :, :-1], 2.0),
+        (dy[:, :, :, :, 1:] - dy[:, :, :, :, :-1], 2.0),
+    ]
+    loss = torch.zeros((), dtype=disp_dhw3.dtype, device=disp_dhw3.device)
+    for term, weight in terms:
+        sq = float(weight) * term.square()
+        reduced = sq.sum(dim=1) if component_reduction == "sum" else sq.mean(dim=1)
+        loss = loss + reduced.mean()
+    return loss
 
 
 CP_MARGIN = 4
