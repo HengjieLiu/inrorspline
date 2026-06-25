@@ -7,3 +7,6 @@
 [submodule "external/SINR"]
 	path = external/SINR
 	url = https://github.com/vasl12/SINR
+[submodule "external/pTVreg"]
+	path = external/pTVreg
+	url = https://github.com/visva89/pTVreg
