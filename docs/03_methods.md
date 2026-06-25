@@ -17,6 +17,9 @@ status: active_draft
 Main target:
 
 - seed-3 shuffled first10 pairs.
+- Canonical foreground/domain mask: raw image-positive foreground, `image > 0`.
+  `seg > 0` is a label/comparison mask unless a run explicitly documents it as
+  an override.
 - Main methods: IDIR original, SINR cps4, SINR cps2, DirectCP cps4.
 - Primary comparison: Dice or HD95 versus bending energy, diffusion energy, and log-Jacobian spread.
 - Baseline dots: saved DL methods and Greedy variants where same-pipeline deformation metrics can be computed.
@@ -26,6 +29,7 @@ Known required consistency items:
 - Pair order and case IDs.
 - Fixed/moving direction.
 - Label set.
+- OASIS foreground rule: default to raw `image > 0`, not `seg > 0`.
 - HD95/ASD missing-label exclusion rule.
 - Physical unit convention for displacement fields.
 - Dense evaluation resolution and foreground/mask definition.

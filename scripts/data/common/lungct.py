@@ -1,0 +1,220 @@
+"""4DCT LungCT path and IO helpers."""
+
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Dict, List, Optional, Sequence, Tuple
+
+import numpy as np
+
+
+FOURDCT_SHAPES_ZYX: Dict[int, Tuple[int, int, int]] = {
+    1: (94, 256, 256),
+    2: (112, 256, 256),
+    3: (104, 256, 256),
+    4: (99, 256, 256),
+    5: (106, 256, 256),
+    6: (128, 512, 512),
+    7: (136, 512, 512),
+    8: (128, 512, 512),
+    9: (128, 512, 512),
+    10: (120, 512, 512),
+}
+
+FOURDCT_SPACING_ZYX: Dict[int, Tuple[float, float, float]] = {
+    1: (2.5, 0.97, 0.97),
+    2: (2.5, 1.16, 1.16),
+    3: (2.5, 1.15, 1.15),
+    4: (2.5, 1.13, 1.13),
+    5: (2.5, 1.10, 1.10),
+    6: (2.5, 0.97, 0.97),
+    7: (2.5, 0.97, 0.97),
+    8: (2.5, 0.97, 0.97),
+    9: (2.5, 0.97, 0.97),
+    10: (2.5, 0.97, 0.97),
+}
+
+
+@dataclass
+class FourDCTCaseFiles:
+    case_id: int
+    status: str
+    root: Optional[str]
+    image_t00: Optional[str]
+    image_t50: Optional[str]
+    landmarks_t00: Optional[str]
+    landmarks_t50: Optional[str]
+    shape_zyx: Tuple[int, int, int]
+    spacing_zyx: Tuple[float, float, float]
+    notes: List[str]
+
+    def to_dict(self) -> Dict[str, object]:
+        return asdict(self)
+
+
+def _candidate_case_roots(fourdct_root: Path, case_id: int) -> List[Path]:
+    roots = sorted(fourdct_root.glob(f"Case{case_id}Pack*"))
+    expanded: List[Path] = []
+    for root in roots:
+        expanded.append(root)
+        expanded.extend(sorted(p for p in root.iterdir() if p.is_dir()))
+    return expanded
+
+
+def _find_subdir(root: Path, names: Sequence[str]) -> Optional[Path]:
+    for name in names:
+        path = root / name
+        if path.is_dir():
+            return path
+    return None
+
+
+def _select_phase_image(image_dir: Optional[Path], case_id: int, phase: str) -> Optional[Path]:
+    if image_dir is None:
+        return None
+    patterns = [
+        f"case{case_id}_T{phase}_s.img",
+        f"case{case_id}_T{phase}-ssm.img",
+        f"case{case_id}_T{phase}.img",
+        f"Case{case_id}_T{phase}_s.img",
+        f"Case{case_id}_T{phase}-ssm.img",
+        f"Case{case_id}_T{phase}.img",
+    ]
+    for pattern in patterns:
+        matches = sorted(image_dir.glob(pattern))
+        if matches:
+            return matches[0]
+    wildcard = sorted(image_dir.glob(f"*case{case_id}*T{phase}*.img"))
+    return wildcard[0] if wildcard else None
+
+
+def _select_phase_landmarks(landmark_dir: Optional[Path], case_id: int, phase: str) -> Optional[Path]:
+    if landmark_dir is None:
+        return None
+    patterns = [
+        f"Case{case_id}_300_T{phase}_xyz.txt",
+        f"case{case_id}_dirLab300_T{phase}_xyz.txt",
+        f"Case{case_id}_dirLab300_T{phase}_xyz.txt",
+        f"case{case_id}_300_T{phase}_xyz.txt",
+    ]
+    for pattern in patterns:
+        matches = sorted(landmark_dir.glob(pattern))
+        if matches:
+            return matches[0]
+    wildcard = sorted(landmark_dir.glob(f"*case{case_id}*T{phase}*xyz.txt"))
+    wildcard += sorted(landmark_dir.glob(f"*Case{case_id}*T{phase}*xyz.txt"))
+    return wildcard[0] if wildcard else None
+
+
+def resolve_4dct_case(case_id: int, data_root: Path) -> FourDCTCaseFiles:
+    root = data_root / "4DCT"
+    notes: List[str] = []
+    selected_root: Optional[Path] = None
+    image_t00 = image_t50 = landmarks_t00 = landmarks_t50 = None
+
+    for candidate in _candidate_case_roots(root, case_id):
+        image_dir = _find_subdir(candidate, ("Images", "images"))
+        landmark_dir = _find_subdir(candidate, ("ExtremePhases", "extremePhases"))
+        t00_img = _select_phase_image(image_dir, case_id, "00")
+        t50_img = _select_phase_image(image_dir, case_id, "50")
+        t00_lm = _select_phase_landmarks(landmark_dir, case_id, "00")
+        t50_lm = _select_phase_landmarks(landmark_dir, case_id, "50")
+        score = sum(v is not None for v in (t00_img, t50_img, t00_lm, t50_lm))
+        current_score = sum(v is not None for v in (image_t00, image_t50, landmarks_t00, landmarks_t50))
+        if score > current_score:
+            selected_root = candidate
+            image_t00, image_t50 = t00_img, t50_img
+            landmarks_t00, landmarks_t50 = t00_lm, t50_lm
+
+    if selected_root is None:
+        status = "missing"
+        notes.append("No case root found.")
+    elif all(v is not None for v in (image_t00, image_t50, landmarks_t00, landmarks_t50)):
+        status = "complete"
+    else:
+        status = "partial"
+        missing = []
+        for name, value in (
+            ("image_t00", image_t00),
+            ("image_t50", image_t50),
+            ("landmarks_t00", landmarks_t00),
+            ("landmarks_t50", landmarks_t50),
+        ):
+            if value is None:
+                missing.append(name)
+        notes.append("Missing: " + ", ".join(missing))
+
+    return FourDCTCaseFiles(
+        case_id=case_id,
+        status=status,
+        root=str(selected_root) if selected_root else None,
+        image_t00=str(image_t00) if image_t00 else None,
+        image_t50=str(image_t50) if image_t50 else None,
+        landmarks_t00=str(landmarks_t00) if landmarks_t00 else None,
+        landmarks_t50=str(landmarks_t50) if landmarks_t50 else None,
+        shape_zyx=FOURDCT_SHAPES_ZYX[case_id],
+        spacing_zyx=FOURDCT_SPACING_ZYX[case_id],
+        notes=notes,
+    )
+
+
+def load_raw_4dct_image(path: Path | str, shape_zyx: Sequence[int]) -> np.ndarray:
+    arr = np.fromfile(Path(path), dtype=np.int16)
+    expected = int(np.prod(shape_zyx))
+    if arr.size != expected:
+        raise ValueError(f"{path} has {arr.size} voxels, expected {expected} for shape {tuple(shape_zyx)}")
+    return arr.reshape(tuple(int(v) for v in shape_zyx)).astype(np.float32)
+
+
+def load_landmarks_xyz(path: Path | str) -> np.ndarray:
+    rows: List[List[float]] = []
+    with Path(path).open() as f:
+        for line in f:
+            if not line.strip():
+                continue
+            rows.append([float(v) for v in line.strip().split()[:3]])
+    arr = np.asarray(rows, dtype=np.float64)
+    if arr.ndim != 2 or arr.shape[1] != 3:
+        raise ValueError(f"Expected Nx3 landmarks in {path}, got {arr.shape}")
+    return arr
+
+
+def landmarks_xyz_to_zyx(landmarks_xyz: np.ndarray) -> np.ndarray:
+    return landmarks_xyz[:, [2, 1, 0]].astype(np.float64, copy=False)
+
+
+def phase_image_path(case: FourDCTCaseFiles, phase: str) -> str:
+    path = case.image_t00 if phase == "00" else case.image_t50
+    if path is None:
+        raise ValueError(f"Case {case.case_id} has no T{phase} image.")
+    return path
+
+
+def phase_landmark_path(case: FourDCTCaseFiles, phase: str) -> str:
+    path = case.landmarks_t00 if phase == "00" else case.landmarks_t50
+    if path is None:
+        raise ValueError(f"Case {case.case_id} has no T{phase} landmarks.")
+    return path
+
+
+def landmark_mask_fraction(mask: np.ndarray, landmarks_zyx: np.ndarray) -> float:
+    idx = np.rint(landmarks_zyx).astype(int)
+    valid = (
+        (idx[:, 0] >= 0)
+        & (idx[:, 0] < mask.shape[0])
+        & (idx[:, 1] >= 0)
+        & (idx[:, 1] < mask.shape[1])
+        & (idx[:, 2] >= 0)
+        & (idx[:, 2] < mask.shape[2])
+    )
+    if not np.any(valid):
+        return float("nan")
+    vals = mask[idx[valid, 0], idx[valid, 1], idx[valid, 2]] > 0
+    return float(np.mean(vals))
+
+
+def mask_root_case_dir(mask_root: Path, case_id: int) -> Path:
+    if (mask_root / "4dct").is_dir():
+        return mask_root / "4dct" / f"case{case_id:02d}"
+    return mask_root / f"case{case_id:02d}"

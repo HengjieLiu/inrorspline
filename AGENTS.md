@@ -132,7 +132,10 @@ commit plan for approval. Include:
 - Files or folders intentionally excluded.
 - Submodule status and planned handling.
 - Verification already run or recommended.
-- One comprehensive but concise commit message.
+- One comprehensive but concise commit message. It should name the main
+  behavioral/protocol fixes, not just the broad feature area. For correction
+  work, mention what was fixed, such as orientation, foreground-mask convention,
+  Docker/notebook execution, verification, or data-safety behavior.
 - The exact `git add` and `git commit` commands that would run after approval.
 
 After presenting the plan, wait for explicit user approval before staging or
@@ -208,6 +211,63 @@ Expected container layout:
 /workspace/scratch          # mounted from $SCRATCH_ROOT; outputs/checkpoints/logs
 ```
 
+## Docker Execution Default
+
+Use the running Docker container below by default for preprocessing and
+data-inspection Python work, unless the user explicitly says to use a different
+environment:
+
+```text
+default_container_name: py310sitreg_v1_test1
+default_container_image: hengjieliu96/dl_dir:py310sitreg_v1
+observed_container_id: c525c6217286
+```
+
+Default interactive entry:
+
+```bash
+docker exec -it py310sitreg_v1_test1 bash
+```
+
+Default direct Python entry:
+
+```bash
+docker exec py310sitreg_v1_test1 python <script-and-args>
+```
+
+Inside this container, use the legacy path mapping:
+
+```text
+/home/hengjie  -> /homebase
+/data/hengjie  -> /database
+```
+
+Do not use the native Python environment for preprocessing, mask generation,
+image-loading audits, notebooks, or dependency-sensitive data work unless the
+user explicitly requests it. Native shell commands remain allowed for repo
+inspection, `rg`, `sed`, `git status`, Docker status checks, and other
+non-Python/non-preprocessing tasks.
+
+## Notebook Review Habit
+
+When the user asks for a notebook, especially for data inspection, visual audit,
+or qualitative review, design the notebook as the primary review surface. It
+must display the important figures, overlays, tables, and summaries inline in
+the notebook, not only save files to disk. Companion scripts are welcome for
+reproducibility, but the notebook should call them and then render the generated
+outputs directly so the user can inspect results without leaving Jupyter.
+
+Notebook outputs can be cleared before commit unless the notebook is intended as
+a small public report. The cells needed to regenerate and display the review
+figures should remain in the notebook.
+
+After creating or materially revising a review notebook, run it in the intended
+environment so the user can open it and inspect populated outputs directly,
+unless the user explicitly asks not to run it or the run would be unsafe or
+prohibitively expensive. For preprocessing/data-inspection notebooks, execute
+inside the default Docker container and keep the executed notebook outputs when
+the user needs immediate visual review.
+
 ## Local Data Source Map
 
 Host-specific raw-data and legacy-workspace paths are private operational context. They must live in ignored files such as `private/data_sources.md`, not in public configs or review-facing docs.
@@ -244,8 +304,14 @@ Do not commit raw data, checkpoints, generated outputs, Docker image archives, p
 
 Do not treat original IDIR, pTVReg, SINR, and DirectCP LungCT rows as clean method-only comparisons unless preprocessing, crop, mask, metric, interpolation, regularization scale, and evaluation convention are matched or explicitly tagged. Read `docs/reports/protocol_warnings/` first.
 
-## OASIS BrainMR Split Rule
+## OASIS BrainMR Split And Foreground Rule
 
 For short OASIS/brainMR tests, use the seed-3 shuffled `pair_test_200`
 protocol documented in `docs/standards/oasis_brainmr_protocol.md`. Do not pick
 the first 10 rows directly from sorted `pair_test_200.txt`.
+
+For OASIS/brainMR foreground masks, default to raw image-positive foreground:
+`image > 0`. Do not use label foreground `seg > 0` as the default foreground,
+sampling-domain, or foreground-scoped analysis mask. `seg > 0` is allowed for
+label metrics and visual/comparison audits, or as an explicit documented
+protocol override.

@@ -45,13 +45,32 @@ These correspond to original sorted `pair_test_200` indices:
 158, 62, 14, 69, 47, 137, 110, 6, 116, 88
 ```
 
+## Foreground Mask Rule
+
+Use the raw image-positive mask as the canonical OASIS/brainMR foreground:
+
+```text
+foreground_mask = image > 0
+```
+
+This applies to default foreground/domain masks for OASIS data inspection,
+preprocessing, experiment sampling domains, and foreground-scoped deformation
+or intensity summaries unless an experiment explicitly defines a different
+mask rule.
+
+Do not use `seg > 0` as the default OASIS foreground mask. The segmentation
+foreground can be used for label-overlap metrics and visual/comparison audits,
+but any use of `seg > 0` as a foreground/domain mask must be documented as an
+explicit protocol override.
+
 ## Required Checks
 
 - Use the repo split file as the source of pair order for first10/first20 runs.
 - Record the subset length, pair list path, and seed in the experiment registry.
 - Keep fixed/moving direction as written in the pair file: first element is fixed,
   second element is moving.
+- Use raw `image > 0` as the default OASIS foreground mask; treat `seg > 0` as
+  a label/comparison mask unless an override is explicitly documented.
 - Use one metric pipeline across IDIR, SINR, DirectCP, learned baselines, and
   Greedy references whenever possible.
 - Report deformation regularity beside overlap metrics, not as an afterthought.
-
