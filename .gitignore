@@ -1,0 +1,62 @@
+# Python/cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Environment and secrets
+.env
+.env.*
+secrets/
+private/
+*.pem
+*.key
+
+# Data: raw/large data stays outside Git
+data/raw/
+data/external/
+data/derived/
+data/tmp/
+
+# Experiment outputs and tracking
+outputs/
+scratch/
+wandb/
+mlruns/
+checkpoints/
+*.log
+
+# Large artifacts
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+*.npy
+*.npz
+*.nii
+*.nii.gz
+*.mha
+*.mhd
+*.img
+*.hdr
+*.mat
+
+# Archives and Docker image exports
+*.tar
+*.tar.gz
+*.tar.zst
+*.tgz
+*.zip
+*.7z
+docker/*.tar*
+
+# OS/editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
