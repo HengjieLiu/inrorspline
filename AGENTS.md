@@ -66,7 +66,8 @@ Use these bracket commands in prompts:
 [anonymous release audit]    # audit review-facing code/docs for identity leaks
 [add git external] <url>     # add a GitHub repo as an external/ submodule and commit
 [prepare commit]             # summarize status and propose commit commands; do not stage/commit
-[summarize and commit]       # produce commit plan first; wait for approval; the commit comment should be comprehensive and concise
+[summarize and commit]       # produce commit plan first; wait for approval
+[summarize and commit <path>] # same as above, scoped to the requested path(s)
 ```
 
 ### `[agents sync]`
@@ -117,6 +118,35 @@ Prompt:
 Add this repository under external/ as a Git submodule and commit only that
 submodule addition.
 ```
+
+### `[summarize and commit]`
+
+Use when the user wants Codex to prepare a commit from the current worktree.
+This command is approval-gated.
+
+Codex must not commit immediately. First inspect the working tree and return a
+commit plan for approval. Include:
+
+- A concise topic-grouped change summary.
+- Folders with new files planned for commit.
+- Files or folders intentionally excluded.
+- Submodule status and planned handling.
+- Verification already run or recommended.
+- One comprehensive but concise commit message.
+- The exact `git add` and `git commit` commands that would run after approval.
+
+After presenting the plan, wait for explicit user approval before staging or
+committing. If approved, stage only the planned files and commit with the
+proposed or user-edited message.
+
+### `[summarize and commit <path>]`
+
+Use when the user wants a commit plan scoped to one or more requested paths.
+
+Codex must scope the audit, staging plan, and commit message to the requested
+path or paths only. Do not stage changes outside the requested scope unless
+required metadata is needed for that scope, such as `.gitmodules` for a
+submodule change. Explain any such exception clearly in the plan.
 
 ## Rsync-Only Safety Gate
 

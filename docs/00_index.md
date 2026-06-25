@@ -14,9 +14,11 @@ status: active
 - `README.md`: top-level orientation.
 - `AGENTS.md`: repo operating rules for Codex and other agents.
 - `docs/01_project_brief.md`: scientific framing.
+- `docs/02_literature_review.md`: literature synthesis map.
 - `docs/03_methods.md`: method and protocol plan.
 - `docs/04_experiment_registry.md`: experiment ledger.
 - `docs/05_results_summary.md`: current evidence map.
+- `docs/literature/`: paper reading notes and external-code links.
 - `docs/standards/`: experiment preflight standards for fair comparisons.
 - `docs/reports/current_results_audit_and_plan.md`: detailed carried-forward audit.
 - `docs/reports/reorganized_paper_points.md`: paper narrative plan.
