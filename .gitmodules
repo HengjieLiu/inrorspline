@@ -1,0 +1,9 @@
+[submodule "external/IDIR"]
+	path = external/IDIR
+	url = https://github.com/MIAGroupUT/IDIR
+[submodule "external/MIR"]
+	path = external/MIR
+	url = https://github.com/junyuchen245/MIR
+[submodule "external/SINR"]
+	path = external/SINR
+	url = https://github.com/vasl12/SINR
