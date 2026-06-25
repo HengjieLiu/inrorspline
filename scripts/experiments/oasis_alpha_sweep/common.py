@@ -1350,6 +1350,7 @@ def accuracy_row(metrics: Dict[str, object], fixed_id: str, moving_id: str) -> D
     row: Dict[str, object] = {
         "fixed_id": fixed_id,
         "moving_id": moving_id,
+        "dense_image_loss": metrics["image_loss"],
         "dice_mean": metrics["dice_mean"],
         "hd95_mean": metrics["hd95_mean"],
         "asd_backend": metrics["asd_backend"],

@@ -43,11 +43,23 @@ Next decision:
 
 ### P1: OASIS Seed-3 First10 Main Pareto
 
-- Status: planned.
+- Status: planned; implementation prepared, launch gated pending user review.
 - Methods: IDIR original, SINR cps4, SINR cps2, DirectCP cps4.
 - Purpose: main brain Pareto result.
-- Required before launch: `docs/standards/oasis_brainmr_protocol.md`,
-  pair list manifest, metric script audit, alpha/LR grid lock.
+- Dataset: OASIS BrainMR seed-3 shuffled ranks `0-9`, original sorted indices
+  `158,62,14,69,47,137,110,6,116,88`.
+- Grid: IDIR alpha `0,0.01,0.1,1,10,100`; spline alpha
+  `0,10,100,1000,10000,100000`; 2500 epochs.
+- LR: IDIR `1e-4`; SINR cps4/cps2 `1e-4`; DirectCP cps4 `1e-3`.
+- Regularizer: BE-trained sweep. IDIR uses coordinate-autograd analytic BE;
+  SINR/DirectCP use cubic B-spline analytic BE.
+- Metrics: Dice, HD95, ASD, native analytic BE/diffusion, forward-difference
+  BE/diffusion, log-Jacobian, folding percentage, NDV; retain per-label and
+  per-case rows, and report population means/spread across cases.
+- Output root: `/database/inrorspline/runs/oasis_seed3_first10_alpha_sweep_be_2500e_v1`.
+- Review root: `experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/`.
+- Required before launch: final user approval after code audit; Docker
+  `py310sitreg_v1_test1`; smallest smoke/dry-run check.
 
 ### P1a: OASIS Seed-3 Case-0 Alpha Pre-Run
 
@@ -91,6 +103,69 @@ Next decision:
 
 - Status: planned.
 - Purpose: regenerate deformation-regime statistics on the same first10 protocol.
+
+### P2a: LungCT pTV-Prep No-Sweep Reproduction
+
+- Status: completed; 40/40 jobs completed with return code 0 and aggregation
+  passed.
+- Date planned: 2026-06-25.
+- Dataset: DIR-Lab 4DCT cases `01-10`, canonical regenerated pTVReg-style
+  landmark crop resampled to 1mm.
+- Methods: IDIR BE default with fixed T00 lung-mask sampling, SINR cps4 pTV LCC
+  plus isoTV, DirectCP cps4 pTV LCC plus isoTV, DirectCP multistage
+  `32,16,8,4` pTV LCC plus isoTV.
+- Fixed parameters: IDIR `alpha_bending=10`, `lr=1e-4`, `epochs=2500`;
+  SINR cps4 `lr=1e-4`, `epochs=2500`; DirectCP cps4 `lr=1e-3`,
+  `epochs=2500`; multistage epochs `200,400,800,1000`, `lr=1e-3`.
+- pTV loss settings: `sigma_mm=2.1`, `isoTV weight=0.11`, `csqrt=5e-3`,
+  `border_mask_voxels=5`.
+- Mask convention: IDIR uses fixed T00 lung mask for sampled-coordinate
+  training; pTV SINR/DirectCP losses do not use lung-mask weighting; all
+  foreground regularity metrics use the fixed T00 lung mask on the cropped 1mm
+  grid.
+- Docker: `py310sitreg_v1_test1`, image `hengjieliu96/dl_dir:py310sitreg_v1`.
+- Dataset root: `/database/datasets/lungCT/processed/preprocessing/ptvprep/ptvreg_landmark_crop_1mm_trilinear_v1`.
+- Output root: `/database/inrorspline/runs/lungct_ptvprep_no_sweep_repro_v1`.
+- Review root: `experiments/2026-06-25_lungct_ptvprep_no_sweep_repro/`.
+- Primary metrics: original/native-crop identity/snap/subvoxel TRE,
+  cropped-1mm identity/snap/subvoxel TRE, fixed-lung-mask foreground
+  log-Jacobian std, folding percentage, bending energy, diffusion energy,
+  displacement magnitude, runtime, peak GPU memory.
+- Actual result, original/native-crop snap/sub TRE: IDIR `1.017/1.133`;
+  SINR cps4 `2.904/3.014`; DirectCP cps4 `6.370/6.450`; DirectCP multistage
+  `0.922/1.049`. Cropped-1mm diagnostic snap/sub TRE: IDIR `1.236/1.138`;
+  SINR cps4 `3.143/3.037`; DirectCP cps4 `6.575/6.495`; DirectCP multistage
+  `1.168/1.052`.
+- Review artifacts: `summary_runs.csv`, `summary_runs.json`, and
+  `review_report.md` under the review root.
+
+### P2b: LungCT pTV-Prep IDIR + DirectCP 32-16-8-4 Regularization Sweep
+
+- Status: in progress.
+- Date planned: 2026-06-25.
+- Dataset: DIR-Lab 4DCT cases `01-10`, canonical regenerated pTVReg-style
+  landmark crop resampled to 1mm.
+- Methods: IDIR BE default with fixed T00 lung-mask sampling and DirectCP
+  multistage `32,16,8,4` pTV LCC plus isoTV.
+- Sweep: reuse completed `1e0` baseline; launch nonbaseline factors
+  `0.01,0.1,10,100` around each method's default regularization weight.
+- IDIR regularization: base `alpha_bending=10`; swept values
+  `0.1,1,100,1000`.
+- DirectCP regularization: base `ptv_isotv_weight=0.11`; swept values
+  `0.0011,0.011,1.1,11`.
+- Fixed parameters: IDIR `lr=1e-4`, `epochs=2500`; DirectCP stage epochs
+  `200,400,800,1000`, `lr=1e-3`; pTV settings `sigma_mm=2.1`,
+  `csqrt=5e-3`, `border_mask_voxels=5`.
+- Primary metric: `original_snap` TRE. Track all four TREs:
+  `original_snap`, `original_subvoxel`, `reg1mm_snap`, and
+  `reg1mm_subvoxel`.
+- Docker: `py310sitreg_v1_test1`, image `hengjieliu96/dl_dir:py310sitreg_v1`.
+- Dataset root: `/database/datasets/lungCT/processed/preprocessing/ptvprep/ptvreg_landmark_crop_1mm_trilinear_v1`.
+- Baseline root: `/database/inrorspline/runs/lungct_ptvprep_no_sweep_repro_v1`.
+- Sweep output root: `/database/inrorspline/runs/lungct_ptvprep_reg_sweep_idir_directcp32_v1`.
+- Review root: `experiments/2026-06-25_lungct_ptvprep_reg_sweep_idir_directcp32/`.
+- Required verification: dry-run queues exactly `80` jobs and smoke jobs pass
+  for case `01` at factors `0.01` and `100` for both methods.
 
 ### P3: LungCT 4DCT Matched Pareto
 

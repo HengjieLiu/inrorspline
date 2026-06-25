@@ -53,6 +53,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-fixed-id", type=str, default=None)
     parser.add_argument("--expected-moving-id", type=str, default=None)
     parser.add_argument("--run-name", type=str, default=None)
+    parser.add_argument("--variant", type=str, default="oasis_seed3_alpha_prerun_repo_local")
     parser.add_argument("--save-final-dense", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--validate-case-only", action="store_true")
@@ -403,7 +404,7 @@ def write_outputs(
     summary: Dict[str, object] = {
         "run_name": run_name,
         "run_dir": str(run_dir),
-        "variant": "oasis_seed3_alpha_prerun_repo_local",
+        "variant": str(args.variant),
         "method": args.method,
         "method_key": method_key(args),
         "case_rank": int(args.case_rank),
@@ -450,6 +451,7 @@ def write_outputs(
         "final_loss": last["loss"],
         "final_data_loss": last["data_loss"],
         "final_reg_loss": last["reg_loss"],
+        "dense_image_loss": metrics["image_loss"],
         "dice_mean": metrics["dice_mean"],
         "hd95_mean": metrics["hd95_mean"],
         "asd_backend": metrics["asd_backend"],

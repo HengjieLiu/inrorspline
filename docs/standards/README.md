@@ -27,4 +27,5 @@ Before a real run:
 - `oasis_brainmr_protocol.md`: seed-3 shuffled OASIS test protocol.
 - `lungct_protocol_tags.md`: LungCT preprocessing/protocol tag standard and
   warning links.
-
+- `lungct_tre_metric_conventions.md`: LungCT TRE metric domains, snap/subvoxel
+  definitions, and pTVReg comparison convention.

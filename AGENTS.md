@@ -133,10 +133,15 @@ commit plan for approval. Include:
 - Files or folders intentionally excluded.
 - Submodule status and planned handling.
 - Verification already run or recommended.
-- One comprehensive but concise commit message. It should name the main
-  behavioral/protocol fixes, not just the broad feature area. For correction
-  work, mention what was fixed, such as orientation, foreground-mask convention,
-  Docker/notebook execution, verification, or data-safety behavior.
+- One comprehensive but concise commit message. "Concise" means no filler, not
+  vague. The subject should identify the concrete deliverable and the main
+  protocol/behavioral change, for example `Add OASIS first10 BE sweep runner and
+  population ARC aggregation`, not `Update experiments`. For multi-topic
+  commits, propose a subject plus a short body with 2-5 bullets naming the
+  actual changes: new runners/aggregators, protocol or metric conventions,
+  generated review artifacts, gated launch behavior, and verification. For
+  correction work, mention what was fixed, such as orientation, foreground-mask
+  convention, Docker/notebook execution, verification, or data-safety behavior.
 - The exact `git add` and `git commit` commands that would run after approval.
 
 After presenting the plan, wait for explicit user approval before staging or

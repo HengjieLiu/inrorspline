@@ -10,6 +10,7 @@ row, read:
 
 - `docs/reports/protocol_warnings/lungct_idir_ptvreg_protocol_bias.md`
 - `docs/reports/protocol_warnings/ptvreg_technique_audit_directcp_multistage.md`
+- `docs/standards/lungct_tre_metric_conventions.md`
 
 ## Required Tag Fields
 
@@ -25,6 +26,8 @@ intensity_rule: native | ct_clip_80_900_scale_0_1 | other
 mask_rule: none | fixed_t00_lung_mask | other
 loss_domain: full_image | crop | mask_sampled | border_masked
 metric_domain: native_landmarks | crop_landmarks | other
+metric_resolution: native_full_or_crop | cropped_1mm_reg | other
+tre_mode: snap_to_voxel | subvoxel | both
 method_family: idir | sinr | directcp | ptvreg | other
 variant: method-specific short name
 ```
@@ -71,3 +74,8 @@ Do not treat native IDIR, pTVReg, pTV-preprocessed SINR, and pTV-preprocessed
 DirectCP rows as clean method-only comparisons unless preprocessing, crop, mask,
 metric, interpolation, regularization scale, and evaluation convention are
 matched or explicitly tagged.
+
+For LungCT pTVReg-style comparisons, use `native_full_or_crop` +
+`snap_to_voxel` as the headline TRE convention. If a method reports
+`cropped_1mm_reg` TRE directly, label it as a 1mm registration-grid diagnostic
+because transformed landmarks are usually fractional in that grid.
