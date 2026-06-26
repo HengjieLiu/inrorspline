@@ -7,6 +7,8 @@ Before coding, syncing, dataset movement, Docker work, paper writing, or experim
 - `docs/00_index.md` for the project map and current status.
 - `docs/01_project_brief.md` for the scientific goal and expected claims.
 - `docs/03_methods.md` for method and protocol definitions.
+- `docs/implementation/README.md` for code-derived implementation summaries
+  used in method review and paper writing.
 - `docs/04_experiment_registry.md` before planning or launching real runs.
 - `docs/05_results_summary.md` before writing conclusions.
 - `docs/06_decision_log.md` before changing major design choices.

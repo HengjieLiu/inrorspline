@@ -5,6 +5,14 @@ status: active_draft
 
 # Methods
 
+## Implementation Reference
+
+For code-level architecture, training-loss definitions, cubic B-spline
+formulas, DirectCP optimization details, and paper-claim crosswalks, see
+`docs/implementation/`. This file remains the protocol/method plan; the
+implementation folder records how the current repo-local code realizes those
+methods.
+
 ## Method Families
 
 - `IDIR`: coordinate-network deformation model. Use original-style loss/regularization where possible, and keep alpha scales separate from spline methods.

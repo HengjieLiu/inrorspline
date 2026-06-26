@@ -84,6 +84,317 @@ Next decision:
 - Known limitation: preliminary 3-alpha subset only; do not interpret as a full
   six-alpha DirectCP cps2 Pareto sweep.
 
+### P1d: OASIS Seed-3 First10 Saved Baseline Evaluation
+
+- Status: completed 2026-06-25 16:40 Pacific in Docker after dry-run, rank-0
+  smoke, 50/50 saved-field evaluations, and overlay aggregation passed.
+- Purpose: add paper-facing OASIS reference dots for saved DL and Greedy
+  baselines using the same first10 accuracy and dense-field regularity pipeline
+  as P1.
+- Dataset: OASIS BrainMR seed-3 shuffled ranks `0-9`, original sorted indices
+  `158,62,14,69,47,137,110,6,116,88`.
+- Methods: `bs1_vxm_v0_2`, `bs2_tm_v0`, `bs3_vfa_v0`, `bs4_sitreg_v0`, and
+  canonical `Greedy`.
+- Inputs: saved dense voxel-space displacement fields from the local DL
+  baseline root and canonical Greedy result root documented in
+  `private/data_sources.md`.
+- Metrics: Dice, HD95, ASD, dense finite-difference BE/diffusion, log-Jacobian,
+  folding percentage, and NDV; retain per-label, per-case, and population rows.
+- Output root: `/database/inrorspline/runs/oasis_seed3_first10_saved_baselines_v1`.
+- Review root:
+  `experiments/2026-06-25_oasis_seed3_first10_saved_baselines/`.
+- Launch environment: Docker container `py310sitreg_v1_test1`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1`, GPU `0`.
+- Acceptance: `50/50` summaries and `50/50` `DONE` files present; each run has
+  case, regularity, BE, diffusion, history, mask-audit, and summary artifacts;
+  aggregation reported `errors=[]`.
+- Actual population means: BS1 VoxelMorph Dice/HD95/ASD
+  `0.7683/2.4477/0.5497`; BS2 TransMorph `0.7913/2.0084/0.4467`;
+  BS3 VFA `0.8198/1.7743/0.3669`; BS4 SITReg `0.8215/1.7159/0.3509`;
+  Greedy `0.8037/1.8726/0.4096`.
+- Greedy displacement format note: canonical Greedy NIfTI fields are stored as
+  5D channel-last arrays and are reoriented by applying the OASIS scalar
+  LIA-to-RAS transform to each component plus component signs `-,-,+`; rank-0
+  smoke reproduced the saved Greedy warped-label Dice closely.
+- Known limitation: saved dense fields do not expose native model/control
+  parameterizations, so native analytic IDIR/B-spline regularity columns are
+  intentionally unavailable for these baseline rows.
+
+### P1e: OASIS Seed-3 First20 Saved Baseline Extension
+
+- Status: completed 2026-06-25 Pacific after rank `10-19` dry-run confirmed
+  all 50 source displacement files, 50 new saved-field evaluations completed,
+  and first20 aggregation passed with `100/100` saved baseline rows.
+- Purpose: extend the saved DL/Greedy baseline evaluation from seed-3 first10
+  to seed-3 first20 without retraining.
+- Dataset: OASIS BrainMR seed-3 shuffled ranks `0-19`; ranks `0-9` reuse P1d
+  completed outputs, ranks `10-19` are newly evaluated. Additional original
+  sorted indices for ranks `10-19`: `130,100,118,67,79,56,142,199,36,12`.
+- Methods: `bs1_vxm_v0_2`, `bs2_tm_v0`, `bs3_vfa_v0`, `bs4_sitreg_v0`, and
+  canonical `Greedy`.
+- Metrics: same saved dense-field posthoc pipeline as P1d: Dice, HD95, ASD,
+  dense finite-difference BE/diffusion, log-Jacobian, folding percentage, and
+  NDV using fixed raw image-positive foreground for regularity metrics.
+- Output root: `/database/inrorspline/runs/oasis_seed3_first10_saved_baselines_v1`
+  extended with rank `10-19` run directories.
+- First20 review root:
+  `experiments/2026-06-25_oasis_seed3_first20_saved_baselines/`.
+- Launch environment: Docker container `py310sitreg_v1_test1`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1`, GPU `0`.
+- Actual first20 population means: BS1 VoxelMorph Dice/HD95/ASD
+  `0.7724/2.5298/0.5493`; BS2 TransMorph `0.7954/2.0932/0.4483`;
+  BS3 VFA `0.8223/1.8050/0.3638`; BS4 SITReg `0.8245/1.7505/0.3491`;
+  Greedy `0.8067/1.9405/0.4101`.
+- Acceptance: `100/100` summaries and `100/100` `DONE` files present across
+  ranks `0-19`; each run has case, regularity, BE, diffusion, history,
+  mask-audit, and summary artifacts; aggregation reported `errors=[]`.
+- Known limitation: output-root slug retains the historical `first10` name
+  because it is the existing P1d artifact root being extended; review artifacts
+  use the explicit `first20` slug.
+
+### P1f: OASIS Rank-9 Registration vs Greedy-Field Fitting LR Sweep
+
+- Status: completed 2026-06-26 after dry-run, smoke, full launch, and
+  aggregation passed with `18/18` summaries and `errors=[]`.
+- Date planned: 2026-06-26.
+- Purpose: illustrate how IDIR, SINR cps4, and DirectCP cps4 behave under
+  image-registration optimization versus direct fitting of a strong Greedy
+  dense displacement field.
+- Dataset: OASIS BrainMR seed-3 shuffled rank `9`, original sorted index `88`,
+  fixed/moving `(0173,0136)`.
+- Methods: IDIR original dense SIREN, SINR cps4 with cubic B-spline analytic
+  BE, and DirectCP cps4 with cubic B-spline analytic BE.
+- Exp1 objective: image registration with the method-native BE regularizer.
+  Alphas are fixed to the completed sweep's best operating points:
+  IDIR `1`, SINR cps4 `1000`, DirectCP cps4 `1000`.
+- Exp2 objective: direct MSE fitting of the canonical Greedy dense displacement
+  in normalized-grid coordinates over the fixed-image-positive brain mask, with
+  no image loss and no regularization. The brain mask is the raw fixed OASIS
+  image after standard reorientation with `fixed_raw > 0`; segmentation masks
+  are not training masks.
+- LR sweep: `1e-2,1e-3,1e-4` for every method/objective; 2500 epochs; seed `1`;
+  eval interval `250`.
+- Greedy displacement convention: canonical Greedy NIfTI fields are loaded with
+  the same saved-baseline convention: 5D channel-last layout, scalar OASIS
+  LIA-to-RAS reorientation per component, and component signs `-,-,+`.
+- Output root: `/database/inrorspline/runs/oasis_rank009_fit_modes_lr_sweep_v1`.
+- Review root:
+  `experiments/2026-06-26_oasis_rank009_fit_modes_lr_sweep/`.
+- Launch environment: Docker container `py310sitreg_v1_test1`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1`; requested GPUs `0,1,2`.
+- Primary metrics: per-epoch raw and plot-normalized loss curves, final
+  brain-mask Greedy-field MSE, full-volume Greedy-field MSE as context,
+  Dice/HD95/ASD, and posthoc deformation regularity metrics.
+- Known limitations: single illustrative OASIS pair only; IDIR field-fit samples
+  `10,000` fixed-image-positive coordinates per epoch, while spline variants
+  expand their cps4 dense field and compute MSE on all fixed-image-positive
+  voxels. IDIR BE scale normalization is plot-only; the IDIR image-registration
+  training objective remains unchanged.
+- Actual best final points: image-registration Dice favored SINR cps4 at
+  lr `1e-4` with Dice `0.8296`; Greedy-field brain-mask MSE favored DirectCP
+  cps4 at lr `1e-2` with MSE `2.08659e-06`.
+- Next decision: compare against a SITReg-field target on the same case before
+  deciding whether to add more cases.
+
+### P1g: OASIS Rank-9 Registration vs SITReg-Field Fitting LR Sweep
+
+- Status: completed 2026-06-26 after dry-run, smoke, full launch, and
+  aggregation passed with `18/18` combined summaries and `errors=[]`.
+- Date planned: 2026-06-26.
+- Purpose: repeat the rank-9 field-fitting diagnostic with the saved BS4 SITReg
+  dense displacement as the target while reusing the completed rank-9
+  image-registration rows from P1f.
+- Dataset: OASIS BrainMR seed-3 shuffled rank `9`, original sorted index `88`,
+  fixed/moving `(0173,0136)`.
+- Methods: IDIR original dense SIREN, SINR cps4 with cubic B-spline controls,
+  and DirectCP cps4.
+- Reused objective: image registration with method-native BE regularization
+  from `/database/inrorspline/runs/oasis_rank009_fit_modes_lr_sweep_v1`.
+  Alphas remain IDIR `1`, SINR cps4 `1000`, DirectCP cps4 `1000`.
+- New objective: direct MSE fitting of the saved `bs4_sitreg_v0` best-Dice
+  dense displacement in normalized-grid coordinates over the
+  fixed-image-positive brain mask, with no image loss and no regularization.
+  The brain mask is the raw fixed OASIS image after standard reorientation with
+  `fixed_raw > 0`; segmentation masks are not training masks.
+- LR sweep: `1e-2,1e-3,1e-4` for every method; 2500 epochs; seed `1`; eval
+  interval `250`.
+- SITReg displacement convention: saved NIfTI shape `(3,160,224,192)`,
+  channel-first `zyx` repo/RAS layout, no reorientation or component sign flip,
+  converted from voxel units to normalized-grid displacement for PyTorch
+  fitting.
+- Output root:
+  `/database/inrorspline/runs/oasis_rank009_sitreg_fit_modes_lr_sweep_v1`.
+- Review root:
+  `experiments/2026-06-26_oasis_rank009_sitreg_fit_modes_lr_sweep/`.
+- Launch environment: Docker container `py310sitreg_v1_test1`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1`; requested GPUs `2,3` with
+  `--max-concurrent 2`.
+- Primary metrics: per-epoch SITReg-field brain-mask MSE, final full-volume
+  MSE as context, Dice/HD95/ASD, posthoc deformation regularity metrics, and
+  reused image-registration loss curves.
+- Known limitations: single illustrative OASIS pair only; IDIR field-fit
+  samples `10,000` fixed-image-positive coordinates per epoch, while spline
+  variants expand their cps4 dense field and compute MSE on all
+  fixed-image-positive voxels.
+- Acceptance: `9/9` new SITReg field-fit `DONE` files, `18/18` combined rows,
+  `45,000` history rows, and `errors=[]`.
+- Actual best final points: reused image-registration Dice favored SINR cps4 at
+  lr `1e-4` with Dice `0.8296`; SITReg-field brain-mask MSE favored DirectCP
+  cps4 at lr `1e-2` with MSE `7.77649e-06`.
+- Next decision: inspect whether SITReg-field fitting changes the relative
+  optimization behavior compared with Greedy-field fitting.
+
+### P1h: OASIS Seed-3 First20 DirectCP 8-4-2 Alpha1000 Preliminary
+
+- Status: completed 2026-06-26; final aggregation passed with `20/20` new
+  summaries and no errors.
+- Purpose: test whether a LungCT-style coarse-to-fine DirectCP path improves
+  the OASIS cps2 operating point before expanding to the full six-alpha sweep.
+- Dataset: OASIS BrainMR seed-3 shuffled ranks `0-19`. The first launch covers
+  ranks `0-9`; a same-setting extension launch covers ranks `10-19`.
+- Method: DirectCP multistage `8,4,2` with exact cubic B-spline dyadic knot
+  insertion between stages and image downsampling.
+- Objective: same OASIS spline objective as SINR/DirectCP alpha sweeps:
+  full-image global NCC plus `alpha *` analytic cubic B-spline BE. No
+  foreground mask in the image loss; foreground regularity uses fixed raw
+  image-positive mask.
+- Fixed parameters: alpha `1000`, learning rate `1e-2`, stage downsample
+  `4,2,1`, stage epochs `400,800,1300`, seed `1`, eval interval `250`.
+- Planned GPUs: first10 on `2,3` with max concurrency `2`; extension ranks
+  `10-19` on `0,1` with max concurrency `2`.
+- Output root:
+  `/database/inrorspline/runs/oasis_seed3_first10_directcp842_alpha1000_prelim_v1`.
+- Review root:
+  `experiments/2026-06-26_oasis_seed3_first10_directcp842_alpha1000_prelim/`.
+- Comparator rows: existing first10 IDIR best-Dice alpha `1`, SINR cps4/cps2
+  alpha `1000`, and DirectCP cps4/cps2 alpha `1000`.
+- Acceptance: compile/import passes; rank-0 `1,1,1` stage-epoch smoke passes;
+  first10 dry-run queues exactly `10` jobs on GPUs `2,3`; extension dry-run
+  queues exactly `10` jobs on GPUs `0,1`; full run produces `20/20` summaries
+  with dense fields, regularity metrics, BE/diffusion CSVs, and
+  stage/prolongation diagnostics; aggregation writes separate first10 and
+  first20 comprehensive comparison tables.
+- Known limitations: alpha `1000` only and no full six-alpha DirectCP 8-4-2
+  sweep in this preliminary step.
+- Result: DirectCP `8-4-2` alpha `1000` was the best mean-Dice row in both
+  generated tables. First10 Dice/HD95/symmetric ASD/fold%:
+  `0.8054` / `2.2429` / `0.4507` / `4.3015`. First20:
+  `0.8077` / `2.2589` / `0.4531` / `4.4071`.
+
+### P1i: OASIS Seed-3 First20 DirectCP 8-4-2 Remaining Alpha Sweep
+
+- Status: running.
+- Date planned: 2026-06-26.
+- Purpose: complete the full six-alpha DirectCP `8,4,2` OASIS curve and add it
+  to the saved-baseline paper-style first10/first20 Pareto figures without
+  overwriting the existing five-sweep package.
+- Dataset: OASIS BrainMR seed-3 shuffled ranks `0-19`, using the documented
+  first20 continuation of `pair_test_200`.
+- Method: DirectCP multistage `8,4,2` with exact cubic B-spline dyadic knot
+  insertion between stages and image downsampling.
+- Objective: full-image global NCC plus `alpha *` analytic cubic B-spline BE;
+  foreground regularity uses fixed raw image-positive mask.
+- New alpha grid: `0,10,100,10000,100000`; alpha `1000` is reused from P1h and
+  must not be relaunched.
+- Fixed parameters: learning rate `1e-2`, stage downsample `4,2,1`, stage
+  epochs `400,800,1300`, seed `1`, eval interval `250`.
+- Launch environment: Docker container `py310sitreg_v1_test1`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1`; requested GPUs `0,1,2,3` with
+  `--max-concurrent 4`.
+- Remaining-alpha output root:
+  `/database/inrorspline/runs/oasis_seed3_first20_directcp842_alpha_sweep_remaining5_v1`.
+- Reused alpha1000 root:
+  `/database/inrorspline/runs/oasis_seed3_first10_directcp842_alpha1000_prelim_v1`.
+- Review root:
+  `experiments/2026-06-26_oasis_seed3_first20_directcp842_alpha_sweep/`.
+- New figure root:
+  `experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_first10_first20_alpha5_saved_baselines_plus_directcp842_paper_v1/`.
+- Acceptance: compile/import passes; rank-0 smoke with stage epochs `1,1,1`
+  and alpha `0` passes; dry-run queues exactly `100` jobs, ranks `0-19`,
+  alphas `0,10,100,10000,100000`, GPUs `0,1,2,3`, and no alpha `1000`; full
+  run produces `100/100` remaining-alpha `DONE` files; aggregation validates
+  `100` new rows plus `20` reused alpha1000 rows; figure generation writes
+  `41` population rows per cohort and the expected PDF/PNG plot families.
+- Known limitations: this completes the DirectCP `8,4,2` alpha curve only; the
+  previous five-sweep figure package remains the historical baseline.
+
+### P1j: Fit-Modes Paper Figure IDIR Matched-Similarity Curves
+
+- Status: completed on 2026-06-26; compile, smoke, full launch, and CSV
+  validation passed.
+- Date planned: 2026-06-26.
+- Purpose: add the missing IDIR image-similarity evaluation curves needed for a
+  paper-quality figure comparing registration optimization curves with direct
+  target-field fitting curves.
+- Dataset/cases: OASIS BrainMR seed-3 rank `9`, original sorted index `88`,
+  fixed/moving `(0173,0136)`; LungCT pTV-preprocessed case `01`; LungCT
+  pTV-preprocessed case `08`.
+- Methods: IDIR only. Existing SINR/DirectCP histories from P1g and the
+  LungCT case01/case08 fit-mode sweeps are reused.
+- Training objectives: unchanged IDIR objectives. OASIS uses sampled fixed
+  image-positive NCC plus IDIR coordinate-autograd BE with alpha `1`. LungCT
+  uses pTV-preprocessed fixed-T00 lung-mask sampled NCC plus IDIR bending with
+  `alpha_bending=10`.
+- New diagnostic eval curves: OASIS full-image global NCC every `10` epochs;
+  LungCT pTV LCC data loss every `10` epochs using the same border-masked
+  pTVReg 1mm crop convention as the LungCT SINR/DirectCP runs.
+- Fixed parameters: lr `1e-4`, 2500 epochs, seed `1`, normal summary eval
+  interval `250`, image-similarity eval interval `10`.
+- Output root:
+  `/database/inrorspline/runs/fit_modes_paper_curves_idir_eval_v1`.
+- Review root:
+  `experiments/2026-06-26_fit_modes_paper_figure/`.
+- Launch environment: Docker container `py310sitreg_v1_test1`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1`; requested GPUs `0,1,2`.
+- Primary metrics: `image_similarity_eval.csv` curves, final Dice for OASIS,
+  final TRE for LungCT, and existing field-fit MSE curves for later notebook
+  composition.
+- Known limitations: eval curves are diagnostic only and do not affect
+  training. The OASIS registration curve is global NCC; the LungCT registration
+  curve is pTV LCC data loss for dataset-protocol matching.
+- Acceptance: Docker compile passed for modified OASIS and LungCT runners;
+  20-epoch smoke produced eval CSVs with epochs `1,10,20`; full run completed
+  all three IDIR jobs and each `image_similarity_eval.csv` has `251` rows
+  covering epoch `1` plus every `10` epochs through `2500`.
+- Final eval values: OASIS full-image global NCC value `0.9750214815`; LungCT
+  case01 pTV LCC data loss `2817243.5`; LungCT case08 pTV LCC data loss
+  `5032755.5`.
+- Next decision: generate the notebook figure combining these IDIR eval curves
+  with existing SINR/DirectCP registration histories and SITReg/pTVReg
+  field-fit MSE histories.
+
+### P1k: Fit-Modes Paper Figure DirectCP 4-Stage Field-Fit Finest-MSE Diagnostics
+
+- Status: completed 2026-06-26; compile, smoke, two reruns, and notebook
+  update passed.
+- Date planned: 2026-06-26.
+- Purpose: replace the LungCT DirectCP 4-stage target-field fitting curve in the
+  paper figure with a true finest-domain diagnostic curve rather than a
+  stage-domain coarse-to-fine training curve.
+- Dataset/cases: LungCT pTV-preprocessed case `01` and case `08`.
+- Method/objective: DirectCP 4-stage cps4 pTVReg field fitting only. Training
+  remains MSE-only with the existing schedule `32,16,8,4`, downsample
+  `8,4,2,1`, stage epochs `400,400,800,900`, lr `1e-2`.
+- New diagnostic curve: `finest_data_loss` equals masked normalized-grid MSE on
+  the original 1mm pTVReg crop and fixed T00 lung mask, evaluated posthoc every
+  50 epochs during coarse stages and every epoch during the final 1mm stage;
+  diagnostic only and does not affect training.
+- Output root:
+  `/database/inrorspline/runs/fit_modes_paper_curves_directcp4stage_field_mse_diag_v1`.
+- Review root:
+  `experiments/2026-06-26_fit_modes_paper_figure/`.
+- Launch environment: Docker container `py310sitreg_v1_test1`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1`; requested GPUs `2,3` if available.
+- Acceptance: modified field-fit runner compiles; smoke validates
+  `finest_data_loss` and `finest_field_mse_objective_normalized_grid` columns;
+  full case01/case08 reruns completed with `2500` history rows and `935` finite
+  finest-domain diagnostic points per case; notebook uses these finest-domain
+  MSE curves.
+- Final diagnostic values: LungCT case01 `finest_data_loss=2.846068e-08`;
+  LungCT case08 `finest_data_loss=9.682780e-08`.
+- Known limitations: DirectCP 4-stage training still optimizes stage-domain MSE
+  at coarse stages. The new curve is posthoc finest-domain diagnostic only.
+
 ### P1a: OASIS Seed-3 Case-0 Alpha Pre-Run
 
 - Status: completed; aggregation passed with 12/12 runs and no acceptance errors.
@@ -306,12 +617,312 @@ Next decision:
   `10000-1000000` for case `01` and `1000-10000` for case `08`, before any
   all-case expansion.
 
+### P2e: LungCT DirectCP 4-Stage Global NCC + Dense FD-BE All-Case Sweep
+
+- Status: completed; launch, aggregation, and ellipse-style comparison plots
+  completed.
+- Date planned: 2026-06-25.
+  Date completed: 2026-06-25.
+- Dataset: DIR-Lab 4DCT cases `01-10`, canonical regenerated pTVReg-style
+  landmark crop resampled to 1mm.
+- Method: DirectCP multistage `32,16,8,4` with exact crop-aligned cubic
+  B-spline dyadic knot insertion.
+- Objective: full-crop global NCC plus `alpha *` dense forward-difference
+  bending energy on the dense displacement field. No lung-mask or border-mask
+  loss weighting.
+- Sweep: alpha values `0,10,100,1000,10000,100000`; absolute weights, not
+  factors.
+- Reuse policy: reuse completed case `01` and `08` rows from P2d for the six
+  requested alphas; launch missing cases `02-07,09,10` only.
+- New jobs: `48` = 8 missing cases times 6 alpha values.
+- Fixed parameters: downsample schedule `8,4,2,1`, stage epochs
+  `200,400,800,1000`, `lr=1e-3`, seed `1`.
+- Mask convention: fixed T00 lung mask is used only for foreground regularity
+  metrics.
+- Primary metric: `original_snap` TRE. Track all four TREs:
+  `original_snap`, `original_subvoxel`, `reg1mm_snap`, and
+  `reg1mm_subvoxel`.
+- Comparison: generate new non-overwriting all-case ellipse-style Pareto figures
+  against IDIR BE and DirectCP 4-stage pTV LCC + isoTV.
+- Docker: `py310sitreg_v1_test1`, image `hengjieliu96/dl_dir:py310sitreg_v1`.
+- Dataset root: `/database/datasets/lungCT/processed/preprocessing/ptvprep/ptvreg_landmark_crop_1mm_trilinear_v1`.
+- Existing selected-case root: `/database/inrorspline/runs/lungct_directcp32_global_ncc_fdbe_case01_case08_alpha_sweep_v1`.
+- New missing-case output root: `/database/inrorspline/runs/lungct_directcp4stage_global_ncc_fdbe_all10_alpha_sweep_v1`.
+- Review root:
+  `experiments/2026-06-25_lungct_directcp4stage_global_ncc_fdbe_all10_alpha_sweep/`.
+- Launch command:
+  `docker exec py310sitreg_v1_test1 python /homebase/code_sync/inrorspline/scripts/experiments/lungct_no_sweep_repro/launch_directcp4stage_global_ncc_fdbe_all10_sweep.py --gpus 0,1,2,3`.
+- Verification: compile/import passed; loader audit passed for cases `01-10`;
+  launcher dry-run queued exactly `48` missing-case jobs; smoke job on case
+  `02` alpha `100000` with stage epochs `1,1,1,1` passed; full launch
+  completed `48/48` jobs with return code 0; aggregation produced `60/60`
+  FD-BE rows, `160` comparison rows, and all-case ellipse-style plots.
+- Best FD-BE mean point: alpha `10000`, original-snap TRE
+  `0.966 +/- 0.151` mm, foreground stdLogJ `0.185452`, foreground
+  `J <= 0` `0.0037%`.
+- Comparator best points in the same all-case ellipse report: IDIR BE alpha
+  `10` gives original-snap TRE `1.017 +/- 0.176` mm, foreground stdLogJ
+  `0.142869`, foreground `J <= 0` `0.0000%`; DirectCP 4-stage pTV LCC +
+  isoTV weight `0.11` gives original-snap TRE `0.922 +/- 0.152` mm,
+  foreground stdLogJ `0.179961`, foreground `J <= 0` `0.0138%`.
+- Known limitations: all-case run still uses dense FD-BE rather than analytic
+  cubic B-spline BE and is not pTVReg-matched because pTVReg uses local CC and
+  isoTV.
+- Next decision: decide whether the FD-BE objective is worth refining around
+  alpha `1000-100000`, given that its best all-case accuracy is close to but
+  still behind the pTV LCC + isoTV DirectCP best point.
+
+### P2f: LungCT Case08 DirectCP 4-Stage FD-BE vs Analytic B-Spline BE
+
+- Status: completed; two-method diagnostic completed for case `08`.
+- Date planned: 2026-06-26.
+  Date completed: 2026-06-26.
+- Dataset: DIR-Lab 4DCT case `08`, canonical regenerated pTVReg-style landmark
+  crop resampled to 1mm.
+- Methods: DirectCP multistage `32,16,8,4` with exact crop-aligned cubic
+  B-spline dyadic knot insertion, comparing full-crop global NCC plus
+  `alpha *` dense forward-difference BE against full-crop global NCC plus
+  `alpha *` analytic cubic B-spline BE.
+- Fixed parameters: alpha `10000`, downsample schedule `8,4,2,1`, stage epochs
+  `200,400,800,1000`, `lr=1e-3`, seed `1`.
+- Mask convention: fixed T00 lung mask is used only for foreground regularity
+  metrics.
+- Primary metric: `original_snap` TRE. Track all four TREs and foreground
+  regularity metrics.
+- Docker: `py310sitreg_v1_test1`, image `hengjieliu96/dl_dir:py310sitreg_v1`.
+- Dataset root: `/database/datasets/lungCT/processed/preprocessing/ptvprep/ptvreg_landmark_crop_1mm_trilinear_v1`.
+- Output root:
+  `/database/inrorspline/runs/lungct_case08_be_impl_compare_alpha1e4_v1`.
+- Review root:
+  `experiments/2026-06-26_lungct_case08_be_impl_compare_alpha1e4/`.
+- Launch: ran the FD-BE job on GPU `2` and analytic B-spline BE job on
+  GPU `3` concurrently.
+- Verification: compile/import passed; loader audit passed for case `08`;
+  minimal smoke passed for both BE variants; full launch completed both jobs
+  with status `completed`; comparison rows and review report were generated.
+- Result: original-snap TRE tied after snap-to-voxel rounding at `1.087383` mm.
+  Analytic B-spline BE was slightly better on original-subvoxel TRE
+  (`1.145162` vs `1.146554` mm) and foreground stdLogJ (`0.191389` vs
+  `0.192354`), but took longer (`367.985` vs `351.897` seconds). Peak memory
+  was identical at `6.492` GB.
+- Known limitations: selected-case diagnostic only; alpha `10000` is the same
+  numeric weight but not guaranteed to imply matched effective regularization
+  scale between dense FD-BE and analytic B-spline BE.
+
 ### P3: LungCT 4DCT Matched Pareto
 
 - Status: planned.
 - Methods: IDIR, SINR, single-stage DirectCP cps4, multistage DirectCP, pTVReg references.
 - Required: `docs/standards/lungct_protocol_tags.md` and explicit protocol
   tags for preprocessing/domain/mask/loss.
+
+### P2g: LungCT Case01 Registration vs pTVReg-Field Fitting LR Sweep
+
+- Status: completed; full 24-job run and aggregation passed 2026-06-26.
+- Date planned: 2026-06-26.
+- Dataset: DIR-Lab 4DCT case `01`, canonical regenerated pTVReg-style landmark
+  crop resampled to 1mm.
+- Methods: IDIR, SINR cps4, DirectCP cps4, and DirectCP 4-stage
+  `32,16,8,4`.
+- Objectives: image registration and direct MSE fitting to the saved pTVReg
+  case01 displacement field.
+- Learning rates: `1e-2,1e-3,1e-4`; total jobs `24`.
+- Scheduling: method batches run serially. Within each method batch, the six
+  objective/LR jobs are distributed across GPUs `0,1,2,3`.
+- Field-fit MSE objective domain: fixed T00 lung mask in the 1mm crop; full
+  crop MSE is diagnostic only.
+- Registration weights: IDIR `alpha_bending=10`; pTV LCC+isoTV methods
+  `ptv_isotv_weight=0.11`.
+- DirectCP 4-stage schedule: `32,16,8,4`, downsample `8,4,2,1`, stage epochs
+  `400,400,800,900`.
+- pTVReg source field:
+  `/database/inrorspline/ptvreg/4DCT/case01_T50_to_T00_deformation.mat`.
+  The saved HDF5 field is `Tptv_rsz` with h5py shape `(3,z,y,x)`, equivalent
+  to MATLAB `T(x,y,z,component)`, physical-mm `x,y,z` components, fixed-to-moving.
+- Required target validation: reproduce saved pTVReg `TRE_phys=0.7671410824`
+  and `TREstd_case=0.8917488134` using the pTVReg snap-to-voxel convention.
+- Output root:
+  `/database/inrorspline/runs/lungct_case01_ptvreg_fit_modes_lr_sweep_v1`.
+- Review root:
+  `experiments/2026-06-26_lungct_case01_ptvreg_fit_modes_lr_sweep/`.
+- Docker: `py310sitreg_v1_test1`, image `hengjieliu96/dl_dir:py310sitreg_v1`.
+- Known limitations: the field-fit target is reconstructed on the repo's
+  reg1mm grid from pTVReg's saved native/full displacement output; the original
+  pTVReg internal reg1mm displacement is not stored in the `.mat`.
+- Restart note: an initial method-pinned launch was stopped and replaced with
+  method-batch scheduling because method runtimes are imbalanced.
+- Completion note: final review includes full LR curves, final metric-vs-LR
+  plots, and best-LR masked-MSE/registration-loss plots with continuous
+  DirectCP 4-stage epoch axes.
+
+### P2h: LungCT Case08 Registration vs pTVReg-Field Fitting LR Sweep
+
+- Status: completed; full 24-job run and aggregation passed 2026-06-26.
+- Date planned: 2026-06-26.
+- Dataset: DIR-Lab 4DCT case `08`, canonical regenerated pTVReg-style landmark
+  crop resampled to 1mm.
+- Methods, objectives, learning rates, scheduling, masks, and regularization:
+  same as P2g Case01.
+- DirectCP 4-stage schedule: `32,16,8,4`, downsample `8,4,2,1`, stage epochs
+  `400,400,800,900`.
+- pTVReg source field:
+  `/database/inrorspline/ptvreg/4DCT/case08_T50_to_T00_deformation.mat`.
+  The saved HDF5 field is `Tptv_rsz` with h5py shape `(3,128,512,512)`,
+  physical-mm `x,y,z` components, fixed-to-moving.
+- Required target validation: reproduce saved pTVReg
+  `TRE_phys=1.0142198317` and `TREstd_case=1.2922227355` using the pTVReg
+  snap-to-voxel convention.
+- Output root:
+  `/database/inrorspline/runs/lungct_case08_ptvreg_fit_modes_lr_sweep_v1`.
+- Review root:
+  `experiments/2026-06-26_lungct_case08_ptvreg_fit_modes_lr_sweep/`.
+- Docker: `py310sitreg_v1_test1`, image `hengjieliu96/dl_dir:py310sitreg_v1`.
+- Acceptance: smoke and full aggregation must report `24/24` completed rows;
+  final visualization must match Case01, including best-LR masked-MSE and
+  registration-loss plots with continuous DirectCP 4-stage epoch axes.
+- Known limitations: same as Case01; the field-fit target is reconstructed on
+  the repo's reg1mm grid from pTVReg's saved native/full displacement output.
+- Completion note: final review includes full LR curves, final metric-vs-LR
+  plots, and best-LR masked-MSE/registration-loss plots with continuous
+  DirectCP 4-stage epoch axes.
+
+### P2i: LungCT Case01/Case08 DirectCP 4-Stage Finest-Domain Loss Diagnostic
+
+- Status: completed; smoke, full reruns, validation, and companion plots
+  completed 2026-06-26.
+- Date planned: 2026-06-26.
+- Purpose: rerun only DirectCP 4-stage image registration at `lr=0.01` for
+  cases `01` and `08`, preserving the original stage-wise training objective
+  while recording a diagnostic loss on the finest 1mm crop domain at every
+  epoch.
+- Dataset: DIR-Lab 4DCT cases `01` and `08`, canonical regenerated pTVReg-style
+  landmark crop resampled to 1mm.
+- Method: `direct_cp_32_16_8_4_ptv_lcc_isotv`.
+- Schedule: `32,16,8,4`, downsample `8,4,2,1`, stage epochs
+  `400,400,800,900`, Adam, seed `1`, `lr=0.01`.
+- Training objective: unchanged stage-domain pTV LCC + isoTV with
+  `ptv_isotv_weight=0.11`, `border_mask_voxels=5`, LCC sigma `2.1 mm`.
+- Diagnostic objective: pre-step, no-gradient full 1mm crop pTV LCC + isoTV
+  after analytic cubic B-spline expansion of current controls to the finest
+  grid; diagnostic only and does not affect optimization.
+- Output root:
+  `/database/inrorspline/runs/lungct_directcp4stage_lr0p01_finest_loss_diag_case01_case08_v1`.
+- Review root:
+  `experiments/2026-06-26_lungct_directcp4stage_lr0p01_finest_loss_diag_case01_case08/`.
+- Companion plots are written next to the accepted Case01/Case08 sweep plots
+  without overwriting `best_lr_registration_loss_spline_methods.png`.
+- Docker: `py310sitreg_v1_test1`, image `hengjieliu96/dl_dir:py310sitreg_v1`.
+- Acceptance: smoke passes for both cases; full reruns produce `2500`
+  `stage_history.csv` rows with finite `finest_loss`, `finest_data_loss`, and
+  `finest_reg_loss`; companion plots render continuous DirectCP 4-stage curves
+  on epochs `1-2500`.
+- Known limitations: this is a loss-curve diagnostic for two cases only; the
+  finest-domain trace is not the training loss used for backprop on coarse
+  stages.
+- Completion note: case01 elapsed `258.6` sec and case08 elapsed `311.7` sec;
+  both histories have `2500` finite diagnostic rows. Companion PNGs were written
+  next to the accepted Case01 and Case08 spline-method loss plots with the
+  suffix `_finest_domain_directcp4stage_lr0p01.png`.
+
+### P2j: LungCT DirectCP 4-Stage Mid-Ratio Pareto Extension
+
+- Status: completed.
+- Date planned: 2026-06-26.
+- Date completed: 2026-06-26.
+- Purpose: add mid-ratio regularization points to improve the all-10
+  TRE-versus-foreground-regularity Pareto visualization.
+- Dataset: DIR-Lab 4DCT cases `01-10`, canonical regenerated pTVReg-style
+  landmark crop resampled to 1mm.
+- Methods:
+  - `direct_cp_32_16_8_4_ptv_lcc_isotv`
+  - `direct_cp_32_16_8_4_global_ncc_fd_be`
+- New pTV-LCC+isoTV ratios: `0.3x` and `3x` around anchor
+  `ptv_isotv_weight=0.11`, giving weights `0.033` and `0.33`.
+- New global-NCC+FD-BE ratios: `0.3x` and `3x` around anchor alpha `10000`,
+  giving alphas `3000` and `30000`.
+- IDIR addendum ratios: `0.3x` and `3x` around anchor `alpha_bending=10`,
+  giving alphas `3` and `30`. Alpha `30` is reused from the existing completed
+  IDIR sweep root; alpha `3` is launched as 10 new jobs.
+- Fixed parameters: `lr=1e-3`, seed `1`, schedule `32,16,8,4`, downsample
+  `8,4,2,1`, stage epochs `200,400,800,1000`.
+- Launch ordering: run all pTV-LCC+isoTV jobs first; after `20/20` complete,
+  run all global-NCC+FD-BE jobs. pTV-LCC+isoTV used GPUs `0,1,2,3`; after a
+  mid-run user request, FD-BE was paused after active children finished and the
+  remaining `5` jobs were relaunched on GPUs `0,1` only so GPUs `2,3` stayed
+  available.
+- pTV-LCC+isoTV output root:
+  `/database/inrorspline/runs/lungct_directcp4stage_midratio_ptvlcc_v1`.
+- global-NCC+FD-BE output root:
+  `/database/inrorspline/runs/lungct_directcp4stage_midratio_fdbe_v1`.
+- IDIR addendum output roots:
+  `/database/inrorspline/runs/lungct_idir_midratio_alpha3_v1` for new alpha
+  `3` jobs, and
+  `/database/inrorspline/runs/lungct_ptvprep_reg_sweep_idir_directcp32_v1` for
+  reused alpha `30` rows.
+- Review root:
+  `experiments/2026-06-26_lungct_directcp4stage_midratio_pareto_extension/`.
+- Notebook:
+  `pareto_visual_review_midratio_extension.ipynb`.
+- Aggregation: reuse existing all-10 rows from P2e, add the 40 new rows, and
+  recompute/validate pTVReg reference rows from uploaded `.mat` fields.
+- Primary metric: `original_snap` TRE. Track `original_subvoxel`,
+  `reg1mm_snap`, `reg1mm_subvoxel`, and foreground regularity metrics.
+- Mask convention: foreground regularity uses the fixed T00 lung mask on the
+  pTV 1mm crop; DirectCP training losses do not use lung-mask weighting.
+- Acceptance: dry-runs queue exactly `20` jobs per method; smoke jobs pass for
+  both methods; full batches complete sequentially; final executed notebook has
+  `210` case rows, `21` mean rows, pTVReg validation errors below `1e-8`, and
+  all 12 requested inline/saved Pareto figures.
+- Completion note: pTV-LCC+isoTV completed `20/20`; global-NCC+FD-BE completed
+  `20/20`; strict aggregation produced `210` case rows and `21` mean rows. The
+  executed notebook and 12 PNG Pareto figures are under
+  `experiments/2026-06-26_lungct_directcp4stage_midratio_pareto_extension/pareto_visual_review_midratio_extension/`.
+- IDIR addendum acceptance: alpha `3` dry-run queues 10 jobs on GPUs
+  `0,1,2,3`; smoke passes; full alpha `3` batch completes `10/10`; reused
+  alpha `30` validates `10/10`; re-executed notebook has `230` case rows,
+  `23` mean rows, and the same 12 inline/saved Pareto figure set updated with
+  IDIR ratios `0.3x` and `3x`.
+- IDIR addendum completion note: alpha `3` completed `10/10`; reused alpha
+  `30` validated `10/10`; strict aggregation produced `230` case rows and `23`
+  mean rows; the re-executed notebook contains IDIR ratios
+  `0.01,0.1,0.3,1,3,10,100` and 12 inline/saved PNG figures.
+- Known limitations: this is a regularization-grid refinement only and does not
+  resolve pTVReg protocol differences such as optimizer, linear basis, and
+  image pyramid.
+
+### P2k: LungCT IDIR Sampled pTV-LCC + TV 0.11 Pilot
+
+- Status: planned; implementation, smoke, full launch, and aggregation requested
+  2026-06-26.
+- Purpose: test whether IDIR remains competitive when its sampled-coordinate
+  mechanism uses a pTV-style local-CC data term and an IDIR-specific sampled TV
+  analogue instead of sampled global NCC plus bending energy.
+- Dataset: DIR-Lab 4DCT cases `01-10`, canonical regenerated pTVReg-style
+  landmark crop resampled to 1mm.
+- Method: `idir_sampled_ptv_lcc_tv`.
+- Objective: sampled pTV-LCC on pTV 1mm border-crop samples plus
+  `0.11 *` sampled analytic physical-unit TV of the SIREN displacement
+  Jacobian. Fixed T00 lung mask is foreground-metric-only, not a training
+  sampling mask.
+- Fixed parameters: `ptv_isotv_weight=0.11`, `lr=1e-4`, `epochs=2500`,
+  seed `1`, SIREN omega `32`, sampled LCC centers `512`, sampled patch offsets
+  `64`, `sigma_mm=2.1`, `csqrt=5e-3`, border mask `5` voxels.
+- Output root:
+  `/database/inrorspline/runs/lungct_idir_sampled_ptvlcc_tv_w0p11_all10_v1`.
+- Review root:
+  `experiments/2026-06-26_lungct_idir_sampled_ptvlcc_tv_w0p11_all10/`.
+- Launch environment: Docker container `py310sitreg_v1_test1`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1`; requested GPUs `0,1,2,3`.
+- Primary metric: `original_snap` TRE. Track `original_subvoxel`,
+  `reg1mm_snap`, `reg1mm_subvoxel`, fixed-T00-lung foreground regularity,
+  elapsed time, and peak GPU memory.
+- Acceptance: compile passes; loader audit for cases `01-10` passes; case01
+  short smoke at weight `0.11` has finite losses and writes summary metrics;
+  dry-run queues exactly `10` jobs; full launch completes `10/10` summaries;
+  aggregation writes case/mean tables with no completion errors.
+- Known limitations: IDIR has no control lattice, so this TV term is a sampled
+  analytic SIREN-Jacobian analogue of pTV isoTV, not the same control-grid
+  regularizer used by pTVReg or DirectCP.
 
 ### P4: pTV-Style DirectCP Ablation Ladder
 

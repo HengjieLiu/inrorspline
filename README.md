@@ -9,6 +9,7 @@ The working thesis is that continuous/off-grid deformation evaluation is not eno
 - [docs/00_index.md](docs/00_index.md): project map and current status.
 - [docs/01_project_brief.md](docs/01_project_brief.md): scientific goal and claims.
 - [docs/03_methods.md](docs/03_methods.md): method/protocol definitions.
+- [docs/implementation/](docs/implementation/): code-derived implementation notes for methods, training losses, deformation math, and paper claims.
 - [docs/04_experiment_registry.md](docs/04_experiment_registry.md): planned and real experiment ledger.
 - [docs/reports/current_results_audit_and_plan.md](docs/reports/current_results_audit_and_plan.md): carried-forward audit and priority plan.
 - [docs/reports/protocol_warnings/lungct_idir_ptvreg_protocol_bias.md](docs/reports/protocol_warnings/lungct_idir_ptvreg_protocol_bias.md): required warning before interpreting LungCT comparisons.

@@ -9,6 +9,9 @@ status: active
 
 - Read `AGENTS.md` and relevant docs before editing.
 - Keep changes scoped.
+- Update `docs/implementation/` when code review, paper writing, or experiment
+  work reveals durable implementation details about method architecture,
+  training losses, deformation math, or paper-facing claims.
 - Do not run rsync without the required briefing and approval.
 - Do not launch Docker or long experiments in plan mode.
 - Do not commit unless explicitly asked.
