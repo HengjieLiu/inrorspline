@@ -58,3 +58,30 @@
 - This is a three-alpha preliminary subset, not a full six-alpha DirectCP cps2
   sweep. Original P1 report/figure files must remain unchanged; overlay outputs
   use suffixed filenames under the add-on review subdirectory.
+
+## DirectCP cps2 Six-Alpha Completion Add-On
+
+- Requested 2026-06-25 after reviewing the P1c preliminary overlay.
+- Launch started 2026-06-25 15:18 Pacific via `nohup docker exec` in
+  `inrorspline_oasis_seed3_first10_run_20260625` after a 2-epoch alpha `0`
+  smoke job passed.
+- Launch completed 2026-06-25 15:41 Pacific with `30/30` summaries,
+  `30/30` `DONE` markers, and `failures=[]`; full overlay aggregation
+  completed 2026-06-25 15:43 Pacific.
+- Scope: complete DirectCP cps2 by running the missing spline-grid alphas
+  `0,10,100000` for ranks `0-9`, then combine those rows with the completed
+  P1c alphas `100,1000,10000`.
+- Fixed settings: DirectCP cps2, cubic B-spline analytic BE/diffusion, 2500
+  epochs, seed `1`, eval interval `250`, lr `1e-3`.
+- Planned launch pattern: one case wave at a time, alpha `0` on GPU `1`, alpha
+  `10` on GPU `2`, and alpha `100000` on GPU `3`.
+- Completion output root:
+  `/database/inrorspline/runs/oasis_seed3_first10_direct_cp_cps2_completion_a0_10_100000_v1`.
+- Full overlay review root:
+  `experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/direct_cp_cps2_full_overlay/`.
+- Original P1 reports and P1c preliminary overlay files must remain unchanged;
+  full-overlay outputs use a separate review directory and `_with_direct_cp_cps2_full`
+  filename suffixes.
+- Acceptance result: combined DirectCP cps2 coverage is `60/60`; each alpha
+  `0,10,100,1000,10000,100000` has 10 summaries; each rank `000-009` has 6
+  DirectCP cps2 summaries; full overlay report says PASS.

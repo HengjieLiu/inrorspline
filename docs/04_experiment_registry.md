@@ -84,6 +84,29 @@ Next decision:
 - Known limitation: preliminary 3-alpha subset only; do not interpret as a full
   six-alpha DirectCP cps2 Pareto sweep.
 
+### P1d: OASIS Seed-3 First10 DirectCP cps2 Six-Alpha Completion
+
+- Status: completed; completion launch ran 2026-06-25 15:18-15:41 Pacific
+  after a 2-epoch smoke passed, and full overlay aggregation completed
+  2026-06-25 15:43 Pacific.
+- Purpose: complete DirectCP cps2 from the preliminary alpha subset to the full
+  six-alpha spline grid without overwriting P1 or P1c review artifacts.
+- Dataset: OASIS BrainMR seed-3 shuffled ranks `0-9`, original sorted indices
+  `158,62,14,69,47,137,110,6,116,88`.
+- Method: DirectCP cps2 with cubic B-spline analytic BE/diffusion.
+- Completion grid: alpha `0,10,100000`; combine with P1c alpha
+  `100,1000,10000` for the full cps2 grid.
+- Fixed settings: 2500 epochs; seed `1`; eval interval `250`; lr `1e-3`.
+- Output root:
+  `/database/inrorspline/runs/oasis_seed3_first10_direct_cp_cps2_completion_a0_10_100000_v1`.
+- Full overlay review root:
+  `experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/direct_cp_cps2_full_overlay/`.
+- Launch environment: Docker container
+  `inrorspline_oasis_seed3_first10_run_20260625`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1_251008`; requested GPUs `1,2,3`.
+- Acceptance: completion root `30/30` with `failures=[]`, combined DirectCP
+  cps2 `60/60`, six alphas by ten ranks, full overlay report PASS.
+
 ### P1a: OASIS Seed-3 Case-0 Alpha Pre-Run
 
 - Status: completed; aggregation passed with 12/12 runs and no acceptance errors.

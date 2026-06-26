@@ -53,6 +53,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--eval-interval", type=int, default=250)
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--lr", type=float, default=LR)
+    parser.add_argument("--variant", type=str, default=VARIANT)
     parser.add_argument("--out-root", type=Path, default=DEFAULT_OUT_ROOT)
     parser.add_argument("--original-root", type=Path, default=DEFAULT_ORIGINAL_ROOT)
     parser.add_argument("--review-root", type=Path, default=DEFAULT_REVIEW_ROOT)
@@ -146,7 +147,7 @@ def build_cmd(args: argparse.Namespace, job: Job) -> List[str]:
         "--seed",
         str(args.seed),
         "--variant",
-        VARIANT,
+        str(args.variant),
         "--out-root",
         str(args.out_root),
         "--oasis-root",
@@ -193,7 +194,7 @@ def write_manifest(args: argparse.Namespace, jobs: Sequence[Job]) -> None:
             "method": METHOD,
             "alphas": parse_alphas(str(args.alphas)),
             "lr": float(args.lr),
-            "variant": VARIANT,
+            "variant": str(args.variant),
             "gpu_alpha_map": {str(job.alpha): job.gpu for job in jobs[: len(parse_alphas(str(args.alphas)))]},
             "jobs": rows,
         },
@@ -323,6 +324,7 @@ def main() -> None:
                 "out_root": str(args.out_root),
                 "original_root": str(args.original_root),
                 "review_root": str(args.review_root),
+                "variant": str(args.variant),
                 "gpus": args.gpus,
                 "epochs": args.epochs,
                 "eval_interval": args.eval_interval,
