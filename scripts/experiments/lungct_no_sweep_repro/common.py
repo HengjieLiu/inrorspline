@@ -816,6 +816,114 @@ def ptv_local_cc_loss_with_cache(
     return loss_map.sum() * dvol
 
 
+def make_sampled_lcc_offsets(
+    image_shape: Sequence[int],
+    cur_pix_zyx: Sequence[float],
+    sigma_mm: float,
+    radius_sigma: float,
+    sigma_floor_pix: float,
+    max_offsets: int,
+    device: torch.device,
+    dtype: torch.dtype,
+) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, object]]:
+    sigma_zyx = ptv_lcc_sigma_zyx(cur_pix_zyx, sigma_mm, sigma_floor_pix)
+    ranges = [
+        torch.arange(
+            -int(math.ceil(float(radius_sigma) * float(sigma))),
+            int(math.ceil(float(radius_sigma) * float(sigma))) + 1,
+            device=device,
+            dtype=dtype,
+        )
+        for sigma in sigma_zyx
+    ]
+    zz, yy, xx = torch.meshgrid(*ranges, indexing="ij")
+    offsets_zyx = torch.stack((zz, yy, xx), dim=-1).reshape(-1, 3)
+    sigma_t = offsets_zyx.new_tensor(sigma_zyx).view(1, 3)
+    weights = torch.exp(-0.5 * (offsets_zyx / sigma_t).square().sum(dim=1))
+    if int(max_offsets) > 0 and int(max_offsets) < int(weights.numel()):
+        keep = torch.topk(weights, k=int(max_offsets), largest=True, sorted=False).indices
+        offsets_zyx = offsets_zyx[keep]
+        weights = weights[keep]
+    weights = weights / weights.sum().clamp_min(1e-12)
+    shape = [max(int(v) - 1, 1) for v in image_shape]
+    offsets_norm_xyz = torch.stack(
+        (
+            2.0 * offsets_zyx[:, 2] / float(shape[2]),
+            2.0 * offsets_zyx[:, 1] / float(shape[1]),
+            2.0 * offsets_zyx[:, 0] / float(shape[0]),
+        ),
+        dim=1,
+    )
+    meta = {
+        "sigma_zyx_pix": [float(v) for v in sigma_zyx],
+        "candidate_offsets": int(zz.numel()),
+        "selected_offsets": int(offsets_zyx.shape[0]),
+        "max_abs_offset_zyx": [float(v) for v in offsets_zyx.abs().max(dim=0).values.detach().cpu().tolist()],
+        "offset_weight_min": float(weights.min().detach().cpu()),
+        "offset_weight_max": float(weights.max().detach().cpu()),
+    }
+    return offsets_norm_xyz.to(dtype=dtype), weights.to(dtype=dtype), meta
+
+
+def sampled_ptv_local_cc_loss(
+    fixed: torch.Tensor,
+    moving: torch.Tensor,
+    patch_coords: torch.Tensor,
+    patch_disp: torch.Tensor,
+    weights: torch.Tensor,
+    domain_voxels: int,
+    cur_pix_zyx: Sequence[float],
+    deps: float = 1e-4,
+) -> torch.Tensor:
+    if patch_coords.shape != patch_disp.shape or patch_coords.ndim != 3 or int(patch_coords.shape[-1]) != 3:
+        raise ValueError(
+            f"Expected patch coords/disp [centers, offsets, 3], got {tuple(patch_coords.shape)} and {tuple(patch_disp.shape)}"
+        )
+    n_centers = int(patch_coords.shape[0])
+    n_offsets = int(patch_coords.shape[1])
+    w = weights.to(device=patch_coords.device, dtype=patch_coords.dtype).reshape(1, n_offsets)
+    w = w / w.sum(dim=1, keepdim=True).clamp_min(1e-12)
+    fixed_samples = sample_volume(fixed, patch_coords.reshape(-1, 3), mode="bilinear").reshape(n_centers, n_offsets)
+    warped_samples = sample_volume(moving, (patch_coords + patch_disp).reshape(-1, 3), mode="bilinear").reshape(
+        n_centers, n_offsets
+    )
+    mean_f = (fixed_samples * w).sum(dim=1)
+    mean_w = (warped_samples * w).sum(dim=1)
+    var_f = (fixed_samples.square() * w).sum(dim=1) - mean_f.square()
+    var_w = (warped_samples.square() * w).sum(dim=1) - mean_w.square()
+    std_f = torch.sqrt(var_f.clamp_min(0.0) + float(deps))
+    std_w = torch.sqrt(var_w.clamp_min(0.0) + float(deps))
+    cross = (fixed_samples * warped_samples * w).sum(dim=1) - mean_f * mean_w
+    lcc = cross / (std_f * std_w).clamp_min(1e-8)
+    dvol = float(cur_pix_zyx[0]) * float(cur_pix_zyx[1]) * float(cur_pix_zyx[2])
+    return (1.0 - lcc).mean() * float(domain_voxels) * dvol
+
+
+def idir_sampled_tv_physical(
+    input_coords: torch.Tensor,
+    output_rel: torch.Tensor,
+    image_shape: Sequence[int],
+    cur_pix_zyx: Sequence[float],
+    csqrt: float,
+    domain_voxels: Optional[int] = None,
+) -> torch.Tensor:
+    jac_norm = idir_jacobian_matrix(input_coords, output_rel)
+    scale_xyz = output_rel.new_tensor(
+        [
+            max(int(image_shape[2]) - 1, 1) * float(cur_pix_zyx[2]) / 2.0,
+            max(int(image_shape[1]) - 1, 1) * float(cur_pix_zyx[1]) / 2.0,
+            max(int(image_shape[0]) - 1, 1) * float(cur_pix_zyx[0]) / 2.0,
+        ]
+    )
+    jac_phys = jac_norm * scale_xyz.view(1, 3, 1) / scale_xyz.view(1, 1, 3).clamp_min(1e-12)
+    density = torch.sqrt(jac_phys.square().sum(dim=(1, 2)) + float(csqrt))
+    loss = density.mean()
+    if domain_voxels is not None:
+        dvol = float(cur_pix_zyx[0]) * float(cur_pix_zyx[1]) * float(cur_pix_zyx[2])
+        loss = loss * float(domain_voxels) * dvol
+    return loss
+
+
 def domain_cps_from_full(full_cps: int, downsample: int) -> int:
     if int(full_cps) % int(downsample) != 0:
         raise ValueError(f"full_cps={full_cps} must be divisible by downsample={downsample}")

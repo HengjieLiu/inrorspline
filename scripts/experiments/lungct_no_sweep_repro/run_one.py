@@ -16,6 +16,7 @@ import common as c
 
 
 METHOD_IDIR = "idir_be_default_lungmask"
+METHOD_IDIR_SAMPLED_PTV_TV = "idir_sampled_ptv_lcc_tv"
 METHOD_SINR_CPS4_PTV = "sinr_cps4_ptv_lcc_isotv"
 METHOD_DIRECT_CP_CPS4_PTV = "direct_cp_cps4_ptv_lcc_isotv"
 METHOD_DIRECT_CP_32_PTV = "direct_cp_32_16_8_4_ptv_lcc_isotv"
@@ -23,6 +24,7 @@ METHOD_DIRECT_CP_32_GLOBAL_NCC_BE = "direct_cp_32_16_8_4_global_ncc_bspline_be"
 METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE = "direct_cp_32_16_8_4_global_ncc_fd_be"
 METHODS = [
     METHOD_IDIR,
+    METHOD_IDIR_SAMPLED_PTV_TV,
     METHOD_SINR_CPS4_PTV,
     METHOD_DIRECT_CP_CPS4_PTV,
     METHOD_DIRECT_CP_32_PTV,
@@ -42,6 +44,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--eval-interval", type=int, default=100)
     parser.add_argument("--eval-chunk-size", type=int, default=200000)
+    parser.add_argument("--image-sim-eval-interval", type=int, default=0)
+    parser.add_argument("--image-sim-eval-chunk-size", type=int, default=None)
     parser.add_argument("--save-dense-dvf", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--audit-loader", action="store_true")
@@ -65,6 +69,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ptv-lcc-sigma-floor-pix", type=float, default=0.8)
     parser.add_argument("--ptv-isotv-weight", type=float, default=0.11)
     parser.add_argument("--ptv-csqrt", type=float, default=5e-3)
+    parser.add_argument("--sampled-lcc-centers", type=int, default=512)
+    parser.add_argument("--sampled-lcc-offsets", type=int, default=64)
 
     parser.add_argument("--stage-full-cps", type=str, default="32,16,8,4")
     parser.add_argument("--stage-downsample", type=str, default="8,4,2,1")
@@ -72,7 +78,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stage-lr", type=str, default="1e-3")
     parser.add_argument("--antialias-sigma-scale", type=float, default=0.5)
     parser.add_argument("--antialias-radius-sigma", type=float, default=3.0)
-    return parser.parse_args()
+    parser.add_argument("--finest-loss-diagnostic", action="store_true")
+    parser.add_argument("--finest-loss-every", type=int, default=1)
+    args = parser.parse_args()
+    if int(args.finest_loss_every) < 1:
+        raise ValueError("--finest-loss-every must be >= 1")
+    return args
 
 
 def default_epochs(method: str) -> int:
@@ -133,6 +144,54 @@ def evaluate_idir_dense(model: torch.nn.Module, image_shape: Sequence[int], devi
     return torch.cat(chunks, dim=0).reshape(*tuple(int(v) for v in image_shape), 3)
 
 
+def should_image_sim_eval(args: argparse.Namespace, epoch: int, epochs: int) -> bool:
+    interval = int(args.image_sim_eval_interval)
+    if interval <= 0:
+        return False
+    return int(epoch) == 1 or int(epoch) % interval == 0 or int(epoch) == int(epochs)
+
+
+def evaluate_idir_ptv_lcc(
+    args: argparse.Namespace,
+    model: torch.nn.Module,
+    fixed_t: torch.Tensor,
+    moving_t: torch.Tensor,
+    id_dense: torch.Tensor,
+    border_mask: torch.Tensor,
+    ptv_cache: Dict[str, torch.Tensor | List[float]],
+    image_shape: Sequence[int],
+    device: torch.device,
+    chunk_size: int,
+    epoch: int,
+) -> Dict[str, float | str | bool]:
+    eval_start = time.time()
+    model.eval()
+    with torch.no_grad():
+        dense = evaluate_idir_dense(model, image_shape, device, chunk_size)
+        warped = c.warp_full(moving_t, id_dense + dense, mode="bilinear")
+        loss = c.ptv_local_cc_loss_with_cache(
+            warped,
+            border_mask,
+            ptv_cache,
+            (1.0, 1.0, 1.0),
+            args.ptv_lcc_radius_sigma,
+        )
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    value = float(loss.detach().cpu())
+    del dense, warped, loss
+    return {
+        "epoch": float(epoch),
+        "global_epoch": float(epoch),
+        "similarity_loss": value,
+        "similarity_value": -value,
+        "similarity_name": "ptv_lcc_data_loss",
+        "eval_domain": "border_masked_crop",
+        "affects_training": False,
+        "eval_elapsed_sec": time.time() - eval_start,
+    }
+
+
 def train_idir(args: argparse.Namespace, case: c.LungCTCase, device: torch.device, out_dir: Path) -> Dict[str, object]:
     epochs = int(args.epochs if args.epochs is not None else 2500)
     lr = float(args.lr if args.lr is not None else 1e-4)
@@ -142,6 +201,7 @@ def train_idir(args: argparse.Namespace, case: c.LungCTCase, device: torch.devic
     fixed_t = torch.from_numpy(case.fixed).to(device=device, dtype=torch.float32)
     moving_t = torch.from_numpy(case.moving).to(device=device, dtype=torch.float32)
     mask_t = torch.from_numpy(case.fixed_mask.astype(np.bool_)).to(device=device)
+    image_shape = tuple(int(v) for v in case.shape_zyx)
     coords_all = c.make_coordinate_tensor(case.shape_zyx, device)
     coords_train = coords_all[mask_t.reshape(-1)].contiguous()
     n_train = int(coords_train.shape[0])
@@ -152,6 +212,17 @@ def train_idir(args: argparse.Namespace, case: c.LungCTCase, device: torch.devic
     model = c.build_siren(args.hidden_dim, args.hidden_layers, args.idir_omega).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     history: List[Dict[str, float]] = []
+    image_similarity_eval: List[Dict[str, float | str | bool]] = []
+    image_sim_chunk_size = int(args.image_sim_eval_chunk_size or args.eval_chunk_size)
+    id_dense = c.make_coordinate_grid(image_shape, device).detach()
+    border_mask = c.make_border_mask(image_shape, int(args.border_mask_voxels), device, fixed_t.dtype)
+    ptv_cache = c.make_ptv_lcc_fixed_cache(
+        fixed_t,
+        (1.0, 1.0, 1.0),
+        args.ptv_lcc_sigma_mm,
+        args.ptv_lcc_radius_sigma,
+        args.ptv_lcc_sigma_floor_pix,
+    )
     if device.type == "cuda":
         torch.cuda.empty_cache()
         torch.cuda.reset_peak_memory_stats()
@@ -176,6 +247,22 @@ def train_idir(args: argparse.Namespace, case: c.LungCTCase, device: torch.devic
             "reg_loss": float(reg_loss.detach().cpu()),
         }
         history.append(row)
+        if should_image_sim_eval(args, epoch, epochs):
+            sim_row = evaluate_idir_ptv_lcc(
+                args,
+                model,
+                fixed_t,
+                moving_t,
+                id_dense,
+                border_mask,
+                ptv_cache,
+                image_shape,
+                device,
+                image_sim_chunk_size,
+                epoch,
+            )
+            image_similarity_eval.append(sim_row)
+            print(json.dumps({"image_similarity_eval": sim_row}), flush=True)
         if epoch == 1 or epoch % int(args.eval_interval) == 0 or epoch == epochs:
             print(json.dumps(row), flush=True)
     if device.type == "cuda":
@@ -184,9 +271,12 @@ def train_idir(args: argparse.Namespace, case: c.LungCTCase, device: torch.devic
     peak = torch.cuda.max_memory_allocated() / (1024**3) if device.type == "cuda" else 0.0
     dense = evaluate_idir_dense(model, case.shape_zyx, device, args.eval_chunk_size)
     c.write_csv(out_dir / "loss_history.csv", history)
+    if image_similarity_eval:
+        c.write_csv(out_dir / "image_similarity_eval.csv", image_similarity_eval)
     return {
         "dense_disp_norm_xyz": dense,
         "history_tail": history[-10:],
+        "image_similarity_eval_tail": image_similarity_eval[-10:],
         "training": {
             "epochs": epochs,
             "lr": lr,
@@ -195,6 +285,137 @@ def train_idir(args: argparse.Namespace, case: c.LungCTCase, device: torch.devic
             "alpha_bending": float(args.alpha_bending),
             "batch_size": batch_size,
             "train_coords": n_train,
+            "seed": int(args.seed),
+            "network": {
+                "type": "SIREN",
+                "layers": [3] + [int(args.hidden_dim)] * int(args.hidden_layers) + [3],
+                "omega": float(args.idir_omega),
+                "trainable_parameters": int(sum(p.numel() for p in model.parameters() if p.requires_grad)),
+            },
+            "image_similarity_eval_interval": int(args.image_sim_eval_interval),
+            "image_similarity_eval_name": "ptv_lcc_data_loss" if int(args.image_sim_eval_interval) > 0 else None,
+            "image_similarity_eval_affects_training": False if int(args.image_sim_eval_interval) > 0 else None,
+        },
+        "elapsed_sec": elapsed,
+        "peak_mem_gb": peak,
+    }
+
+
+def train_idir_sampled_ptv_tv(
+    args: argparse.Namespace,
+    case: c.LungCTCase,
+    device: torch.device,
+    out_dir: Path,
+) -> Dict[str, object]:
+    epochs = int(args.epochs if args.epochs is not None else 2500)
+    lr = float(args.lr if args.lr is not None else 1e-4)
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+
+    fixed_t = torch.from_numpy(case.fixed).to(device=device, dtype=torch.float32)
+    moving_t = torch.from_numpy(case.moving).to(device=device, dtype=torch.float32)
+    image_shape = tuple(int(v) for v in case.shape_zyx)
+    coords_all = c.make_coordinate_tensor(image_shape, device)
+    border_mask = c.make_border_mask(image_shape, int(args.border_mask_voxels), device, fixed_t.dtype).bool()
+    coords_train = coords_all[border_mask.reshape(-1)].contiguous()
+    n_train = int(coords_train.shape[0])
+    n_centers = min(int(args.sampled_lcc_centers), n_train)
+    if n_centers <= 0:
+        raise RuntimeError("Empty IDIR sampled pTV-LCC training coordinate set.")
+    offsets_norm_xyz, offset_weights, offset_meta = c.make_sampled_lcc_offsets(
+        image_shape,
+        (1.0, 1.0, 1.0),
+        args.ptv_lcc_sigma_mm,
+        args.ptv_lcc_radius_sigma,
+        args.ptv_lcc_sigma_floor_pix,
+        int(args.sampled_lcc_offsets),
+        device,
+        fixed_t.dtype,
+    )
+    max_offset = max(float(v) for v in offset_meta["max_abs_offset_zyx"])
+    if max_offset > float(args.border_mask_voxels):
+        raise ValueError(
+            f"sampled LCC max offset {max_offset:g} exceeds border mask {int(args.border_mask_voxels)}; "
+            "increase --border-mask-voxels or reduce --sampled-lcc-offsets/radius."
+        )
+
+    model = c.build_siren(args.hidden_dim, args.hidden_layers, args.idir_omega).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    history: List[Dict[str, float]] = []
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
+    start = time.time()
+    for epoch in range(1, epochs + 1):
+        model.train()
+        indices = torch.randint(n_train, (n_centers,), device=device)
+        center_coords = coords_train[indices].detach()
+        patch_coords = center_coords[:, None, :] + offsets_norm_xyz[None, :, :]
+        patch_flat = patch_coords.reshape(-1, 3)
+        patch_disp = model(patch_flat).reshape(n_centers, int(offsets_norm_xyz.shape[0]), 3)
+        data_loss = c.sampled_ptv_local_cc_loss(
+            fixed_t,
+            moving_t,
+            patch_coords,
+            patch_disp,
+            offset_weights,
+            n_train,
+            (1.0, 1.0, 1.0),
+        )
+        tv_coords = center_coords.detach().requires_grad_(True)
+        tv_disp = model(tv_coords)
+        reg_loss = c.idir_sampled_tv_physical(
+            tv_coords,
+            tv_disp,
+            image_shape,
+            (1.0, 1.0, 1.0),
+            args.ptv_csqrt,
+            domain_voxels=n_train,
+        )
+        loss = data_loss + float(args.ptv_isotv_weight) * reg_loss
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
+        row = {
+            "epoch": float(epoch),
+            "loss": float(loss.detach().cpu()),
+            "data_loss": float(data_loss.detach().cpu()),
+            "reg_loss": float(reg_loss.detach().cpu()),
+            "reg_weight": float(args.ptv_isotv_weight),
+            "sampled_lcc_centers": float(n_centers),
+            "sampled_lcc_offsets": float(offsets_norm_xyz.shape[0]),
+        }
+        history.append(row)
+        if epoch == 1 or epoch % int(args.eval_interval) == 0 or epoch == epochs:
+            print(json.dumps(row), flush=True)
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    elapsed = time.time() - start
+    peak = torch.cuda.max_memory_allocated() / (1024**3) if device.type == "cuda" else 0.0
+    dense = evaluate_idir_dense(model, image_shape, device, args.eval_chunk_size)
+    c.write_csv(out_dir / "loss_history.csv", history)
+    return {
+        "dense_disp_norm_xyz": dense,
+        "history_tail": history[-10:],
+        "training": {
+            "epochs": epochs,
+            "lr": lr,
+            "optimizer": "Adam",
+            "loss": "sampled pTV-style LCC + sampled analytic physical-unit TV",
+            "image_loss": "sampled_ptv_lcc",
+            "regularizer": "sampled_idir_physical_tv",
+            "ptv_lcc_sigma_mm": float(args.ptv_lcc_sigma_mm),
+            "ptv_lcc_radius_sigma": float(args.ptv_lcc_radius_sigma),
+            "ptv_lcc_sigma_floor_pix": float(args.ptv_lcc_sigma_floor_pix),
+            "ptv_isotv_weight": float(args.ptv_isotv_weight),
+            "ptv_csqrt": float(args.ptv_csqrt),
+            "border_mask_voxels": int(args.border_mask_voxels),
+            "sampled_lcc_centers": int(n_centers),
+            "sampled_lcc_offsets": int(offsets_norm_xyz.shape[0]),
+            "sampled_lcc_offset_meta": offset_meta,
+            "train_coords": n_train,
+            "sample_domain": "ptv_1mm_border_masked_crop",
+            "sample_domain_voxels": n_train,
             "seed": int(args.seed),
             "network": {
                 "type": "SIREN",
@@ -338,6 +559,38 @@ def prolongation_diagnostics(
     return c.grid_to_flat(exact_grid).detach(), rows
 
 
+def finest_ptv_loss_diagnostic(
+    args: argparse.Namespace,
+    fixed_t: torch.Tensor,
+    moving_t: torch.Tensor,
+    full_border_mask: torch.Tensor,
+    full_id_grid: torch.Tensor,
+    full_ptv_cache: Dict[str, torch.Tensor | List[float]],
+    control: torch.Tensor,
+    control_shape: Sequence[int],
+    full_cps: int,
+    reg_weight: float,
+) -> Dict[str, object]:
+    dense_full = c.expand_on_shape(control, control_shape, full_cps, fixed_t.shape, 1)
+    warped_full = c.warp_full(moving_t, full_id_grid + dense_full, mode="bilinear")
+    data_loss = c.ptv_local_cc_loss_with_cache(
+        warped_full,
+        full_border_mask,
+        full_ptv_cache,
+        (1.0, 1.0, 1.0),
+        args.ptv_lcc_radius_sigma,
+    )
+    reg_loss = c.isotv_control_loss(control, control_shape, fixed_t.shape, (1.0, 1.0, 1.0), int(full_cps), args.ptv_csqrt)
+    loss = data_loss + float(reg_weight) * reg_loss
+    return {
+        "finest_loss": float(loss.detach().cpu()),
+        "finest_data_loss": float(data_loss.detach().cpu()),
+        "finest_reg_loss": float(reg_loss.detach().cpu()),
+        "finest_reg_weight": float(reg_weight),
+        "finest_loss_domain": "full_1mm_crop",
+    }
+
+
 def optimize_stage(
     args: argparse.Namespace,
     fixed_t: torch.Tensor,
@@ -350,6 +603,7 @@ def optimize_stage(
     epochs: int,
     lr: float,
     stage_idx: int,
+    global_epoch_offset: int,
 ) -> Tuple[torch.Tensor, Dict[str, object], List[Dict[str, object]]]:
     fixed_l, blur_sigma, blur_kernel = c.make_loss_volume(
         fixed_t, downsample, args.antialias_sigma_scale, args.antialias_radius_sigma
@@ -360,6 +614,8 @@ def optimize_stage(
     is_analytic_be_loss = str(args.method) == METHOD_DIRECT_CP_32_GLOBAL_NCC_BE
     is_fd_be_loss = str(args.method) == METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE
     is_be_loss = is_analytic_be_loss or is_fd_be_loss
+    if bool(args.finest_loss_diagnostic) and is_be_loss:
+        raise ValueError("--finest-loss-diagnostic is only implemented for pTV LCC + isoTV multistage runs.")
     mask_l = (
         None
         if is_be_loss
@@ -374,6 +630,17 @@ def optimize_stage(
         ptv_cache = c.make_ptv_lcc_fixed_cache(
             fixed_l,
             cur_pix_zyx,
+            args.ptv_lcc_sigma_mm,
+            args.ptv_lcc_radius_sigma,
+            args.ptv_lcc_sigma_floor_pix,
+        )
+    full_id_grid = None
+    full_ptv_cache = None
+    if bool(args.finest_loss_diagnostic) and not is_be_loss and int(downsample) != 1:
+        full_id_grid = c.make_coordinate_grid(tuple(int(v) for v in fixed_t.shape), fixed_t.device).detach()
+        full_ptv_cache = c.make_ptv_lcc_fixed_cache(
+            fixed_t,
+            (1.0, 1.0, 1.0),
             args.ptv_lcc_sigma_mm,
             args.ptv_lcc_radius_sigma,
             args.ptv_lcc_sigma_floor_pix,
@@ -393,6 +660,7 @@ def optimize_stage(
                 "stage_pix_zyx_mm": list(cur_pix_zyx),
                 "epochs": int(epochs),
                 "lr": float(lr),
+                "finest_loss_diagnostic": bool(args.finest_loss_diagnostic),
             }
         ),
         flush=True,
@@ -421,12 +689,48 @@ def optimize_stage(
             reg_loss = c.isotv_control_loss(control, control_shape, eval_shape, cur_pix_zyx, domain_cps, args.ptv_csqrt)
             reg_weight = float(args.ptv_isotv_weight)
         loss = data_loss + reg_weight * reg_loss
+        finest_diag: Dict[str, object] = {}
+        if bool(args.finest_loss_diagnostic) and not is_be_loss:
+            should_eval_finest = epoch == 1 or epoch % int(args.finest_loss_every) == 0 or epoch == int(epochs)
+            if should_eval_finest:
+                if int(downsample) == 1:
+                    finest_diag = {
+                        "finest_loss": float(loss.detach().cpu()),
+                        "finest_data_loss": float(data_loss.detach().cpu()),
+                        "finest_reg_loss": float(reg_loss.detach().cpu()),
+                        "finest_reg_weight": float(reg_weight),
+                        "finest_loss_domain": "full_1mm_crop",
+                    }
+                else:
+                    assert full_id_grid is not None and full_ptv_cache is not None
+                    with torch.no_grad():
+                        finest_diag = finest_ptv_loss_diagnostic(
+                            args,
+                            fixed_t,
+                            moving_t,
+                            full_border_mask,
+                            full_id_grid,
+                            full_ptv_cache,
+                            control,
+                            control_shape,
+                            int(full_cps),
+                            float(reg_weight),
+                        )
+            else:
+                finest_diag = {
+                    "finest_loss": float("nan"),
+                    "finest_data_loss": float("nan"),
+                    "finest_reg_loss": float("nan"),
+                    "finest_reg_weight": float(reg_weight),
+                    "finest_loss_domain": "full_1mm_crop",
+                }
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
         row = {
             "stage_idx": float(stage_idx),
             "epoch": float(epoch),
+            "global_epoch": float(int(global_epoch_offset) + int(epoch)),
             "full_cps": float(full_cps),
             "downsample": float(downsample),
             "domain_cps": float(domain_cps),
@@ -437,6 +741,7 @@ def optimize_stage(
             "alpha": float(args.alpha) if is_be_loss else float("nan"),
             "lr": float(lr),
         }
+        row.update(finest_diag)
         rows.append(row)
         if epoch == 1 or epoch % int(args.eval_interval) == 0 or epoch == int(epochs):
             print(json.dumps(row), flush=True)
@@ -467,6 +772,10 @@ def optimize_stage(
         "border_mask_voxels": 0 if is_be_loss else int(args.border_mask_voxels),
         "antialias_sigma": float(blur_sigma),
         "antialias_kernel_size": int(blur_kernel),
+        "finest_loss_diagnostic": bool(args.finest_loss_diagnostic),
+        "finest_loss_every": int(args.finest_loss_every) if bool(args.finest_loss_diagnostic) else None,
+        "finest_loss_domain": "full_1mm_crop" if bool(args.finest_loss_diagnostic) else None,
+        "finest_loss_affects_training": False if bool(args.finest_loss_diagnostic) else None,
         "elapsed_sec": float(elapsed),
         "control_abs_max_norm": float(ctrl_abs.max().detach().cpu()),
         "control_abs_p95_norm": float(torch.quantile(ctrl_abs, 0.95).detach().cpu()),
@@ -507,6 +816,7 @@ def train_multistage(args: argparse.Namespace, case: c.LungCTCase, device: torch
     for stage_idx, (full_cps, downsample, epochs, lr) in enumerate(
         zip(stage_cps, stage_downsample, stage_epochs, stage_lr)
     ):
+        global_epoch_offset = int(sum(stage_epochs[:stage_idx]))
         control_shape = tuple(int(v) for v in nested_shapes[int(full_cps)])
         control = torch.nn.Parameter(torch.zeros(int(np.prod(control_shape)), 3, device=device, dtype=torch.float32))
         if prev_control is not None and prev_shape is not None and prev_dense_full is not None:
@@ -535,6 +845,7 @@ def train_multistage(args: argparse.Namespace, case: c.LungCTCase, device: torch
             int(epochs),
             float(lr),
             int(stage_idx),
+            global_epoch_offset,
         )
         prev_control = control.detach()
         prev_shape = control_shape
@@ -609,6 +920,10 @@ def train_multistage(args: argparse.Namespace, case: c.LungCTCase, device: torch
             "ptv_csqrt": None if is_be_loss else float(args.ptv_csqrt),
             "border_mask_voxels": 0 if is_be_loss else int(args.border_mask_voxels),
             "prolongation": "exact crop-aligned cubic B-spline dyadic knot insertion",
+            "finest_loss_diagnostic": bool(args.finest_loss_diagnostic),
+            "finest_loss_every": int(args.finest_loss_every) if bool(args.finest_loss_diagnostic) else None,
+            "finest_loss_domain": "full_1mm_crop" if bool(args.finest_loss_diagnostic) else None,
+            "finest_loss_affects_training": False if bool(args.finest_loss_diagnostic) else None,
             "seed": int(args.seed),
             "nested_control_shapes_zyx": {str(k): list(v) for k, v in nested_shapes.items()},
         },
@@ -647,21 +962,34 @@ def main() -> None:
         protocol_tag = "ptv_landmark_crop_1mm_with_idir_fixed_t00_lungmask_sampling"
         mask_rule = "fixed_t00_lung_mask_sampling_and_metric"
         loss_domain = "fixed_t00_lung_mask_sampled"
+        method_note = "IDIR uses the fixed T00 lung mask for sampled-coordinate training."
+    elif method == METHOD_IDIR_SAMPLED_PTV_TV:
+        result = train_idir_sampled_ptv_tv(args, case, device, out_dir)
+        protocol_tag = "ptv_landmark_crop_1mm_idir_sampled_ptv_lcc_tv_border_crop"
+        mask_rule = "fixed_t00_lung_mask_metric_only"
+        loss_domain = "sampled_border_masked_crop"
+        method_note = (
+            "This IDIR variant trains on pTV border-crop samples with sampled pTV LCC "
+            "and sampled analytic physical-unit TV; the lung mask is metric-only."
+        )
     elif method == METHOD_SINR_CPS4_PTV:
         result = train_single_stage_spline(args, case, device, out_dir, direct_cp=False)
         protocol_tag = "ptv_landmark_crop_1mm_no_lungmask+fixed_t00_lung_mask_metric"
         mask_rule = "fixed_t00_lung_mask_metric_only"
         loss_domain = "border_masked_crop"
+        method_note = "pTV loss methods use border-mask loss weighting, not lung-mask loss weighting."
     elif method == METHOD_DIRECT_CP_CPS4_PTV:
         result = train_single_stage_spline(args, case, device, out_dir, direct_cp=True)
         protocol_tag = "ptv_landmark_crop_1mm_no_lungmask+fixed_t00_lung_mask_metric"
         mask_rule = "fixed_t00_lung_mask_metric_only"
         loss_domain = "border_masked_crop"
+        method_note = "pTV loss methods use border-mask loss weighting, not lung-mask loss weighting."
     elif method == METHOD_DIRECT_CP_32_PTV:
         result = train_multistage(args, case, device, out_dir)
         protocol_tag = "ptv_directcp_multistage+ptv_landmark_crop_1mm_no_lungmask+fixed_t00_lung_mask_metric"
         mask_rule = "fixed_t00_lung_mask_metric_only"
         loss_domain = "border_masked_crop"
+        method_note = "pTV loss methods use border-mask loss weighting, not lung-mask loss weighting."
     elif method == METHOD_DIRECT_CP_32_GLOBAL_NCC_BE:
         result = train_multistage(args, case, device, out_dir)
         protocol_tag = (
@@ -670,6 +998,7 @@ def main() -> None:
         )
         mask_rule = "fixed_t00_lung_mask_metric_only"
         loss_domain = "full_crop_global_ncc"
+        method_note = "This method uses full-crop global NCC with no border-mask or lung-mask loss weighting."
     elif method == METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE:
         result = train_multistage(args, case, device, out_dir)
         protocol_tag = (
@@ -678,6 +1007,7 @@ def main() -> None:
         )
         mask_rule = "fixed_t00_lung_mask_metric_only"
         loss_domain = "full_crop_global_ncc"
+        method_note = "This method uses full-crop global NCC with no border-mask or lung-mask loss weighting."
     else:
         raise ValueError(f"Unknown method: {method}")
 
@@ -715,11 +1045,7 @@ def main() -> None:
         "history_tail": result.get("history_tail", []),
         "notes": [
             "Inputs are canonical regenerated pTV-prep cropped 1mm arrays.",
-            (
-                "This method uses full-crop global NCC with no border-mask or lung-mask loss weighting."
-                if method in {METHOD_DIRECT_CP_32_GLOBAL_NCC_BE, METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE}
-                else "pTV loss methods use border-mask loss weighting, not lung-mask loss weighting."
-            ),
+            method_note,
             "Foreground regularity metrics use the fixed T00 lung mask on the cropped 1mm grid.",
             "TRE is measured directly in cropped 1mm landmark coordinates.",
         ],
