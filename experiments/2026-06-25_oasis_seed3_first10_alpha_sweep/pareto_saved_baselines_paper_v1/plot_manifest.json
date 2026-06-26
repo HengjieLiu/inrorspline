@@ -1,0 +1,78 @@
+{
+  "generated_at": "2026-06-26 00:10:56 +0000",
+  "input": "/homebase/code_sync/inrorspline/experiments/2026-06-25_oasis_seed3_first10_saved_baselines/population_summary_with_saved_baselines.csv",
+  "review_root": "/homebase/code_sync/inrorspline/experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_saved_baselines_paper_v1",
+  "row_count": 29,
+  "sweep_methods": [
+    "idir_original_dense_siren_be_autograd",
+    "sinr_cps4_be_bspline_analytic",
+    "sinr_cps2_be_bspline_analytic",
+    "direct_cp_cps4_be_bspline_analytic"
+  ],
+  "baseline_methods": [
+    "bs1_vxm_v0_2",
+    "bs2_tm_v0",
+    "bs3_vfa_v0",
+    "bs4_sitreg_v0",
+    "greedy"
+  ],
+  "primary_panels": [
+    [
+      "dice_mean",
+      "jdet_le0_pct_fg",
+      true
+    ],
+    [
+      "dice_mean",
+      "log_jdet_std_fg",
+      true
+    ],
+    [
+      "dice_mean",
+      "be_fd_forward_fixed_fg_voxel",
+      true
+    ],
+    [
+      "dice_mean",
+      "diffusion_fd_forward_fixed_fg_voxel",
+      true
+    ]
+  ],
+  "full_regularities": [
+    [
+      "be_fd_forward_fixed_fg_voxel",
+      "FG BE forward FD"
+    ],
+    [
+      "diffusion_fd_forward_fixed_fg_voxel",
+      "FG diffusion forward FD"
+    ],
+    [
+      "diffusion_l2_fg",
+      "FG diffusion L2"
+    ],
+    [
+      "jdet_le0_pct_fg",
+      "FG Jdet <= 0 (%)"
+    ],
+    [
+      "log_jdet_std_fg",
+      "FG std(log Jdet)"
+    ],
+    [
+      "ndv_frac_fg",
+      "FG NDV fraction"
+    ]
+  ],
+  "output_files": [
+    "/homebase/code_sync/inrorspline/experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_saved_baselines_paper_v1/population_primary_line_segments_with_saved_baselines.pdf",
+    "/homebase/code_sync/inrorspline/experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_saved_baselines_paper_v1/population_primary_line_segments_with_saved_baselines.png",
+    "/homebase/code_sync/inrorspline/experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_saved_baselines_paper_v1/population_contact_sheet_line_segments_with_saved_baselines.pdf",
+    "/homebase/code_sync/inrorspline/experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_saved_baselines_paper_v1/population_contact_sheet_line_segments_with_saved_baselines.png",
+    "/homebase/code_sync/inrorspline/experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_saved_baselines_paper_v1/population_primary_ellipses_with_saved_baselines.pdf",
+    "/homebase/code_sync/inrorspline/experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_saved_baselines_paper_v1/population_primary_ellipses_with_saved_baselines.png",
+    "/homebase/code_sync/inrorspline/experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_saved_baselines_paper_v1/population_contact_sheet_ellipses_with_saved_baselines.pdf",
+    "/homebase/code_sync/inrorspline/experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_saved_baselines_paper_v1/population_contact_sheet_ellipses_with_saved_baselines.png"
+  ],
+  "validation": "passed"
+}

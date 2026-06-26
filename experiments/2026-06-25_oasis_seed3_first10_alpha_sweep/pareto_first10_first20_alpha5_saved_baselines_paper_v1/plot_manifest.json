@@ -1,0 +1,33 @@
+{
+  "generated_at": "2026-06-26 17:12:42 +0000",
+  "review_root": "/homebase/code_sync/inrorspline/experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_first10_first20_alpha5_saved_baselines_paper_v1",
+  "results": [
+    {
+      "cohort": "first10",
+      "cohort_dir": "/homebase/code_sync/inrorspline/experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_first10_first20_alpha5_saved_baselines_paper_v1/first10",
+      "sweep_rows": 300,
+      "baseline_rows": 50,
+      "population_rows": 35,
+      "label_rows": 1225,
+      "output_files": 162,
+      "validation_errors": []
+    },
+    {
+      "cohort": "first20",
+      "cohort_dir": "/homebase/code_sync/inrorspline/experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_first10_first20_alpha5_saved_baselines_paper_v1/first20",
+      "sweep_rows": 600,
+      "baseline_rows": 100,
+      "population_rows": 35,
+      "label_rows": 1225,
+      "output_files": 162,
+      "validation_errors": []
+    }
+  ],
+  "input_roots": {
+    "first10_main_root": "/database/inrorspline/runs/oasis_seed3_first10_alpha_sweep_be_2500e_v1",
+    "first10_cps2_prelim_root": "/database/inrorspline/runs/oasis_seed3_first10_direct_cp_cps2_prelim_a100_1000_10000_v1",
+    "first10_cps2_completion_root": "/database/inrorspline/runs/oasis_seed3_first10_direct_cp_cps2_completion_a0_10_100000_v1",
+    "next10_root": "/database/inrorspline/runs/oasis_seed3_next10_alpha_sweep_be_2500e_5models_v1",
+    "baseline_root": "/database/inrorspline/runs/oasis_seed3_first10_saved_baselines_v1"
+  }
+}

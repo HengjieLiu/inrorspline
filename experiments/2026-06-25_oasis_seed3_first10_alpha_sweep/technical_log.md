@@ -58,3 +58,50 @@
 - This is a three-alpha preliminary subset, not a full six-alpha DirectCP cps2
   sweep. Original P1 report/figure files must remain unchanged; overlay outputs
   use suffixed filenames under the add-on review subdirectory.
+
+## Saved Baseline Add-On
+
+- Requested 2026-06-25 after deciding not to continue DirectCP cps2 on this
+  machine. Scope is saved-field evaluation only, not retraining.
+- Completed 2026-06-25 16:40 Pacific in Docker container
+  `py310sitreg_v1_test1` after dry-run, rank-0 BS1/Greedy smoke, and full
+  50-job evaluation.
+- Methods: `bs1_vxm_v0_2`, `bs2_tm_v0`, `bs3_vfa_v0`, `bs4_sitreg_v0`, and
+  canonical `Greedy` on the same seed-3 first10 case ranks.
+- Output root:
+  `/database/inrorspline/runs/oasis_seed3_first10_saved_baselines_v1`.
+- Review root:
+  `experiments/2026-06-25_oasis_seed3_first10_saved_baselines/`.
+- Metric convention: use the same Dice/HD95/ASD and dense finite-difference
+  regularity pipeline as the INR/CP first10 run. Native analytic B-spline/IDIR
+  regularity is intentionally unavailable for saved dense fields.
+- Greedy format convention: saved Greedy displacement NIfTI files are 5D
+  channel-last arrays. The repo evaluator applies the scalar OASIS LIA-to-RAS
+  reorientation to each component and component signs `-,-,+`, which matched
+  the saved Greedy rank-0 warped-label Dice sanity check.
+- Acceptance: `50/50` summaries and `50/50` `DONE` files present; aggregation
+  loaded `240` original P1 rows, wrote `290` combined rows, and reported
+  `errors=[]`.
+- Population means from
+  `experiments/2026-06-25_oasis_seed3_first10_saved_baselines/review_report.md`:
+  BS1 Dice/HD95/ASD `0.7683/2.4477/0.5497`, BS2
+  `0.7913/2.0084/0.4467`, BS3 `0.8198/1.7743/0.3669`, BS4
+  `0.8215/1.7159/0.3509`, Greedy `0.8037/1.8726/0.4096`.
+
+## Saved Baseline First20 Extension
+
+- Requested 2026-06-25 after the first10 saved-baseline evaluation. Scope is
+  saved-field evaluation for seed-3 shuffled ranks `10-19`, reusing completed
+  rank `0-9` P1d outputs.
+- Completed 2026-06-25 Pacific in Docker container `py310sitreg_v1_test1`.
+  Rank `10-19` dry-run confirmed all 50 source displacements; the real run
+  produced 50 new summaries. First20 aggregation passed with `100/100` saved
+  baseline summaries and `errors=[]`.
+- Large output root:
+  `/database/inrorspline/runs/oasis_seed3_first10_saved_baselines_v1`. The slug
+  is historical from P1d; it now contains ranks `0-19`.
+- First20 review root:
+  `experiments/2026-06-25_oasis_seed3_first20_saved_baselines/`.
+- First20 population means: BS1 Dice/HD95/ASD `0.7724/2.5298/0.5493`, BS2
+  `0.7954/2.0932/0.4483`, BS3 `0.8223/1.8050/0.3638`, BS4
+  `0.8245/1.7505/0.3491`, Greedy `0.8067/1.9405/0.4101`.
