@@ -283,7 +283,7 @@ Next decision:
 
 ### P1i: OASIS Seed-3 First20 DirectCP 8-4-2 Remaining Alpha Sweep
 
-- Status: running.
+- Status: completed 2026-06-26.
 - Date planned: 2026-06-26.
 - Purpose: complete the full six-alpha DirectCP `8,4,2` OASIS curve and add it
   to the saved-baseline paper-style first10/first20 Pareto figures without
@@ -317,6 +317,18 @@ Next decision:
   `41` population rows per cohort and the expected PDF/PNG plot families.
 - Known limitations: this completes the DirectCP `8,4,2` alpha curve only; the
   previous five-sweep figure package remains the historical baseline.
+- Completion note: Docker compile and rank-0 alpha-0 `1,1,1` stage-epoch smoke
+  passed; dry-run queued exactly `100` jobs with no alpha `1000`; full launch
+  completed `100/100` new jobs with `0` skipped and `0` failures in `6697`
+  seconds. Aggregation reused the P1h alpha `1000` root and validated `100`
+  remaining rows, `20` reused alpha1000 rows, and `120` combined DirectCP
+  `8,4,2` rows with `errors=[]`. The new plus-DirectCP842 figure package wrote
+  `360` first10 sweep rows, `720` first20 sweep rows, `41` population rows per
+  cohort, and `162` non-empty PDF/PNG files per cohort.
+- Result: DirectCP `8,4,2` alpha `1000` remained the best mean-Dice point on
+  both cohorts; alpha `10000` had best mean HD95. First10 Dice/HD95/symmetric
+  ASD/fold% at alpha `1000`: `0.8054` / `2.2429` / `0.4507` / `4.3015`.
+  First20: `0.8077` / `2.2589` / `0.4531` / `4.4071`.
 
 ### P1j: Fit-Modes Paper Figure IDIR Matched-Similarity Curves
 
@@ -892,8 +904,8 @@ Next decision:
 
 ### P2k: LungCT IDIR Sampled pTV-LCC + TV 0.11 Pilot
 
-- Status: planned; implementation, smoke, full launch, and aggregation requested
-  2026-06-26.
+- Status: completed 2026-06-26; implementation, smoke, full launch, and
+  aggregation passed.
 - Purpose: test whether IDIR remains competitive when its sampled-coordinate
   mechanism uses a pTV-style local-CC data term and an IDIR-specific sampled TV
   analogue instead of sampled global NCC plus bending energy.
@@ -920,6 +932,13 @@ Next decision:
   short smoke at weight `0.11` has finite losses and writes summary metrics;
   dry-run queues exactly `10` jobs; full launch completes `10/10` summaries;
   aggregation writes case/mean tables with no completion errors.
+- Result: `10/10` completed summaries and `errors=[]`. Mean original-snap TRE
+  `1.400 +/- 0.857` mm; original-subvoxel TRE `1.476 +/- 0.821` mm;
+  reg1mm snap/sub TRE `1.579 +/- 0.829` / `1.483 +/- 0.836` mm. Foreground
+  stdLogJ `0.171860`, foreground `J <= 0` `0.0477%`, foreground BE
+  `0.001448`, foreground diffusion `0.010796`. Mean elapsed `31.7` sec/case
+  and peak memory `0.58` GB. Case08 remained the outlier with original-snap TRE
+  `3.895` mm.
 - Known limitations: IDIR has no control lattice, so this TV term is a sampled
   analytic SIREN-Jacobian analogue of pTV isoTV, not the same control-grid
   regularizer used by pTVReg or DirectCP.
