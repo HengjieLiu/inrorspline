@@ -145,6 +145,19 @@ Current LungCT IDIR setup:
 - Regularizer: IDIR coordinate-autograd BE.
 - Default training: `lr=1e-4`, `epochs=2500`, `alpha_bending=10`, seed `1`.
 
+Pilot LungCT sampled pTV-LCC + TV IDIR variant:
+
+- Method key: `idir_sampled_ptv_lcc_tv`.
+- Image domain: regenerated pTVReg-style landmark crop, 1 mm registration grid.
+- Training coordinates: pTV 1mm border-masked crop samples, not lung-mask
+  samples.
+- Image loss: sampled pTV-style local CC from Gaussian-weighted integer patch
+  offsets around sampled centers.
+- Regularizer: sampled analytic physical-unit TV of the SIREN displacement
+  Jacobian. This is an IDIR-specific analogue of pTV isoTV because IDIR has no
+  control lattice.
+- Pilot default: `ptv_isotv_weight=0.11`, `lr=1e-4`, `epochs=2500`, seed `1`.
+
 Current pTV-prep SINR cps4 setup:
 
 - Image domain: regenerated pTVReg-style landmark crop, 1 mm registration grid.
