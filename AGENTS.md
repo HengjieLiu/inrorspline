@@ -56,7 +56,8 @@ PROJECT_OBJECT = {
 Use these bracket commands in prompts:
 
 ```text
-[use plan mode]              # do not edit files, stop jobs, launch jobs, remove artifacts, or run destructive commands. Convert the request into a concrete plan, summarize assumptions and risks, recommend defaults, list files likely to change, identify verification steps, ask concise clarifying questions if needed, suggest recommendations if any, and wait for explicit approval before acting. This command should not be superceded.
+[use plan mode]              # do not edit files, stop jobs, launch jobs, remove artifacts, or run destructive commands. Convert the request into a concrete plan, summarize assumptions and risks, recommend defaults, list files likely to change, identify verification steps, ask concise clarifying questions if needed, suggest recommendations if any, and wait for explicit approval before acting. This command should not be superseded.
+[adapt and plan]             # reuse rules of [use plan mode], but more specifically understand the project context and adapt the current plan files into a new concrete plan, summarize key adaptation needed, ask a series of clarifying questions and if appropriate provide selection answers, suggest recommendations if any, and wait for explicit approval before acting. This command should not be superseded.
 [adapt project]              # adapt instructions/docs when assumptions change; plan first
 [adapt AGENTS.md]            # revise AGENTS.md after classifying legacy rules
 [agents sync]                # propose AGENTS.md updates from current repo/conversation context
