@@ -258,6 +258,43 @@ Next decision:
   full-image global NCC plus `alpha *` analytic cubic B-spline BE. No
   foreground mask in the image loss; foreground regularity uses fixed raw
   image-positive mask.
+
+### P7: OASIS Rank-9 SINR CP-Space NTK Conditioning
+
+- Status: completed 2026-06-29 after dry-run, smoke, full first pass, and
+  artifact verification.
+- Owner/agent: Codex.
+- Purpose: test whether SINR's coefficient INR induces a rank-deficient,
+  anisotropic, or amplifying CP-space tangent kernel compared with DirectCP's
+  identity kernel in the same cps4 B-spline control space.
+- Dataset: OASIS BrainMR seed-3 shuffled rank `9`, original sorted index `88`,
+  fixed/moving `(0173,0136)`.
+- Method state: SINR cps4 BE alpha `1000`, lr `1e-4`; compare local kernel
+  action against the hypothetical DirectCP cps4 update from the same CP-space
+  gradient.
+- Protocol tag: `oasis_rank9_sinr_cps4_ntk_conditioning_local_gradient_action`.
+- Planned diagnostics: `B s` versus `B J_theta J_theta^T s`, dense-action
+  cosine, scalar-rescaled residual, CP/dense amplification, PSD/Rayleigh checks,
+  random Rayleigh probes, matrix-size/rank/nullity summary.
+- Output root:
+  `/database/inrorspline/runs/sinr_ntk_conditioning_20260629_v1`.
+- Review root:
+  `experiments/2026-06-29_sinr_ntk_conditioning/`.
+- Launch environment: Docker container `py310sitreg_v1_test1`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1`.
+- Known limitations: local NTK/SGD diagnostic only; initial scope is one OASIS
+  pair; dense kernels are not materialized; Adam trajectory effects are not
+  directly modeled.
+- Actual result: `4` action rows and `128` spectrum-probe rows completed with
+  `errors=[]`. The SINR CP-space kernel is rank-deficient by construction in
+  the cps4 space: `388,161` CP coefficients versus `133,379` SINR parameters,
+  giving nullity lower bound `254,782`. Sampled dense update cosine was
+  `0.2888/0.2888` at init for data/total gradients and `0.4638/0.4649` at
+  final; scalar-rescaled residual remained high (`0.9574` init and about
+  `0.885` final). Dense-action amplification was large (`1.21e6` init data and
+  `2.38e5` final data).
+- Next decision: decide whether to extend to replayed checkpoints, first10
+  OASIS cases, or LungCT case01/case08.
 - Fixed parameters: alpha `1000`, learning rate `1e-2`, stage downsample
   `4,2,1`, stage epochs `400,800,1300`, seed `1`, eval interval `250`.
 - Planned GPUs: first10 on `2,3` with max concurrency `2`; extension ranks
@@ -947,3 +984,151 @@ Next decision:
 
 - Status: planned.
 - Purpose: isolate pTVReg gap by adding local CC, border mask, isoTV, pyramid, optimizer, and basis factors one at a time.
+
+### P5: Overnight First-Three-Case Update-Alignment Diagnostic
+
+- Status: completed 2026-06-29; full aggregation passed and follow-up gate did
+  not pass.
+- Date planned: 2026-06-29.
+- Purpose: adapt the compact update-alignment and SINR/direct-CP mechanism
+  prompts into a self-supervised first-three-case run. The primary diagnostic
+  tests whether sampled image-registration updates move toward strong teacher
+  displacement fields, separating representational fit evidence from
+  image-optimization trajectory evidence.
+- Source prompts:
+  `docs/codex_prompts/260629_2_smaller_plan.md` and
+  `docs/codex_prompts/260629_1_sinr_cp_kernel_experiment_plan.md`.
+- Adapted plans:
+  `docs/codex_prompts/260629_3_from_260629_2_overnight_update_alignment_run_plan.md`
+  and
+  `docs/codex_prompts/260629_4_from_260629_1_optional_sinr_cp_kernel_followup_plan.md`.
+- Dataset/cases:
+  OASIS BrainMR seed-3 shuffled rank `9`, original sorted index `88`,
+  fixed/moving `(0173,0136)`; DIR-Lab 4DCT case `01`; DIR-Lab 4DCT case `08`.
+- Teacher fields: saved BS4 SITReg dense displacement for OASIS rank `9`;
+  saved pTVReg displacement fields for LungCT case `01` and case `08`,
+  reconstructed on the canonical pTV 1mm crop with saved TRE validation.
+- Methods: OASIS `idir_original`, `sinr_cps4_be_bspline_analytic`, and
+  `direct_cp_cps4_be_bspline_analytic`; LungCT `idir_be_default_lungmask`,
+  `sinr_cps4_ptv_lcc_isotv`, `direct_cp_cps4_ptv_lcc_isotv`, and
+  `direct_cp_32_16_8_4_ptv_lcc_isotv`.
+- Fixed operating points: OASIS IDIR alpha `1` lr `1e-4`, SINR cps4 alpha
+  `1000` lr `1e-4`, DirectCP cps4 alpha `1000` lr `1e-3`; LungCT IDIR
+  alpha_bending `10` lr `1e-4`, pTV-LCC+isoTV methods weight `0.11`, SINR lr
+  `1e-4`, DirectCP lr `1e-3`, multistage schedule `32,16,8,4` with
+  `200,400,800,1000` stage epochs.
+- Checkpoint logging: opt-in deterministic sampled displacement checkpoints,
+  sample seed `1729`, up to `100000` fixed-mask points per case, checkpoints
+  `0,1,10,25,50,100,250,500,1000,1500,2000,2500`. Large checkpoint samples
+  stay under the run root, not Git.
+- Output root:
+  `/database/inrorspline/runs/update_alignment_overnight_20260629_v1`.
+- Review root:
+  `experiments/2026-06-29_update_alignment_overnight/`.
+- Launch environment: Docker container `py310sitreg_v1_test1`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1`; requested GPUs `0,1,2,3`.
+- Preflight smoke: completed on 2026-06-29 with `11/11` jobs successful,
+  `22` checkpoint-alignment rows, `11` case rows, and `3`
+  SINR-vs-DirectCP similarity rows. The smoke promising gate did not pass,
+  as expected for the 2-epoch sanity run; it verified launcher,
+  checkpoint-sample logging, teacher loading, aggregation, plots, and the
+  optional follow-up smoke path.
+- Full result: completed `11/11` jobs with `0` failures. Aggregation wrote
+  `119` checkpoint-alignment rows, `11` case rows, and `3`
+  SINR-vs-DirectCP similarity rows. Follow-up gate did not pass:
+  similarity values were LungCT case01 `0.0009`, LungCT case08 `0.2794`, and
+  OASIS rank9 `0.3876`, so `promising_similarity_count=0`.
+- Primary metrics: per-interval update alignment to teacher residual, early
+  mean/median alignment, cumulative early alignment, final teacher distance,
+  SINR-vs-DirectCP cumulative early update similarity, final OASIS Dice/HD95
+  and LungCT reg1mm crop TRE diagnostics.
+- Follow-up gate: if all `11/11` small-plan jobs complete, metrics are finite,
+  and SINR-vs-DirectCP cumulative early update similarity is at least `0.5` in
+  at least two of the three cases, auto-start
+  `scripts/experiments/update_alignment/run_sinr_cp_kernel_followup.py`.
+  The first follow-up implementation is an overnight-safe sampled dense-update
+  proxy; it does not yet form the full autograd CP kernel `J_theta J_theta^T`.
+- Known limitations: LungCT final metrics emitted by the current runner are
+  cropped 1mm registration-grid TRE diagnostics, while the teacher pTVReg field
+  is validated against original/native snap TRE. Do not treat these as a new
+  headline pTVReg-comparable LungCT table without the full original-snap metric
+  reconstruction. First-three-case evidence is diagnostic, not population-final.
+- Next decision: after full small-plan aggregation, decide whether to trust the
+  auto-follow-up gate, expand to more cases, or refine checkpoint/teacher-unit
+  handling before running the heavier kernel diagnostic.
+
+### P6: Exploratory SINR/DirectCP Mechanism Follow-Up
+
+- Status: active exploratory self-supervised run; smoke completed and launch
+  scope adapted.
+- Date planned: 2026-06-29.
+- Purpose: continue the optional follow-up as exploration despite the failed
+  promising gate, with explicit Scientist/Reviewer role rounds and durable
+  communication logging. The target artifact is a useful paper table, figure,
+  or draft section explaining whether the observed behavior is better explained
+  by SINR/DirectCP kernel similarity, representation capacity, or
+  optimization-path/capture-range effects.
+- Primary review root:
+  `experiments/2026-06-29_sinr_cp_kernel_followup/`.
+- Primary run root:
+  `/database/inrorspline/runs/sinr_cp_mechanism_explore_20260629_v1`.
+- Communication log:
+  `experiments/2026-06-29_sinr_cp_kernel_followup/scientist_reviewer_log.md`.
+- Exploration controller:
+  `scripts/experiments/update_alignment/explore_mechanism_followup.py`.
+- Sidecar monitor:
+  `scripts/experiments/update_alignment/monitor_mechanism_explore.py`, writing
+  `experiments/2026-06-29_sinr_cp_kernel_followup/exploration/live_monitor_status.json`
+  and appending role-log updates without launching or stopping jobs.
+- Initial evidence sources:
+  completed P5 update-alignment tables, sampled SINR-vs-DirectCP proxy metrics,
+  and prior LungCT case01/case08 pTVReg field-fit versus image-registration LR
+  sweeps.
+- New schedule-ablation direction: DirectCP `32,16,8,4` on LungCT cases `01`
+  and `08`, removing or weakening the image-pyramid downsampling while
+  preserving control-grid staging. Primary variants include pTV LCC + isoTV and
+  global NCC + dense FD-BE objectives on canonical pTV-preprocessed 1mm crops.
+- Smoke evidence: no-pyramid `1,1,1,1` stage-epoch jobs completed on cases
+  `01` and `08` with no failures, but took roughly 4-6 minutes/job. Case08
+  remained poor after this tiny smoke, so the long launch is a time-budgeted
+  diagnostic set with `25,25,25,25` stage epochs, targeted extra case01/case08
+  variants, and no all10 expansion yet.
+- First-phase result: targeted schedule ablation completed `10/10` with `0`
+  failures. Case01 reached `1.076` mm best reg1mm snap TRE without the image
+  pyramid, while case08 remained poor under no-pyramid (`6.478` mm best after
+  LR probe) and partial `4,2,1,1` pyramid (`11.937` mm best). This strengthens
+  the optimization-path/capture-range interpretation but does not yet isolate
+  whether the missing factor is the full standard `8,4,2,1` pyramid or a
+  longer schedule.
+- Second-phase standard-pyramid probe:
+  `scripts/experiments/update_alignment/run_standard_pyramid_probe.py`,
+  case08-only DirectCP `32,16,8,4` with standard `8,4,2,1` pyramid, pTV/FD-BE,
+  LR, and modest schedule-length probes.
+- Second-phase result: standard-pyramid probe completed `4/4` with `0`
+  failures. Best case08 standard-pyramid short row was pTV LCC + isoTV,
+  `8,4,2,1`, `25,25,25,25`, LR `0.01`, with `2.270` mm reg1mm snap TRE.
+  LR `0.001` standard-pyramid rows remained poor (`11.496` mm pTV and
+  `11.361` mm FD-BE), and the longer LR `0.001` pTV row reached `8.896` mm.
+  Interpretation: full standard image-pyramid capture range plus optimizer
+  scale substantially rescues case08, while no/partial pyramid does not.
+  Remaining gap to the prior full schedule should be described as runtime/LR
+  and metric-convention limited, not as a population-final conclusion.
+- Active refinement: launched
+  `scripts/experiments/update_alignment/run_standard_pyramid_probe.py` with
+  `--probe-set refinement --phase-name capture_refinement_probe` on GPUs
+  `0,1,2,3`. This tests case08 standard `8,4,2,1` LR `0.01` at
+  `100,100,100,100` and `200,200,200,200`, plus partial `4,2,1,1` and
+  no-pyramid LR `0.01` controls at `100,100,100,100`.
+- Refinement result: completed `4/4` with `0` failures. Case08 reg1mm snap TRE
+  converged near `1.21` mm for all LR `0.01` e100/e200 controls: standard
+  `8,4,2,1` e100 `1.213`, standard e200 `1.217`, partial `4,2,1,1` e100
+  `1.219`, and no-pyramid e100 `1.218`. Interpretation: the image pyramid
+  matters under short optimization budgets, but longer LR `0.01` optimization
+  removes the pyramid ablation gap in this diagnostic case.
+- Requested runtime: user requested a long exploratory run of at least four
+  hours, with the controller refreshing aggregation and role logs during the
+  run.
+- Known limitations: this is not a population-final result and not a
+  pTVReg-method-only comparison. LungCT rows must be tagged as pTV-preprocessed
+  diagnostic-domain experiments unless original/native TRE reconstruction is
+  explicitly supplied by the source artifact.

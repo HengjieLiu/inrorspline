@@ -1,0 +1,4 @@
+dataset,case_key,sinr_method,directcp_method,cumulative_early_update_similarity
+lungct,lungct_case01,sinr_cps4_ptv_lcc_isotv,direct_cp_cps4_ptv_lcc_isotv,0.21213815396180152
+lungct,lungct_case08,sinr_cps4_ptv_lcc_isotv,direct_cp_cps4_ptv_lcc_isotv,-0.029101654752138273
+oasis,oasis_rank009,sinr_cps4_be_bspline_analytic,direct_cp_cps4_be_bspline_analytic,-0.015956699675656418

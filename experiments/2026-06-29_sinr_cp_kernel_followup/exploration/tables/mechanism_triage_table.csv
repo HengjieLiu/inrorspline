@@ -1,0 +1,5 @@
+question,evidence,current_answer,paper_use
+Is SINR merely rescaled single-stage DirectCP?,SINR-vs-DirectCP cumulative early update similarity below 0.5 in all first-three cases.,"No, not under sampled dense-update similarity.",Mechanism caveat / negative result.
+Can failed case08 SINR represent the pTVReg-like field?,Prior case08 pTVReg field-fit sweep gives SINR cps4 near-target TRE while image registration remains poor.,Representation capacity is not the main failure.,Supports optimization-path claim.
+Does multistage DirectCP rescue hard LungCT case08?,Prior and overnight rows show multistage DirectCP near pTVReg/IDIR while single-stage SINR/DirectCP fail.,Yes on selected case08 diagnostics.,Capture-range figure/table.
+"Is the rescue due to image pyramid, control staging, or both?",New schedule-ablation rows compare standard pyramid against no-pyramid and partial-pyramid variants.,See schedule_ablation_rows.csv.,Follow-up mechanistic subsection.

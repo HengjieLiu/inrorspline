@@ -80,10 +80,148 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--antialias-radius-sigma", type=float, default=3.0)
     parser.add_argument("--finest-loss-diagnostic", action="store_true")
     parser.add_argument("--finest-loss-every", type=int, default=1)
+    parser.add_argument("--sample-checkpoints", action="store_true")
+    parser.add_argument("--checkpoint-sample-count", type=int, default=100000)
+    parser.add_argument("--checkpoint-sample-seed", type=int, default=1729)
+    parser.add_argument("--checkpoint-epochs", type=str, default="0,1,10,25,50,100,250,500,1000,1500,2000,2500")
     args = parser.parse_args()
     if int(args.finest_loss_every) < 1:
         raise ValueError("--finest-loss-every must be >= 1")
     return args
+
+
+class CheckpointSampler:
+    def __init__(self, *, args: argparse.Namespace, case: c.LungCTCase, device: torch.device, out_dir: Path) -> None:
+        self.enabled = bool(args.sample_checkpoints)
+        self.out_dir = Path(out_dir)
+        self.rows: List[Dict[str, object]] = []
+        self.disp_norm_xyz: List[np.ndarray] = []
+        self.disp_vox_xyz: List[np.ndarray] = []
+        self.epochs = {
+            int(token)
+            for token in str(args.checkpoint_epochs).replace(" ", "").split(",")
+            if token
+        }
+        self.shape = tuple(int(v) for v in case.shape_zyx)
+        self.device = device
+        self.flat_indices_np = np.asarray([], dtype=np.int64)
+        self.flat_indices_t = torch.empty(0, dtype=torch.long, device=device)
+        self.points_zyx = np.zeros((0, 3), dtype=np.int64)
+        self.points_norm_xyz = np.zeros((0, 3), dtype=np.float32)
+        if not self.enabled:
+            return
+        eligible = np.flatnonzero(case.fixed_mask.reshape(-1).astype(bool))
+        if eligible.size == 0:
+            raise RuntimeError("Cannot sample checkpoints from an empty LungCT fixed T00 mask.")
+        count = min(int(args.checkpoint_sample_count), int(eligible.size))
+        rng = np.random.default_rng(int(args.checkpoint_sample_seed))
+        chosen = eligible if count >= eligible.size else rng.choice(eligible, size=count, replace=False)
+        self.flat_indices_np = np.sort(chosen.astype(np.int64, copy=False))
+        self.flat_indices_t = torch.from_numpy(self.flat_indices_np).to(device=device, dtype=torch.long)
+        z, y, x = np.unravel_index(self.flat_indices_np, self.shape)
+        self.points_zyx = np.stack((z, y, x), axis=1).astype(np.int64, copy=False)
+        d, h, w = self.shape
+        self.points_norm_xyz = np.stack(
+            (
+                2.0 * x.astype(np.float32) / max(float(w - 1), 1.0) - 1.0,
+                2.0 * y.astype(np.float32) / max(float(h - 1), 1.0) - 1.0,
+                2.0 * z.astype(np.float32) / max(float(d - 1), 1.0) - 1.0,
+            ),
+            axis=1,
+        ).astype(np.float32, copy=False)
+        self.coords_t = torch.from_numpy(self.points_norm_xyz).to(device=device, dtype=torch.float32)
+        self.scale_xyz = torch.tensor(
+            [(w - 1) / 2.0, (h - 1) / 2.0, (d - 1) / 2.0],
+            dtype=torch.float32,
+            device=device,
+        )
+        c.write_json(
+            self.out_dir / "checkpoint_sample_metadata.json",
+            {
+                "enabled": True,
+                "dataset": "lungct",
+                "case_id": int(case.case_id),
+                "sample_seed": int(args.checkpoint_sample_seed),
+                "requested_sample_count": int(args.checkpoint_sample_count),
+                "actual_sample_count": int(self.flat_indices_np.size),
+                "sample_domain": "fixed_t00_lung_mask_reg1mm",
+                "field_units_saved": ["normalized_grid_xyz", "reg1mm_voxel_xyz"],
+                "field_direction": "fixed_T00_to_moving_T50",
+                "component_order": "x,y,z",
+                "grid_shape_zyx": list(self.shape),
+                "checkpoint_epochs": sorted(self.epochs),
+            },
+        )
+
+    def should_record(self, epoch: int) -> bool:
+        return self.enabled and int(epoch) in self.epochs
+
+    def record_samples(
+        self,
+        *,
+        epoch: int,
+        disp_norm_xyz: torch.Tensor,
+        row_extra: Optional[Dict[str, object]] = None,
+    ) -> None:
+        if not self.should_record(int(epoch)):
+            return
+        sample_norm = disp_norm_xyz.detach().to(dtype=torch.float32)
+        sample_vox = sample_norm * self.scale_xyz.view(1, 3)
+        self.disp_norm_xyz.append(sample_norm.cpu().numpy().astype(np.float32, copy=False))
+        self.disp_vox_xyz.append(sample_vox.cpu().numpy().astype(np.float32, copy=False))
+        mag = torch.linalg.norm(sample_vox, dim=1)
+        row = {
+            "checkpoint_index": len(self.rows),
+            "epoch": int(epoch),
+            "sample_count": int(sample_norm.shape[0]),
+            "norm_abs_max": float(sample_norm.abs().max().detach().cpu()),
+            "voxel_mag_mean": float(mag.mean().detach().cpu()),
+            "voxel_mag_p95": float(torch.quantile(mag, 0.95).detach().cpu()),
+        }
+        if row_extra:
+            row.update(row_extra)
+        self.rows.append(row)
+
+    def record_idir(
+        self,
+        *,
+        epoch: int,
+        model: torch.nn.Module,
+        row_extra: Optional[Dict[str, object]] = None,
+    ) -> None:
+        if not self.should_record(int(epoch)):
+            return
+        model.eval()
+        with torch.no_grad():
+            disp = model(self.coords_t)
+        self.record_samples(epoch=epoch, disp_norm_xyz=disp, row_extra=row_extra)
+
+    def record_dense(
+        self,
+        *,
+        epoch: int,
+        dense_disp_norm_xyz: torch.Tensor,
+        row_extra: Optional[Dict[str, object]] = None,
+    ) -> None:
+        if not self.should_record(int(epoch)):
+            return
+        disp = dense_disp_norm_xyz.reshape(-1, 3)[self.flat_indices_t]
+        self.record_samples(epoch=epoch, disp_norm_xyz=disp, row_extra=row_extra)
+
+    def save(self) -> None:
+        if not self.enabled:
+            return
+        c.write_csv(self.out_dir / "checkpoint_sample_rows.csv", self.rows)
+        if self.rows:
+            np.savez_compressed(
+                self.out_dir / "checkpoint_samples.npz",
+                epochs=np.asarray([int(row["epoch"]) for row in self.rows], dtype=np.int64),
+                flat_indices=self.flat_indices_np,
+                points_zyx=self.points_zyx,
+                points_norm_xyz=self.points_norm_xyz,
+                disp_norm_xyz=np.stack(self.disp_norm_xyz, axis=0),
+                disp_vox_xyz=np.stack(self.disp_vox_xyz, axis=0),
+            )
 
 
 def default_epochs(method: str) -> int:
@@ -192,7 +330,13 @@ def evaluate_idir_ptv_lcc(
     }
 
 
-def train_idir(args: argparse.Namespace, case: c.LungCTCase, device: torch.device, out_dir: Path) -> Dict[str, object]:
+def train_idir(
+    args: argparse.Namespace,
+    case: c.LungCTCase,
+    device: torch.device,
+    out_dir: Path,
+    sampler: Optional[CheckpointSampler] = None,
+) -> Dict[str, object]:
     epochs = int(args.epochs if args.epochs is not None else 2500)
     lr = float(args.lr if args.lr is not None else 1e-4)
     torch.manual_seed(args.seed)
@@ -211,6 +355,8 @@ def train_idir(args: argparse.Namespace, case: c.LungCTCase, device: torch.devic
 
     model = c.build_siren(args.hidden_dim, args.hidden_layers, args.idir_omega).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    if sampler is not None:
+        sampler.record_idir(epoch=0, model=model, row_extra={"method": args.method, "checkpoint_source": "model_init"})
     history: List[Dict[str, float]] = []
     image_similarity_eval: List[Dict[str, float | str | bool]] = []
     image_sim_chunk_size = int(args.image_sim_eval_chunk_size or args.eval_chunk_size)
@@ -263,6 +409,18 @@ def train_idir(args: argparse.Namespace, case: c.LungCTCase, device: torch.devic
             )
             image_similarity_eval.append(sim_row)
             print(json.dumps({"image_similarity_eval": sim_row}), flush=True)
+        if sampler is not None:
+            sampler.record_idir(
+                epoch=epoch,
+                model=model,
+                row_extra={
+                    "method": args.method,
+                    "checkpoint_source": "post_optimizer_step",
+                    "loss": row["loss"],
+                    "data_loss": row["data_loss"],
+                    "reg_loss": row["reg_loss"],
+                },
+            )
         if epoch == 1 or epoch % int(args.eval_interval) == 0 or epoch == epochs:
             print(json.dumps(row), flush=True)
     if device.type == "cuda":
@@ -436,6 +594,7 @@ def train_single_stage_spline(
     out_dir: Path,
     *,
     direct_cp: bool,
+    sampler: Optional[CheckpointSampler] = None,
 ) -> Dict[str, object]:
     method_epochs = int(args.epochs if args.epochs is not None else 2500)
     method_lr = float(args.lr if args.lr is not None else (1e-3 if direct_cp else 1e-4))
@@ -467,6 +626,19 @@ def train_single_stage_spline(
 
     optimizer = torch.optim.Adam(trainable, lr=method_lr)
     history: List[Dict[str, float]] = []
+    if sampler is not None:
+        with torch.no_grad():
+            if direct_cp:
+                init_control = params
+            else:
+                assert model is not None
+                init_control = model(control_coords)
+            init_dense = c.expand_bspline_controls(init_control, control_shape, image_shape, args.cps)
+        sampler.record_dense(
+            epoch=0,
+            dense_disp_norm_xyz=init_dense,
+            row_extra={"method": args.method, "checkpoint_source": "model_init"},
+        )
     if device.type == "cuda":
         torch.cuda.empty_cache()
         torch.cuda.reset_peak_memory_stats()
@@ -493,6 +665,25 @@ def train_single_stage_spline(
             "reg_weight": float(args.ptv_isotv_weight),
         }
         history.append(row)
+        if sampler is not None and sampler.should_record(epoch):
+            with torch.no_grad():
+                if direct_cp:
+                    sample_control = params
+                else:
+                    assert model is not None
+                    sample_control = model(control_coords)
+                sample_dense = c.expand_bspline_controls(sample_control, control_shape, image_shape, args.cps)
+            sampler.record_dense(
+                epoch=epoch,
+                dense_disp_norm_xyz=sample_dense,
+                row_extra={
+                    "method": args.method,
+                    "checkpoint_source": "post_optimizer_step",
+                    "loss": row["loss"],
+                    "data_loss": row["data_loss"],
+                    "reg_loss": row["reg_loss"],
+                },
+            )
         if epoch == 1 or epoch % int(args.eval_interval) == 0 or epoch == method_epochs:
             print(json.dumps(row), flush=True)
     if dense_disp is None:
@@ -604,6 +795,7 @@ def optimize_stage(
     lr: float,
     stage_idx: int,
     global_epoch_offset: int,
+    sampler: Optional[CheckpointSampler] = None,
 ) -> Tuple[torch.Tensor, Dict[str, object], List[Dict[str, object]]]:
     fixed_l, blur_sigma, blur_kernel = c.make_loss_volume(
         fixed_t, downsample, args.antialias_sigma_scale, args.antialias_radius_sigma
@@ -743,6 +935,24 @@ def optimize_stage(
         }
         row.update(finest_diag)
         rows.append(row)
+        if sampler is not None and sampler.should_record(int(row["global_epoch"])):
+            with torch.no_grad():
+                sample_dense_full = c.expand_on_shape(control, control_shape, int(full_cps), fixed_t.shape, 1)
+            sampler.record_dense(
+                epoch=int(row["global_epoch"]),
+                dense_disp_norm_xyz=sample_dense_full,
+                row_extra={
+                    "method": args.method,
+                    "checkpoint_source": "post_optimizer_step",
+                    "stage_idx": int(stage_idx),
+                    "stage_epoch": int(epoch),
+                    "full_cps": int(full_cps),
+                    "downsample": int(downsample),
+                    "loss": row["loss"],
+                    "data_loss": row["data_loss"],
+                    "reg_loss": row["reg_loss"],
+                },
+            )
         if epoch == 1 or epoch % int(args.eval_interval) == 0 or epoch == int(epochs):
             print(json.dumps(row), flush=True)
     with torch.no_grad():
@@ -783,7 +993,13 @@ def optimize_stage(
     return dense_full.detach(), summary, rows
 
 
-def train_multistage(args: argparse.Namespace, case: c.LungCTCase, device: torch.device, out_dir: Path) -> Dict[str, object]:
+def train_multistage(
+    args: argparse.Namespace,
+    case: c.LungCTCase,
+    device: torch.device,
+    out_dir: Path,
+    sampler: Optional[CheckpointSampler] = None,
+) -> Dict[str, object]:
     stage_cps = c.parse_int_list(args.stage_full_cps)
     stage_downsample = c.parse_stage_ints(args.stage_downsample, len(stage_cps))
     stage_epochs = c.parse_stage_ints(args.stage_epochs, len(stage_cps))
@@ -813,6 +1029,12 @@ def train_multistage(args: argparse.Namespace, case: c.LungCTCase, device: torch
         torch.cuda.empty_cache()
         torch.cuda.reset_peak_memory_stats()
     start = time.time()
+    if sampler is not None:
+        sampler.record_dense(
+            epoch=0,
+            dense_disp_norm_xyz=torch.zeros((*image_shape, 3), dtype=torch.float32, device=device),
+            row_extra={"method": args.method, "checkpoint_source": "model_init"},
+        )
     for stage_idx, (full_cps, downsample, epochs, lr) in enumerate(
         zip(stage_cps, stage_downsample, stage_epochs, stage_lr)
     ):
@@ -846,6 +1068,7 @@ def train_multistage(args: argparse.Namespace, case: c.LungCTCase, device: torch
             float(lr),
             int(stage_idx),
             global_epoch_offset,
+            sampler=sampler,
         )
         prev_control = control.detach()
         prev_shape = control_shape
@@ -957,8 +1180,9 @@ def main() -> None:
 
     device = c.set_cuda_device(args.gpu)
     case = c.load_case(args.data_root, args.case_id)
+    sampler = CheckpointSampler(args=args, case=case, device=device, out_dir=out_dir)
     if method == METHOD_IDIR:
-        result = train_idir(args, case, device, out_dir)
+        result = train_idir(args, case, device, out_dir, sampler=sampler)
         protocol_tag = "ptv_landmark_crop_1mm_with_idir_fixed_t00_lungmask_sampling"
         mask_rule = "fixed_t00_lung_mask_sampling_and_metric"
         loss_domain = "fixed_t00_lung_mask_sampled"
@@ -973,25 +1197,25 @@ def main() -> None:
             "and sampled analytic physical-unit TV; the lung mask is metric-only."
         )
     elif method == METHOD_SINR_CPS4_PTV:
-        result = train_single_stage_spline(args, case, device, out_dir, direct_cp=False)
+        result = train_single_stage_spline(args, case, device, out_dir, direct_cp=False, sampler=sampler)
         protocol_tag = "ptv_landmark_crop_1mm_no_lungmask+fixed_t00_lung_mask_metric"
         mask_rule = "fixed_t00_lung_mask_metric_only"
         loss_domain = "border_masked_crop"
         method_note = "pTV loss methods use border-mask loss weighting, not lung-mask loss weighting."
     elif method == METHOD_DIRECT_CP_CPS4_PTV:
-        result = train_single_stage_spline(args, case, device, out_dir, direct_cp=True)
+        result = train_single_stage_spline(args, case, device, out_dir, direct_cp=True, sampler=sampler)
         protocol_tag = "ptv_landmark_crop_1mm_no_lungmask+fixed_t00_lung_mask_metric"
         mask_rule = "fixed_t00_lung_mask_metric_only"
         loss_domain = "border_masked_crop"
         method_note = "pTV loss methods use border-mask loss weighting, not lung-mask loss weighting."
     elif method == METHOD_DIRECT_CP_32_PTV:
-        result = train_multistage(args, case, device, out_dir)
+        result = train_multistage(args, case, device, out_dir, sampler=sampler)
         protocol_tag = "ptv_directcp_multistage+ptv_landmark_crop_1mm_no_lungmask+fixed_t00_lung_mask_metric"
         mask_rule = "fixed_t00_lung_mask_metric_only"
         loss_domain = "border_masked_crop"
         method_note = "pTV loss methods use border-mask loss weighting, not lung-mask loss weighting."
     elif method == METHOD_DIRECT_CP_32_GLOBAL_NCC_BE:
-        result = train_multistage(args, case, device, out_dir)
+        result = train_multistage(args, case, device, out_dir, sampler=sampler)
         protocol_tag = (
             "ptv_directcp_multistage+ptv_landmark_crop_1mm_no_lungmask+"
             "full_crop_global_ncc_bspline_be+fixed_t00_lung_mask_metric"
@@ -1000,7 +1224,7 @@ def main() -> None:
         loss_domain = "full_crop_global_ncc"
         method_note = "This method uses full-crop global NCC with no border-mask or lung-mask loss weighting."
     elif method == METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE:
-        result = train_multistage(args, case, device, out_dir)
+        result = train_multistage(args, case, device, out_dir, sampler=sampler)
         protocol_tag = (
             "ptv_directcp_multistage+ptv_landmark_crop_1mm_no_lungmask+"
             "full_crop_global_ncc_dense_fd_be+fixed_t00_lung_mask_metric"
@@ -1011,6 +1235,7 @@ def main() -> None:
     else:
         raise ValueError(f"Unknown method: {method}")
 
+    sampler.save()
     metrics = c.final_metrics_from_dense(
         result["dense_disp_norm_xyz"],
         case,

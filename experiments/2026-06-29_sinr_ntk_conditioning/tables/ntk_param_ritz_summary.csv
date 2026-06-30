@@ -1,0 +1,3 @@
+state,ritz_dim,cp_coefficients,sinr_param_count,rank_upper_bound,nullity_lower_bound,ritz_min,ritz_p05,ritz_p50,ritz_p95,ritz_max,positive_count_tol1e-12,ritz_condition_proxy_max_over_min_positive,ritz_condition_proxy_p95_over_p05,note
+init,64,388161,133379,133379,254782,65511.68359375,75885.219921875,127598.40234375,224134.77578124992,13794139.0,64,210.5599832472631,2.9536025066804856,Randomized range-finder Ritz proxy for leading parameter-space spectrum; not exact smallest nonzero eigenvalue.
+final,64,388161,133379,133379,254782,35530.68359375,37624.994921875,48796.974609375,101255.16601562494,2670927.25,64,75.1724138082676,2.6911675662913024,Randomized range-finder Ritz proxy for leading parameter-space spectrum; not exact smallest nonzero eigenvalue.

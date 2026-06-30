@@ -1,0 +1,14 @@
+{
+  "status": "completed",
+  "all_complete": true,
+  "errors": [],
+  "job_count": 11,
+  "alignment_rows": 22,
+  "case_rows": 11,
+  "similarity_rows": 3,
+  "promising_similarity_threshold": 0.5,
+  "promising_similarity_count": 0,
+  "followup_recommended": false,
+  "tables_dir": "/homebase/code_sync/inrorspline/experiments/2026-06-29_update_alignment_overnight/smoke/tables",
+  "plots_dir": "/homebase/code_sync/inrorspline/experiments/2026-06-29_update_alignment_overnight/smoke/plots"
+}

@@ -1,0 +1,3 @@
+dataset,image_shape_zyx,dense_displacement_dim,control_shape_zyx,control_points,cp_coefficients,sinr_param_count,rank_upper_bound,nullity_lower_bound,dense_jjt_fp32_gb,cp_kernel_dense_fp32_gb,state,case_rank,fixed_id,moving_id,state_source,state_run_name
+oasis,"160,224,192",20643840,"43,59,51",129387,388161,133379,133379,254782,1704672.5197824,602.675847684,init,9,0173,0136,seeded_init,
+oasis,"160,224,192",20643840,"43,59,51",129387,388161,133379,133379,254782,1704672.5197824,602.675847684,final,9,0173,0136,/database/inrorspline/runs/oasis_seed3_first10_alpha_sweep_be_2500e_v1/sinr_cps4_be_bspline_analytic/sinr_cps4_be_bspline_analytic_rank009_a1000_e2500_lr0p0001/model_state.pt,sinr_cps4_be_bspline_analytic_rank009_a1000_e2500_lr0p0001
