@@ -30,6 +30,66 @@ mlruns/
 checkpoints/
 *.log
 
+# Known generated experiment artifacts
+#
+# Keep these as exact paths or tightly scoped patterns. Do not add broad
+# experiment CSV ignores here: small review CSVs, summary tables, and paper
+# tables may still be intended for commit. Sizes are approximate as of
+# 2026-06-30.
+
+# Duplicate local notebook export (~1.2M). Commit canonical review notebooks or
+# reports instead of ad hoc copy files.
+experiments/2026-06-25_lungct_directcp4stage_global_ncc_fdbe_all10_alpha_sweep/pareto_visual_review-Copy1.ipynb
+
+# OASIS seed3 first10 DirectCP cps2 overlay per-epoch loss histories
+# (~399M all rows, ~28M population rows). Compact review artifacts should carry
+# the commit-facing summary.
+experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/direct_cp_cps2_full_overlay/loss_history_all_with_direct_cp_cps2_full.csv
+experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/direct_cp_cps2_full_overlay/loss_history_population_with_direct_cp_cps2_full.csv
+
+# OASIS rank009 fit-mode LR sweep generated loss traces. These are per-epoch
+# diagnostics, including smoke/preview siblings; commit curated summaries,
+# plots, and tables instead.
+experiments/2026-06-26_oasis_rank009_fit_modes_lr_sweep/loss_history_all.csv
+experiments/2026-06-26_oasis_rank009_fit_modes_lr_sweep/loss_history_augmented.csv
+experiments/2026-06-26_oasis_rank009_fit_modes_lr_sweep/masked_smoke_review/loss_history_all.csv
+experiments/2026-06-26_oasis_rank009_fit_modes_lr_sweep/masked_smoke_review/loss_history_augmented.csv
+experiments/2026-06-26_oasis_rank009_fit_modes_lr_sweep/preview_9_image_reg/loss_history_all.csv
+experiments/2026-06-26_oasis_rank009_fit_modes_lr_sweep/preview_9_image_reg/loss_history_augmented.csv
+experiments/2026-06-26_oasis_rank009_fit_modes_lr_sweep/smoke_review/loss_history_all.csv
+experiments/2026-06-26_oasis_rank009_fit_modes_lr_sweep/smoke_review/loss_history_augmented.csv
+
+# OASIS rank009 SITReg fit-mode LR sweep generated loss traces
+# (~13M-34M for retained histories). Commit summaries/plots instead.
+experiments/2026-06-26_oasis_rank009_sitreg_fit_modes_lr_sweep/loss_history_all.csv
+experiments/2026-06-26_oasis_rank009_sitreg_fit_modes_lr_sweep/loss_history_augmented.csv
+experiments/2026-06-26_oasis_rank009_sitreg_fit_modes_lr_sweep/smoke_review/loss_history_all.csv
+experiments/2026-06-26_oasis_rank009_sitreg_fit_modes_lr_sweep/smoke_review/loss_history_augmented.csv
+
+# OASIS seed3 DirectCP preliminary/first20 combined histories (~36M-218M each).
+# These are dense run histories; commit aggregate summaries and review reports.
+experiments/2026-06-26_oasis_seed3_first10_directcp842_alpha1000_prelim/history_new.csv
+experiments/2026-06-26_oasis_seed3_first10_directcp842_alpha1000_prelim/stage_history_new.csv
+experiments/2026-06-26_oasis_seed3_first20_directcp842_alpha_sweep/history_combined.csv
+experiments/2026-06-26_oasis_seed3_first20_directcp842_alpha_sweep/stage_history_combined.csv
+
+# OASIS seed3 next10 five-model sweep per-epoch loss histories
+# (~404M all rows, ~28M population rows). Tracked review artifacts summarize the
+# run; detailed histories stay out of Git.
+experiments/2026-06-26_oasis_seed3_next10_alpha_sweep/loss_history_all.csv
+experiments/2026-06-26_oasis_seed3_next10_alpha_sweep/loss_history_population.csv
+
+# Private/local prelaunch provenance in experiment folders. Durable,
+# anonymous-safe provenance belongs in codex_execution_spec.md and
+# technical_log.md.
+experiments/2026-06-26_oasis_seed3_next10_alpha_sweep/*_prelaunch_provenance.txt
+
+# June 29 mechanism exploration transient monitor state and duplicate table
+# copies. Canonical summaries and tables are tracked.
+experiments/2026-06-29_sinr_cp_kernel_followup/exploration/live_monitor_status.json
+experiments/2026-06-29_sinr_cp_kernel_followup/exploration/tables/capture_refinement_probe_rows_copy.csv
+experiments/2026-06-29_sinr_cp_kernel_followup/exploration/tables/standard_pyramid_probe_rows_copy.csv
+
 # Large artifacts
 *.pt
 *.pth

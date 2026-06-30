@@ -136,6 +136,19 @@ commit plan for approval. Include:
 - Files or folders intentionally excluded.
 - Submodule status and planned handling.
 - Verification already run or recommended.
+- Large generated-artifact handling. Inspect untracked files with sizes before
+  deciding what to exclude, for example with
+  `git ls-files --others --exclude-standard -z | xargs -0 du -h | sort -h`.
+  Do not exclude or ignore files solely because they are CSV, JSON, notebook, or
+  image files; small review tables, summaries, figures, and paper artifacts may
+  belong in Git. When a large or transient generated artifact should remain out
+  of Git and should stop appearing in future commit audits, propose an
+  exact-path or tightly scoped `.gitignore` entry with a short comment naming
+  the approximate size, purpose, and tracked summary/report that replaces it.
+  Use `.git/info/exclude` instead of committed `.gitignore` for host-local
+  clutter that should not become repo policy. If the artifact is already
+  tracked, do not remove it from Git without explicit approval for
+  `git rm --cached`.
 - One comprehensive but concise commit message. "Concise" means no filler, not
   vague. The subject should identify the concrete deliverable and the main
   protocol/behavioral change, for example `Add OASIS first10 BE sweep runner and
