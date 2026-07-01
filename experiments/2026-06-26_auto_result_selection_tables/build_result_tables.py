@@ -294,8 +294,14 @@ def selected_setting(row: Mapping[str, Any], dataset_key: str) -> str:
     return "reference"
 
 
-def load_oasis_rows(spec: Mapping[str, Any]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    source = repo_path(str(spec["source"]))
+def load_oasis_rows(
+    spec: Mapping[str, Any],
+    standard: Mapping[str, Any] | None = None,
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    source_text = str(spec["source"])
+    if standard is not None:
+        source_text = str(standard.get("artifact_source_overrides", {}).get("oasis20_population_summary", source_text))
+    source = repo_path(source_text)
     rows = read_csv(source)
     for row in rows:
         row["_source_name"] = "oasis20_population"
@@ -419,7 +425,7 @@ def build_dataset(
     standard: Mapping[str, Any] | None = None,
 ) -> Dict[str, Any]:
     if dataset_key == "oasis20":
-        candidates, sources = load_oasis_rows(spec)
+        candidates, sources = load_oasis_rows(spec, standard=standard)
     elif dataset_key == "lungct10":
         candidates, sources = load_lungct_rows(spec)
     else:

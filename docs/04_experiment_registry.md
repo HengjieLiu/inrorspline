@@ -1426,3 +1426,46 @@ Next decision:
   - Greedy target: start `97.58%`, epoch 10 `78.18%`, final `1.23%`.
 - Standardized artifact regenerated:
   `experiments/paper_artifacts/fitting_figure/v001/fit_modes_standardized_rrmse_field_fit_curves.png`.
+
+### P11: OASIS DirectCP 8-4-2 Canonical lr=1e-3 Pareto/Table Standardization
+
+- Status: completed 2026-07-01 after smoke, full launch, aggregation,
+  candidate artifact regeneration, and comparison audit.
+- Purpose: replace the final-paper OASIS DirectCP 8-4-2 `lr=1e-2`
+  Pareto/table temporary exception with a canonical `lr=1e-3` candidate while
+  leaving current `v001` artifacts intact for historical review.
+- Dataset: OASIS BrainMR seed-3 shuffled first20 ranks `0-19`.
+- Method: `direct_cp_8_4_2_be_bspline_analytic_multistage`.
+- Objective: full-image global NCC plus `alpha *` analytic cubic B-spline BE;
+  foreground regularity metrics use the fixed raw image-positive mask.
+- Alpha grid: `0,10,100,1000,10000,100000`.
+- LR/schedule: `lr=1e-3`; cps `8,4,2`; stage downsample `4,2,1`; stage
+  epochs `400,800,1300`; total epochs `2500`; seed `1`; eval interval `250`.
+- Launch environment: Docker container `py310sitreg_v1_test1`; use all visible
+  GPUs with one job per GPU.
+- Smoke output root:
+  `/database/inrorspline/runs/oasis_seed3_first20_directcp842_lr1e3_alpha_sweep_smoke_v1`.
+- Full output root:
+  `/database/inrorspline/runs/oasis_seed3_first20_directcp842_lr1e3_alpha_sweep_v1`.
+- Review root:
+  `experiments/2026-07-01_oasis_directcp842_lr1e3_pareto_standardization/`.
+- Candidate artifact roots:
+  `experiments/paper_artifacts/best_result_table/v002_candidate/`,
+  `experiments/paper_artifacts/pareto_figure/v002_candidate/`, and
+  `experiments/paper_artifacts/comparison/v001_vs_v002_candidate/`.
+- Monitoring: poll every 5 minutes; report completed/failed/running/remaining
+  jobs, elapsed time, throughput, ETA, newest log update, and failure log
+  paths; save snapshots in the review root.
+- Required preflight: Docker `py_compile`; one rank/one-alpha smoke with stage
+  epochs `1,1,1`; verify finite metrics and expected multistage files.
+- Acceptance: full run produces `120/120` summaries and `DONE` markers;
+  aggregation has no missing case-alpha combinations; `v002_candidate`
+  validation has zero `temporary_exception`, `mismatch`, or blocking LR issues;
+  current `v001` artifacts remain unchanged.
+- Actual completion: full run completed `120/120` jobs with `0` failures in
+  about `2h 7m`; aggregation reported `combined_rows=120`,
+  `population_scopes={"first10": 6, "first20": 6}`, and `errors=[]`.
+- Candidate artifact audit: best-result table validation has `11`
+  `matches_standard` rows plus `4` references; Pareto validation has `11`
+  `matches_standard` rows; no `temporary_exception`, `mismatch`, or blocking
+  LR issue remains in `v002_candidate`.

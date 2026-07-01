@@ -20,9 +20,8 @@ as `INR-Dense (IDIR loss)`, `MR-D-BSCP (IDIR loss)`, and
 method-ID to display-name mapping.
 
 Typography is controlled near the top of `../build_standardized_pareto.py`.
-For the current v001 regeneration, Pareto tick labels are `12 pt` and x/y axis
-labels are `16 pt` for both OASIS and LungCT. OASIS legends are `10 pt`, while
-LungCT legends remain `12 pt`. The
+For the current regeneration, Pareto tick labels are `12 pt`, x/y axis labels
+are `16 pt`, and legends are `12 pt` for both OASIS and LungCT. The
 previous OASIS plots used Matplotlib-default tick and axis-label sizes
 (`~10 pt`) with `6.4 pt` legends; the previous LungCT plots used `8 pt` tick
 labels, `10 pt` axis labels, and `8 pt` legends. An intermediate review pass

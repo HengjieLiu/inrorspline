@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import math
+import argparse
 import shutil
 import sys
 from datetime import datetime, timezone
@@ -39,7 +40,7 @@ OASIS_COHORT = "first20"
 OASIS_DPI = 300
 OASIS_TICK_LABEL_SIZE = 12
 OASIS_AXIS_LABEL_SIZE = 16
-OASIS_LEGEND_FONT_SIZE = 10
+OASIS_LEGEND_FONT_SIZE = 12
 OASIS_ANNOTATED_DIRNAME = "oasis20"
 OASIS_PAPER_NO_ANNOTATIONS_DIRNAME = "oasis20_paper_no_annotations"
 OASIS_SOURCE_WITH_DIRECTCP842 = repo_path(
@@ -52,6 +53,7 @@ OASIS_SOURCE_FIVE_SWEEP = repo_path(
     "pareto_first10_first20_alpha5_saved_baselines_paper_v1/"
     "first20/population_summary_first20_with_saved_baselines.csv"
 )
+OASIS_SOURCE_OVERRIDE_KEY = "oasis20_population_summary"
 OASIS_ACCURACY_METRICS = [
     ("dice_mean", "Mean Dice", True),
     ("hd95_mean", "Mean HD95", False),
@@ -201,7 +203,11 @@ def _display_name_mapping(*frames: pd.DataFrame) -> list[dict[str, object]]:
     return sorted(rows, key=lambda item: (str(item["dataset"]), str(item["method_family"]), str(item["method_id"])))
 
 
-def _oasis_source() -> Path:
+def _oasis_source(standard: Mapping[str, Any] | None = None) -> Path:
+    if standard is not None:
+        override = standard.get("artifact_source_overrides", {}).get(OASIS_SOURCE_OVERRIDE_KEY)
+        if override:
+            return repo_path(str(override))
     return OASIS_SOURCE_WITH_DIRECTCP842 if OASIS_INCLUDE_DIRECTCP842 else OASIS_SOURCE_FIVE_SWEEP
 
 
@@ -259,8 +265,12 @@ def _clean_output_dir(output_dir: Path) -> None:
             path.unlink()
 
 
-def load_oasis_rows(nicknames: dict[str, dict[str, str]], standard_records: list[dict[str, Any]]) -> pd.DataFrame:
-    source = _oasis_source()
+def load_oasis_rows(
+    nicknames: dict[str, dict[str, str]],
+    standard_records: list[dict[str, Any]],
+    standard: Mapping[str, Any] | None = None,
+) -> pd.DataFrame:
+    source = _oasis_source(standard)
     rows = pd.read_csv(source)
     rows["dataset"] = "oasis20"
     rows["method_id"] = rows["method_key"].astype(str)
@@ -693,6 +703,8 @@ def write_manifest(
     standard: Mapping[str, Any],
     validation_rows: list[dict[str, Any]],
     *,
+    standard_path: str,
+    nickname_path: str,
     oasis: pd.DataFrame,
     lung: pd.DataFrame,
     oasis_paths: Sequence[Path],
@@ -711,11 +723,11 @@ def write_manifest(
         "artifact": "pareto_figure",
         "version": standard["artifact_versions"]["pareto_figure"]["current"],
         "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "standard_path": "experiments/paper_artifacts/artifact_standard.json",
-        "nickname_path": "experiments/paper_artifacts/method_nicknames.csv",
+        "standard_path": standard_path,
+        "nickname_path": nickname_path,
         "output_formats": list(OUTPUT_FORMATS),
         "source_files": {
-            "oasis20": repo_relative(_oasis_source()),
+            "oasis20": repo_relative(_oasis_source(standard)),
             "lungct10_mean_rows": repo_relative(LUNG_MEAN_SOURCE),
             "lungct10_single_stage_rows": repo_relative(LUNG_NO_SWEEP_SOURCE),
         },
@@ -775,13 +787,14 @@ def write_review_report(
     output_dir: Path,
     validation_rows: list[dict[str, Any]],
     *,
+    version: str,
     oasis_paths: Sequence[Path],
     oasis_paper_paths: Sequence[Path],
     lung_paths: Sequence[Path],
     lung_paper_paths: Sequence[Path],
 ) -> None:
     lines = [
-        "# Pareto Figure v001 Plot Package",
+        f"# Pareto Figure {version} Plot Package",
         "",
         f"- Output formats: `{', '.join(OUTPUT_FORMATS)}`",
         f"- OASIS annotated PNGs: `{len(oasis_paths)}`",
@@ -813,14 +826,22 @@ def write_review_report(
     (output_dir / "review_report.md").write_text("\n".join(lines))
 
 
-def main() -> None:
-    standard = load_standard()
-    nicknames = load_nicknames()
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--standard-path", type=Path, default=None)
+    parser.add_argument("--nickname-path", type=Path, default=None)
+    return parser.parse_args(argv)
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    args = parse_args(argv)
+    standard = load_standard(args.standard_path) if args.standard_path is not None else load_standard()
+    nicknames = load_nicknames(args.nickname_path) if args.nickname_path is not None else load_nicknames()
     output_dir = artifact_output_dir("pareto_figure", standard)
     _clean_output_dir(output_dir)
 
     standard_records = selected_hypervariant_records("pareto_figure", standard)
-    oasis = load_oasis_rows(nicknames, standard_records)
+    oasis = load_oasis_rows(nicknames, standard_records, standard)
     lung = load_lung_rows(nicknames, standard_records)
     _sanitize_dataframe(oasis).to_csv(output_dir / "oasis20_pareto_source_rows.csv", index=False)
     _sanitize_dataframe(lung).to_csv(output_dir / "lungct10_pareto_source_rows.csv", index=False)
@@ -865,6 +886,8 @@ def main() -> None:
         output_dir,
         standard,
         validation_rows,
+        standard_path=repo_relative(args.standard_path) if args.standard_path is not None else "experiments/paper_artifacts/artifact_standard.json",
+        nickname_path=repo_relative(args.nickname_path) if args.nickname_path is not None else "experiments/paper_artifacts/method_nicknames.csv",
         oasis=oasis,
         lung=lung,
         oasis_paths=oasis_paths,
@@ -875,6 +898,7 @@ def main() -> None:
     write_review_report(
         output_dir,
         validation_rows,
+        version=str(standard["artifact_versions"]["pareto_figure"]["current"]),
         oasis_paths=oasis_paths,
         oasis_paper_paths=oasis_paper_paths,
         lung_paths=lung_paths,
