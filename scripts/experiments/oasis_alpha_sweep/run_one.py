@@ -15,14 +15,20 @@ import numpy as np
 import torch
 
 THIS_DIR = Path(__file__).resolve().parent
+EXPERIMENTS_DIR = THIS_DIR.parent
 if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
 
+import common_dctfield as dctfield  # noqa: E402
 import common as c  # noqa: E402
 
 
 METHODS = [
     "idir_original",
+    "direct_dvf_sampled_ncc_fd_be",
+    "dctfield_sampled_ncc_fd_be",
     "sinr_cps4_be_bspline_analytic",
     "sinr_cps2_be_bspline_analytic",
     "direct_cp_cps4_be_bspline_analytic",
@@ -46,6 +52,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--idir-omega", type=float, default=32.0)
     parser.add_argument("--spline-omega", type=float, default=50.0)
     parser.add_argument("--coords-batch-size", type=int, default=10000)
+    parser.add_argument("--dct-size", type=int, default=32)
     parser.add_argument("--eval-chunk-size", type=int, default=200000)
     parser.add_argument("--image-sim-eval-interval", type=int, default=0)
     parser.add_argument("--image-sim-eval-chunk-size", type=int, default=None)
@@ -246,6 +253,11 @@ def build_run_name(args: argparse.Namespace, lr: float) -> str:
             f"{key}_rank{args.case_rank:03d}_sched{args.stage_full_cps.replace(',', '-')}"
             f"_ds{args.stage_downsample.replace(',', '-')}_e{args.stage_epochs.replace(',', '-')}"
             f"_a{c.format_float(args.alpha)}_lr{c.format_float(lr)}"
+        )
+    if args.method == "dctfield_sampled_ncc_fd_be":
+        return (
+            f"{key}_rank{args.case_rank:03d}_k{int(args.dct_size)}"
+            f"_a{c.format_float(args.alpha)}_e{args.epochs}_lr{c.format_float(lr)}"
         )
     return (
         f"{key}_rank{args.case_rank:03d}_a{c.format_float(args.alpha)}"
@@ -454,6 +466,200 @@ def train_idir(
     metrics["train_coords"] = n_train
     metrics["coords_batch_size"] = batch_size
     metrics["param_count"] = c.count_trainable_params(model)
+    return metrics
+
+
+def train_direct_dvf(
+    args: argparse.Namespace,
+    batch: Dict[str, torch.Tensor | str | int | Dict[str, object]],
+    device: torch.device,
+    lr: float,
+    sampler: Optional[CheckpointSampler] = None,
+) -> Dict[str, object]:
+    moving = batch["moving"]
+    fixed_image = batch["fixed"]
+    fixed_mask = batch["fixed_mask"]
+    assert isinstance(moving, torch.Tensor)
+    assert isinstance(fixed_image, torch.Tensor)
+    assert isinstance(fixed_mask, torch.Tensor)
+    fixed_mask_bool = fixed_mask.detach().bool()
+
+    coords_all = c.make_coordinate_tensor(c.IMAGE_SHAPE, device)
+    flat_mask = fixed_mask_bool.reshape(-1)
+    train_indices = torch.nonzero(flat_mask, as_tuple=False).reshape(-1)
+    n_train = int(train_indices.shape[0])
+    batch_size = min(int(args.coords_batch_size), n_train)
+    if batch_size <= 0:
+        raise RuntimeError("Empty direct-DVF training coordinate set.")
+
+    id_dense = c.make_coordinate_grid(c.IMAGE_SHAPE, device).detach()
+    dense_disp = torch.nn.Parameter(torch.zeros((*c.IMAGE_SHAPE, 3), dtype=torch.float32, device=device))
+    optimizer = torch.optim.Adam([dense_disp], lr=lr)
+    history: List[Dict[str, float]] = []
+    if sampler is not None:
+        sampler.record_dense(
+            epoch=0,
+            dense_disp_norm_xyz=dense_disp.detach(),
+            row_extra={"method": args.method, "checkpoint_source": "dense_dvf_init"},
+        )
+
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+        torch.cuda.reset_peak_memory_stats()
+    train_start = time.time()
+    for epoch in range(1, int(args.epochs) + 1):
+        local = torch.randperm(n_train, device=device)[:batch_size]
+        flat_idx = train_indices[local]
+        coords = coords_all[flat_idx]
+        disp = dense_disp.reshape(-1, 3)[flat_idx]
+        warped = c.sample_volume(moving, coords + disp, mode="bilinear")
+        fixed_samples = c.sample_volume(fixed_image, coords, mode="bilinear")
+        data_loss = c.ncc_loss(fixed_samples, warped)
+        reg_loss = c.forward_valid_be(
+            c.dhw3_to_ncdhw(dense_disp),
+            fixed_mask_bool,
+            component_reduction="mean",
+        )
+        loss = data_loss + float(args.alpha) * reg_loss
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
+        entry = {
+            "epoch": float(epoch),
+            "loss": float(loss.detach().cpu()),
+            "data_loss": float(data_loss.detach().cpu()),
+            "reg_loss": float(reg_loss.detach().cpu()),
+        }
+        history.append(entry)
+        if sampler is not None:
+            sampler.record_dense(
+                epoch=epoch,
+                dense_disp_norm_xyz=dense_disp.detach(),
+                row_extra={
+                    "method": args.method,
+                    "checkpoint_source": "post_optimizer_step",
+                    "loss": entry["loss"],
+                    "data_loss": entry["data_loss"],
+                    "reg_loss": entry["reg_loss"],
+                },
+            )
+        if epoch == 1 or epoch % int(args.eval_interval) == 0 or epoch == int(args.epochs):
+            print(json.dumps(entry), flush=True)
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    training_elapsed_sec = time.time() - train_start
+    training_peak_mem_gb = torch.cuda.max_memory_allocated() / (1024**3) if device.type == "cuda" else 0.0
+
+    final_dense_disp = dense_disp.detach()
+    with torch.no_grad():
+        metrics = c.evaluate_from_dense_coords(id_dense + final_dense_disp, batch)
+    metrics["history"] = history
+    metrics["dense_disp"] = final_dense_disp
+    metrics["training_elapsed_sec"] = training_elapsed_sec
+    metrics["training_peak_mem_gb"] = training_peak_mem_gb
+    metrics["train_coords"] = n_train
+    metrics["coords_batch_size"] = batch_size
+    metrics["param_count"] = int(final_dense_disp.numel())
+    return metrics
+
+
+def train_dctfield(
+    args: argparse.Namespace,
+    batch: Dict[str, torch.Tensor | str | int | Dict[str, object]],
+    device: torch.device,
+    lr: float,
+    sampler: Optional[CheckpointSampler] = None,
+) -> Dict[str, object]:
+    moving = batch["moving"]
+    fixed_image = batch["fixed"]
+    fixed_mask = batch["fixed_mask"]
+    assert isinstance(moving, torch.Tensor)
+    assert isinstance(fixed_image, torch.Tensor)
+    assert isinstance(fixed_mask, torch.Tensor)
+    fixed_mask_bool = fixed_mask.detach().bool()
+
+    dct_size = dctfield.normalize_dct_size(int(args.dct_size), c.IMAGE_SHAPE)
+    decoder = dctfield.DCTFieldDecoder(c.IMAGE_SHAPE, dct_size, device=device, dtype=torch.float32)
+    coeff = torch.nn.Parameter(torch.zeros((3, *dct_size), dtype=torch.float32, device=device))
+    coords_all = c.make_coordinate_tensor(c.IMAGE_SHAPE, device)
+    flat_mask = fixed_mask_bool.reshape(-1)
+    train_indices = torch.nonzero(flat_mask, as_tuple=False).reshape(-1)
+    n_train = int(train_indices.shape[0])
+    batch_size = min(int(args.coords_batch_size), n_train)
+    if batch_size <= 0:
+        raise RuntimeError("Empty DCTField training coordinate set.")
+
+    id_dense = c.make_coordinate_grid(c.IMAGE_SHAPE, device).detach()
+    optimizer = torch.optim.Adam([coeff], lr=lr)
+    history: List[Dict[str, float]] = []
+    if sampler is not None:
+        sampler.record_dense(
+            epoch=0,
+            dense_disp_norm_xyz=torch.zeros((*c.IMAGE_SHAPE, 3), dtype=torch.float32, device=device),
+            row_extra={"method": args.method, "checkpoint_source": "dct_coeff_init"},
+        )
+
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+        torch.cuda.reset_peak_memory_stats()
+    train_start = time.time()
+    for epoch in range(1, int(args.epochs) + 1):
+        dense_disp = decoder.decode(coeff)
+        local = torch.randperm(n_train, device=device)[:batch_size]
+        flat_idx = train_indices[local]
+        coords = coords_all[flat_idx]
+        disp = dense_disp.reshape(-1, 3)[flat_idx]
+        warped = c.sample_volume(moving, coords + disp, mode="bilinear")
+        fixed_samples = c.sample_volume(fixed_image, coords, mode="bilinear")
+        data_loss = c.ncc_loss(fixed_samples, warped)
+        reg_loss = c.forward_valid_be(
+            c.dhw3_to_ncdhw(dense_disp),
+            fixed_mask_bool,
+            component_reduction="mean",
+        )
+        loss = data_loss + float(args.alpha) * reg_loss
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
+        entry = {
+            "epoch": float(epoch),
+            "loss": float(loss.detach().cpu()),
+            "data_loss": float(data_loss.detach().cpu()),
+            "reg_loss": float(reg_loss.detach().cpu()),
+        }
+        history.append(entry)
+        if sampler is not None:
+            sampler.record_dense(
+                epoch=epoch,
+                dense_disp_norm_xyz=dense_disp.detach(),
+                row_extra={
+                    "method": args.method,
+                    "checkpoint_source": "post_optimizer_step",
+                    "loss": entry["loss"],
+                    "data_loss": entry["data_loss"],
+                    "reg_loss": entry["reg_loss"],
+                },
+            )
+        if epoch == 1 or epoch % int(args.eval_interval) == 0 or epoch == int(args.epochs):
+            print(json.dumps(entry), flush=True)
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    training_elapsed_sec = time.time() - train_start
+    training_peak_mem_gb = torch.cuda.max_memory_allocated() / (1024**3) if device.type == "cuda" else 0.0
+
+    with torch.no_grad():
+        final_dense_disp = decoder.decode(coeff).detach()
+        metrics = c.evaluate_from_dense_coords(id_dense + final_dense_disp, batch)
+    metrics["history"] = history
+    metrics["dense_disp"] = final_dense_disp
+    metrics["dct_coeff"] = coeff.detach()
+    metrics["dct_size_zyx"] = list(dct_size)
+    metrics["dct_basis"] = decoder.basis_name
+    metrics["training_elapsed_sec"] = training_elapsed_sec
+    metrics["training_peak_mem_gb"] = training_peak_mem_gb
+    metrics["train_coords"] = n_train
+    metrics["coords_batch_size"] = batch_size
+    metrics["param_count"] = int(coeff.numel())
     return metrics
 
 
@@ -895,6 +1101,12 @@ def write_outputs(
     if "generator" in metrics:
         state["generator_state_dict"] = metrics["generator"].state_dict()  # type: ignore[union-attr]
         state["control_shape"] = metrics["control_shape"]
+    if args.method == "direct_dvf_sampled_ncc_fd_be" and "dense_disp" in metrics:
+        state["dense_disp_norm"] = metrics["dense_disp"].detach().cpu()  # type: ignore[union-attr]
+    if args.method == "dctfield_sampled_ncc_fd_be" and "dct_coeff" in metrics:
+        state["dct_coeff"] = metrics["dct_coeff"].detach().cpu()  # type: ignore[union-attr]
+        state["dct_size_zyx"] = metrics.get("dct_size_zyx")
+        state["dct_basis"] = metrics.get("dct_basis")
     if "control_disp" in metrics and "generator" not in metrics:
         state["control_disp"] = metrics["control_disp"].detach().cpu()  # type: ignore[union-attr]
         state["control_shape"] = metrics["control_shape"]
@@ -937,6 +1149,74 @@ def write_outputs(
 
     last = metrics["history"][-1]  # type: ignore[index]
     is_idir = args.method == "idir_original"
+    is_direct_dvf = args.method == "direct_dvf_sampled_ncc_fd_be"
+    is_dctfield = args.method == "dctfield_sampled_ncc_fd_be"
+    is_bspline = not is_idir and not is_direct_dvf and not is_dctfield
+    activation = (
+        "dctfield_coefficients"
+        if is_dctfield
+        else "direct_dense_grid_displacement"
+        if is_direct_dvf
+        else "direct_control_points"
+        if args.method.startswith("direct_cp_")
+        else "Siren"
+    )
+    omega = float(args.idir_omega) if is_idir else (None if (is_direct_dvf or is_dctfield) else float(args.spline_omega))
+    be_type = (
+        "be_native_analytic"
+        if is_idir
+        else "dct_decoded_dense_forward_difference_be"
+        if is_dctfield
+        else "dense_forward_difference_be"
+        if is_direct_dvf
+        else "be_bspline_analytic"
+    )
+    diffusion_type = (
+        "diffusion_native_analytic"
+        if is_idir
+        else "dct_decoded_dense_forward_difference"
+        if is_dctfield
+        else "dense_forward_difference"
+        if is_direct_dvf
+        else "diffusion_bspline_analytic"
+    )
+    native_be_formula = (
+        "idir_coordinate_autograd_hessian"
+        if is_idir
+        else "not_used_dct_spectral_be_possible"
+        if is_dctfield
+        else "not_available_dense_grid_dvf"
+        if is_direct_dvf
+        else "bspline_analytic"
+    )
+    native_diffusion_formula = (
+        "idir_coordinate_autograd_jacobian"
+        if is_idir
+        else "not_used_dct_spectral_diffusion_possible"
+        if is_dctfield
+        else "not_available_dense_grid_dvf"
+        if is_direct_dvf
+        else "bspline_analytic"
+    )
+    be_training_reduction = (
+        "original IDIR coordinate-autograd analytic BE; sampled spatial means then divided by batch size"
+        if is_idir
+        else "dense valid-stencil finite-difference BE over decoded DCT field and fixed image-positive mask; spatial mean plus component mean"
+        if is_dctfield
+        else "dense valid-stencil finite-difference BE over fixed image-positive mask; spatial mean plus component mean"
+        if is_direct_dvf
+        else "analytic cubic B-spline BE sampled at voxel centers; spatial mean plus component mean"
+    )
+    image_loss = "idir_global_ncc_sampled" if (is_idir or is_direct_dvf or is_dctfield) else "sinr_ncc"
+    sample_domain = (
+        "fixed_image_positive"
+        if is_idir
+        else "fixed_image_positive_grid_points"
+        if is_dctfield
+        else "fixed_image_positive_grid_points"
+        if is_direct_dvf
+        else "none_full_image_ncc"
+    )
     summary: Dict[str, object] = {
         "run_name": run_name,
         "run_dir": str(run_dir),
@@ -960,32 +1240,30 @@ def write_outputs(
         "image_similarity_eval_affects_training": False if is_idir and int(args.image_sim_eval_interval) > 0 else None,
         "hidden_dim": int(args.hidden_dim),
         "hidden_layers": int(args.hidden_layers),
-        "activation": "direct_control_points" if args.method.startswith("direct_cp_") else "Siren",
-        "omega": float(args.idir_omega if is_idir else args.spline_omega),
+        "activation": activation,
+        "omega": omega,
         "lr": float(lr),
         "alpha": float(args.alpha),
-        "be_type": "be_native_analytic" if is_idir else "be_bspline_analytic",
-        "diffusion_type": "diffusion_native_analytic" if is_idir else "diffusion_bspline_analytic",
-        "regularizer": "be_native_analytic" if is_idir else "be_bspline_analytic",
-        "native_analytic_be_formula": "idir_coordinate_autograd_hessian" if is_idir else "bspline_analytic",
-        "native_analytic_diffusion_formula": "idir_coordinate_autograd_jacobian" if is_idir else "bspline_analytic",
-        "be_training_reduction": (
-            "original IDIR coordinate-autograd analytic BE; sampled spatial means then divided by batch size"
-            if is_idir
-            else "analytic cubic B-spline BE sampled at voxel centers; spatial mean plus component mean"
-        ),
-        "image_loss": "idir_global_ncc_sampled" if is_idir else "sinr_ncc",
-        "sample_domain": "fixed_image_positive" if is_idir else "none_full_image_ncc",
+        "be_type": be_type,
+        "diffusion_type": diffusion_type,
+        "regularizer": be_type,
+        "native_analytic_be_formula": native_be_formula,
+        "native_analytic_diffusion_formula": native_diffusion_formula,
+        "be_training_reduction": be_training_reduction,
+        "image_loss": image_loss,
+        "sample_domain": sample_domain,
         "foreground_metric_mask": "fixed_image_positive",
         "segmentation_mask_role": "dice_hd95_asd_only",
         "cps": metrics.get("cps"),
-        "bspline_order": 3 if not is_idir else None,
-        "bspline_mode": "disp" if not is_idir else None,
+        "bspline_order": 3 if is_bspline else None,
+        "bspline_mode": "disp" if is_bspline else None,
         "grid_order": "pytorch",
         "seed": int(args.seed),
         "coords_batch_size": metrics.get("coords_batch_size"),
         "train_coords": metrics.get("train_coords"),
         "param_count": metrics.get("param_count"),
+        "dct_size_zyx": metrics.get("dct_size_zyx"),
+        "dct_basis": metrics.get("dct_basis"),
         "stage_full_cps": metrics.get("stage_full_cps"),
         "stage_downsample": metrics.get("stage_downsample"),
         "stage_epochs": metrics.get("stage_epochs"),
@@ -1082,6 +1360,10 @@ def main() -> None:
 
     if args.method == "idir_original":
         metrics = train_idir(args, batch, device, lr, sampler=sampler)
+    elif args.method == "direct_dvf_sampled_ncc_fd_be":
+        metrics = train_direct_dvf(args, batch, device, lr, sampler=sampler)
+    elif args.method == "dctfield_sampled_ncc_fd_be":
+        metrics = train_dctfield(args, batch, device, lr, sampler=sampler)
     elif args.method == "direct_cp_8_4_2_be_bspline_analytic_multistage":
         metrics = train_multistage_direct_cp(args, batch, device, lr, sampler=sampler)
     else:

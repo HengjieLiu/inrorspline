@@ -557,6 +557,7 @@ def analytic_bspline_sampled_diffusion(
 
 def dense_forward_difference_be(
     disp_dhw3: torch.Tensor,
+    mask: Optional[torch.Tensor] = None,
     *,
     component_reduction: str = "mean",
 ) -> torch.Tensor:
@@ -574,11 +575,32 @@ def dense_forward_difference_be(
         (dz[:, :, :, :, 1:] - dz[:, :, :, :, :-1], 2.0),
         (dy[:, :, :, :, 1:] - dy[:, :, :, :, :-1], 2.0),
     ]
+    if mask is None:
+        masks: List[Optional[torch.Tensor]] = [None for _term, _weight in terms]
+    else:
+        m = mask.to(device=disp_dhw3.device).bool()
+        if m.ndim != 3:
+            raise ValueError(f"Expected [D,H,W] mask, got {tuple(m.shape)}")
+        masks = [
+            m[2:, :, :] & m[1:-1, :, :] & m[:-2, :, :],
+            m[:, 2:, :] & m[:, 1:-1, :] & m[:, :-2, :],
+            m[:, :, 2:] & m[:, :, 1:-1] & m[:, :, :-2],
+            m[1:, 1:, :] & m[:-1, 1:, :] & m[1:, :-1, :] & m[:-1, :-1, :],
+            m[1:, :, 1:] & m[:-1, :, 1:] & m[1:, :, :-1] & m[:-1, :, :-1],
+            m[:, 1:, 1:] & m[:, :-1, 1:] & m[:, 1:, :-1] & m[:, :-1, :-1],
+        ]
     loss = torch.zeros((), dtype=disp_dhw3.dtype, device=disp_dhw3.device)
-    for term, weight in terms:
+    for (term, weight), term_mask in zip(terms, masks):
         sq = float(weight) * term.square()
         reduced = sq.sum(dim=1) if component_reduction == "sum" else sq.mean(dim=1)
-        loss = loss + reduced.mean()
+        if term_mask is None:
+            loss = loss + reduced.mean()
+        else:
+            selected = reduced[..., term_mask]
+            if selected.numel() == 0:
+                loss = loss + torch.as_tensor(float("nan"), dtype=reduced.dtype, device=reduced.device)
+            else:
+                loss = loss + selected.mean()
     return loss
 
 

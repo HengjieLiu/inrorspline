@@ -1132,3 +1132,114 @@ Next decision:
   pTVReg-method-only comparison. LungCT rows must be tagged as pTV-preprocessed
   diagnostic-domain experiments unless original/native TRE reconstruction is
   explicitly supplied by the source artifact.
+
+### P7: Direct Dense-DVF vs IDIR Preliminary Check
+
+- Status: completed.
+- Date planned: 2026-06-30.
+- Purpose: test whether replacing IDIR's continuous SIREN displacement model
+  with a directly optimized dense displacement field is worth a fuller
+  ablation. This isolates optimization over dense grid values from the IDIR
+  coordinate-network parameterization while keeping the IDIR-style sampled NCC
+  loss and bending anchor.
+- Method handles:
+  - OASIS `direct_dvf_sampled_ncc_fd_be`.
+  - LungCT `direct_dvf_lungmask_sampled_ncc_fd_be`.
+- Cases:
+  - OASIS rank `9`, seed-3 shuffled first10 pair `(fixed 0173, moving 0136)`,
+    original pair index `88`.
+  - LungCT cases `01` and `08`, canonical pTV-preprocessed diagnostic crop
+    domain.
+- Fixed settings: seed `1`, LR `1e-4`, `2500` epochs, sampled image-loss
+  locations `10000`, no tuning in this precheck.
+- Regularization: direct dense DVF has no native continuous analytic bending
+  formula, so training BE is tagged as
+  `dense_forward_difference_be`. OASIS uses fixed image-positive valid-stencil
+  BE; LungCT uses fixed T00 lung-mask valid-stencil BE on the cropped 1mm grid.
+- IDIR anchors for interpretation:
+  - OASIS IDIR alpha `1`, LR `1e-4`.
+  - LungCT IDIR `alpha_bending=10`, LR `1e-4`.
+- Launch GPU assignment: OASIS rank9 on GPU `0`; LungCT case01 on GPU `2`;
+  LungCT case08 on GPU `3`. Do not use GPU `1` for this launch.
+- Run roots:
+  - `/database/inrorspline/runs/oasis_rank009_direct_dvf_idir_loss_precheck_v1`
+  - `/database/inrorspline/runs/lungct_case01_case08_direct_dvf_idir_loss_precheck_v1`
+- Review root:
+  `experiments/2026-06-30_direct_dvf_idir_precheck/`.
+- Required preflight: compile/import checks, OASIS rank9 validation, LungCT
+  loader audit for cases `01,08`, and two-epoch smoke after implementation.
+- Planned aggregation: report accuracy/TRE, dense finite-difference BE,
+  diffusion, log-Jacobian, folding, NDV, runtime, and peak memory against the
+  existing IDIR anchors. LungCT metrics remain pTV-preprocessed reg1mm crop
+  diagnostics unless an original/native TRE reconstruction is explicitly added.
+- Result: all `3/3` full jobs completed on requested GPUs `0,2,3` with no
+  process failures. Aggregation wrote
+  `experiments/2026-06-30_direct_dvf_idir_precheck/review_report.md`,
+  `direct_dvf_idir_precheck_rows.csv`, and
+  `direct_dvf_idir_precheck_rows.json`.
+- Headline comparison: direct dense DVF under the matched IDIR-style loss was
+  worse than the IDIR anchor on all three preliminary cases. OASIS rank9 Dice
+  was `0.7673` versus IDIR `0.8110`, with much higher foreground folding
+  (`9.889%` versus `1.560%`). LungCT case01 snap TRE was `3.764` mm versus
+  IDIR `1.063` mm, and case08 snap TRE was `15.076` mm versus IDIR `1.331` mm.
+- Preliminary interpretation: the direct dense-grid parameterization is
+  feasible to run, but this fixed LR/alpha precheck does not motivate a broader
+  same-settings expansion before trying stronger smoothness, different LR, or a
+  multiscale/capture-range schedule.
+
+### P8: DCTField IDIR-Loss K-Sweep Preliminary Check
+
+- Status: completed.
+- Date planned: 2026-06-30.
+- Purpose: test a non-neural, non-spline compressed displacement basis as a
+  paper-facing baseline for the deformation-search-space story. DCTField
+  optimizes low-frequency cosine coefficients and decodes them to a dense
+  displacement field.
+- Method handles:
+  - OASIS `dctfield_sampled_ncc_fd_be`.
+  - LungCT `dctfield_lungmask_sampled_ncc_fd_be`.
+- Cases:
+  - OASIS rank `9`, seed-3 shuffled first10 pair `(fixed 0173, moving 0136)`,
+    original pair index `88`.
+  - LungCT cases `01` and `08`, canonical pTV-preprocessed diagnostic crop
+    domain.
+- DCT sizes: `16^3`, `32^3`, `64^3`, `128^3`, with coefficient counts
+  `12288`, `98304`, `786432`, and `6291456`.
+- Fixed settings: seed `1`, LR `1e-4`, `2500` epochs, sampled image-loss
+  locations `10000`, no tuning in this precheck.
+- Regularization: training BE is finite-difference BE over the decoded dense
+  DCT field, tagged as `dct_decoded_dense_forward_difference_be`. Spectral DCT
+  analytic BE is intentionally not used in this first round.
+- IDIR/direct-field anchors for interpretation:
+  - OASIS IDIR alpha `1`, LR `1e-4`; direct dense-DVF P7.
+  - LungCT IDIR `alpha_bending=10`, LR `1e-4`; direct dense-DVF P7.
+- Launch queue: GPU `0` runs OASIS K `16,32,64,128` sequentially; GPU `2`
+  runs LungCT case01 K `16,32,64,128` sequentially; GPU `3` runs LungCT case08
+  K `16,32,64,128` sequentially. Do not use GPU `1`.
+- Run roots:
+  - `/database/inrorspline/runs/oasis_rank009_dctfield_idir_k_sweep_precheck_v1`
+  - `/database/inrorspline/runs/lungct_case01_case08_dctfield_idir_k_sweep_precheck_v1`
+- Review root:
+  `experiments/2026-06-30_dctfield_idir_k_sweep_precheck/`.
+- Required preflight: compile/import checks, DCT decoder sanity checks, OASIS
+  rank9 validation, LungCT loader audit for cases `01,08`, and two-epoch K128
+  smokes for OASIS rank9 and LungCT case08. If K128 smoke fails with OOM or
+  NaN, stop and report rather than silently dropping K128.
+- Planned aggregation: compare IDIR anchor, direct dense-DVF P7, and DCTField
+  K `16,32,64,128` on accuracy/TRE, dense finite-difference BE, diffusion,
+  log-Jacobian, folding, NDV, final loss terms, runtime, and peak memory.
+- Result: all `12/12` DCTField full jobs completed on requested GPU queues
+  `0,2,3` with no process failures. Aggregation wrote
+  `experiments/2026-06-30_dctfield_idir_k_sweep_precheck/review_report.md`,
+  `dctfield_idir_k_sweep_rows.csv`, and `dctfield_idir_k_sweep_rows.json`.
+- Headline comparison: OASIS DCTField K128 reached the best DCT Dice
+  (`0.7781`) but folded heavily (`16.89%` foreground), while K32 was the
+  smoother tradeoff (`0.7242` Dice, `0.265%` folding). LungCT case01 was best
+  at K32 (`3.652` mm snap TRE, `0.739%` folding), slightly better and smoother
+  than direct dense-DVF but far behind IDIR (`1.063` mm). LungCT case08 stayed
+  near identity/direct-dense performance across K values, with best DCT K64
+  `14.986` mm versus IDIR `1.331` mm.
+- Preliminary interpretation: DCTField is useful as a compact spectral
+  search-space baseline and supports the representation-prior framing, but this
+  fixed LR/alpha single-stage DCT sweep does not explain IDIR's LungCT success
+  or rescue the hard case08 capture-range failure.

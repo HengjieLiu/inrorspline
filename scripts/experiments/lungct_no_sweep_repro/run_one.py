@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -12,6 +13,12 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import torch
 
+THIS_DIR = Path(__file__).resolve().parent
+EXPERIMENTS_DIR = THIS_DIR.parent
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import common_dctfield as dctfield  # noqa: E402
 import common as c
 
 
@@ -22,6 +29,8 @@ METHOD_DIRECT_CP_CPS4_PTV = "direct_cp_cps4_ptv_lcc_isotv"
 METHOD_DIRECT_CP_32_PTV = "direct_cp_32_16_8_4_ptv_lcc_isotv"
 METHOD_DIRECT_CP_32_GLOBAL_NCC_BE = "direct_cp_32_16_8_4_global_ncc_bspline_be"
 METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE = "direct_cp_32_16_8_4_global_ncc_fd_be"
+METHOD_DIRECT_DVF_FD_BE = "direct_dvf_lungmask_sampled_ncc_fd_be"
+METHOD_DCTFIELD_FD_BE = "dctfield_lungmask_sampled_ncc_fd_be"
 METHODS = [
     METHOD_IDIR,
     METHOD_IDIR_SAMPLED_PTV_TV,
@@ -30,6 +39,8 @@ METHODS = [
     METHOD_DIRECT_CP_32_PTV,
     METHOD_DIRECT_CP_32_GLOBAL_NCC_BE,
     METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE,
+    METHOD_DIRECT_DVF_FD_BE,
+    METHOD_DCTFIELD_FD_BE,
 ]
 
 
@@ -62,6 +73,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--alpha-bending", type=float, default=10.0)
     parser.add_argument("--alpha", type=float, default=100.0)
     parser.add_argument("--cps", type=int, default=4)
+    parser.add_argument("--dct-size", type=int, default=32)
 
     parser.add_argument("--border-mask-voxels", type=int, default=5)
     parser.add_argument("--ptv-lcc-sigma-mm", type=float, default=2.1)
@@ -263,7 +275,16 @@ def run_name(args: argparse.Namespace, method: str, lr: float) -> str:
             f"e{epoch_name}_lr{c.format_float(lr)}_a{c.format_float(args.alpha)}_seed{args.seed}"
         )
     epochs = int(args.epochs if args.epochs is not None else default_epochs(method))
-    extra = f"bend{c.format_float(args.alpha_bending)}" if method == METHOD_IDIR else f"w{c.format_float(args.ptv_isotv_weight)}"
+    if method == METHOD_DCTFIELD_FD_BE:
+        return (
+            f"{method}_case{args.case_id:02d}_k{int(args.dct_size)}_e{epochs}"
+            f"_lr{c.format_float(lr)}_bend{c.format_float(args.alpha_bending)}_seed{args.seed}"
+        )
+    extra = (
+        f"bend{c.format_float(args.alpha_bending)}"
+        if method in {METHOD_IDIR, METHOD_DIRECT_DVF_FD_BE}
+        else f"w{c.format_float(args.ptv_isotv_weight)}"
+    )
     return f"{method}_case{args.case_id:02d}_e{epochs}_lr{c.format_float(lr)}_{extra}_seed{args.seed}"
 
 
@@ -453,6 +474,234 @@ def train_idir(
             "image_similarity_eval_interval": int(args.image_sim_eval_interval),
             "image_similarity_eval_name": "ptv_lcc_data_loss" if int(args.image_sim_eval_interval) > 0 else None,
             "image_similarity_eval_affects_training": False if int(args.image_sim_eval_interval) > 0 else None,
+        },
+        "elapsed_sec": elapsed,
+        "peak_mem_gb": peak,
+    }
+
+
+def train_direct_dvf(
+    args: argparse.Namespace,
+    case: c.LungCTCase,
+    device: torch.device,
+    out_dir: Path,
+    sampler: Optional[CheckpointSampler] = None,
+) -> Dict[str, object]:
+    epochs = int(args.epochs if args.epochs is not None else 2500)
+    lr = float(args.lr if args.lr is not None else 1e-4)
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+
+    fixed_t = torch.from_numpy(case.fixed).to(device=device, dtype=torch.float32)
+    moving_t = torch.from_numpy(case.moving).to(device=device, dtype=torch.float32)
+    mask_t = torch.from_numpy(case.fixed_mask.astype(np.bool_)).to(device=device)
+    image_shape = tuple(int(v) for v in case.shape_zyx)
+    coords_all = c.make_coordinate_tensor(image_shape, device)
+    train_indices = torch.nonzero(mask_t.reshape(-1), as_tuple=False).reshape(-1)
+    n_train = int(train_indices.shape[0])
+    batch_size = min(int(args.batch_size), n_train)
+    if batch_size <= 0:
+        raise RuntimeError("Empty direct-DVF training coordinate set.")
+
+    dense_disp = torch.nn.Parameter(torch.zeros((*image_shape, 3), dtype=torch.float32, device=device))
+    optimizer = torch.optim.Adam([dense_disp], lr=lr)
+    if sampler is not None:
+        sampler.record_dense(
+            epoch=0,
+            dense_disp_norm_xyz=dense_disp.detach(),
+            row_extra={"method": args.method, "checkpoint_source": "dense_dvf_init"},
+        )
+    history: List[Dict[str, float]] = []
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
+    start = time.time()
+    for epoch in range(1, epochs + 1):
+        local = torch.randperm(n_train, device=device)[:batch_size]
+        flat_idx = train_indices[local]
+        coords = coords_all[flat_idx]
+        disp = dense_disp.reshape(-1, 3)[flat_idx]
+        warped = c.sample_volume(moving_t, coords + disp, mode="bilinear")
+        fixed_samples = c.sample_volume(fixed_t, coords, mode="bilinear")
+        data_loss = c.ncc_loss(fixed_samples, warped)
+        reg_loss = c.dense_forward_difference_be(dense_disp, mask_t, component_reduction="mean")
+        loss = data_loss + float(args.alpha_bending) * reg_loss
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
+        row = {
+            "epoch": float(epoch),
+            "loss": float(loss.detach().cpu()),
+            "data_loss": float(data_loss.detach().cpu()),
+            "reg_loss": float(reg_loss.detach().cpu()),
+        }
+        history.append(row)
+        if sampler is not None:
+            sampler.record_dense(
+                epoch=epoch,
+                dense_disp_norm_xyz=dense_disp.detach(),
+                row_extra={
+                    "method": args.method,
+                    "checkpoint_source": "post_optimizer_step",
+                    "loss": row["loss"],
+                    "data_loss": row["data_loss"],
+                    "reg_loss": row["reg_loss"],
+                },
+            )
+        if epoch == 1 or epoch % int(args.eval_interval) == 0 or epoch == epochs:
+            print(json.dumps(row), flush=True)
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    elapsed = time.time() - start
+    peak = torch.cuda.max_memory_allocated() / (1024**3) if device.type == "cuda" else 0.0
+    dense = dense_disp.detach()
+    c.write_csv(out_dir / "loss_history.csv", history)
+    return {
+        "dense_disp_norm_xyz": dense,
+        "history_tail": history[-10:],
+        "training": {
+            "epochs": epochs,
+            "lr": lr,
+            "optimizer": "Adam",
+            "loss": "sampled NCC + dense forward-difference BE",
+            "image_loss": "idir_global_ncc_sampled",
+            "regularizer": "dense_forward_difference_be",
+            "alpha_bending": float(args.alpha_bending),
+            "batch_size": batch_size,
+            "train_coords": n_train,
+            "sample_domain": "fixed_t00_lung_mask_reg1mm_grid_points",
+            "be_type": "dense_forward_difference_be",
+            "native_analytic_be_formula": "not_available_dense_grid_dvf",
+            "seed": int(args.seed),
+            "network": {
+                "type": "direct_dense_grid_displacement",
+                "layers": None,
+                "omega": None,
+                "trainable_parameters": int(dense_disp.numel()),
+            },
+        },
+        "elapsed_sec": elapsed,
+        "peak_mem_gb": peak,
+    }
+
+
+def train_dctfield(
+    args: argparse.Namespace,
+    case: c.LungCTCase,
+    device: torch.device,
+    out_dir: Path,
+    sampler: Optional[CheckpointSampler] = None,
+) -> Dict[str, object]:
+    epochs = int(args.epochs if args.epochs is not None else 2500)
+    lr = float(args.lr if args.lr is not None else 1e-4)
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+
+    fixed_t = torch.from_numpy(case.fixed).to(device=device, dtype=torch.float32)
+    moving_t = torch.from_numpy(case.moving).to(device=device, dtype=torch.float32)
+    mask_t = torch.from_numpy(case.fixed_mask.astype(np.bool_)).to(device=device)
+    image_shape = tuple(int(v) for v in case.shape_zyx)
+    dct_size = dctfield.normalize_dct_size(int(args.dct_size), image_shape)
+    decoder = dctfield.DCTFieldDecoder(image_shape, dct_size, device=device, dtype=torch.float32)
+    coeff = torch.nn.Parameter(torch.zeros((3, *dct_size), dtype=torch.float32, device=device))
+    coords_all = c.make_coordinate_tensor(image_shape, device)
+    train_indices = torch.nonzero(mask_t.reshape(-1), as_tuple=False).reshape(-1)
+    n_train = int(train_indices.shape[0])
+    batch_size = min(int(args.batch_size), n_train)
+    if batch_size <= 0:
+        raise RuntimeError("Empty DCTField training coordinate set.")
+
+    optimizer = torch.optim.Adam([coeff], lr=lr)
+    if sampler is not None:
+        sampler.record_dense(
+            epoch=0,
+            dense_disp_norm_xyz=torch.zeros((*image_shape, 3), dtype=torch.float32, device=device),
+            row_extra={"method": args.method, "checkpoint_source": "dct_coeff_init"},
+        )
+    history: List[Dict[str, float]] = []
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
+    start = time.time()
+    for epoch in range(1, epochs + 1):
+        dense_disp = decoder.decode(coeff)
+        local = torch.randperm(n_train, device=device)[:batch_size]
+        flat_idx = train_indices[local]
+        coords = coords_all[flat_idx]
+        disp = dense_disp.reshape(-1, 3)[flat_idx]
+        warped = c.sample_volume(moving_t, coords + disp, mode="bilinear")
+        fixed_samples = c.sample_volume(fixed_t, coords, mode="bilinear")
+        data_loss = c.ncc_loss(fixed_samples, warped)
+        reg_loss = c.dense_forward_difference_be(dense_disp, mask_t, component_reduction="mean")
+        loss = data_loss + float(args.alpha_bending) * reg_loss
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
+        row = {
+            "epoch": float(epoch),
+            "loss": float(loss.detach().cpu()),
+            "data_loss": float(data_loss.detach().cpu()),
+            "reg_loss": float(reg_loss.detach().cpu()),
+        }
+        history.append(row)
+        if sampler is not None:
+            sampler.record_dense(
+                epoch=epoch,
+                dense_disp_norm_xyz=dense_disp.detach(),
+                row_extra={
+                    "method": args.method,
+                    "checkpoint_source": "post_optimizer_step",
+                    "loss": row["loss"],
+                    "data_loss": row["data_loss"],
+                    "reg_loss": row["reg_loss"],
+                },
+            )
+        if epoch == 1 or epoch % int(args.eval_interval) == 0 or epoch == epochs:
+            print(json.dumps(row), flush=True)
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    elapsed = time.time() - start
+    peak = torch.cuda.max_memory_allocated() / (1024**3) if device.type == "cuda" else 0.0
+    with torch.no_grad():
+        dense = decoder.decode(coeff).detach()
+    c.write_csv(out_dir / "loss_history.csv", history)
+    torch.save(
+        {
+            "dct_coeff": coeff.detach().cpu(),
+            "dct_size_zyx": list(dct_size),
+            "dct_basis": decoder.basis_name,
+            "image_shape_zyx": list(image_shape),
+            "method": str(args.method),
+            "alpha_bending": float(args.alpha_bending),
+            "lr": float(lr),
+        },
+        out_dir / "dct_coefficients.pt",
+    )
+    return {
+        "dense_disp_norm_xyz": dense,
+        "history_tail": history[-10:],
+        "training": {
+            "epochs": epochs,
+            "lr": lr,
+            "optimizer": "Adam",
+            "loss": "sampled NCC + DCT-decoded dense forward-difference BE",
+            "image_loss": "idir_global_ncc_sampled",
+            "regularizer": "dct_decoded_dense_forward_difference_be",
+            "alpha_bending": float(args.alpha_bending),
+            "batch_size": batch_size,
+            "train_coords": n_train,
+            "sample_domain": "fixed_t00_lung_mask_reg1mm_grid_points",
+            "be_type": "dct_decoded_dense_forward_difference_be",
+            "native_analytic_be_formula": "not_used_dct_spectral_be_possible",
+            "dct_size_zyx": list(dct_size),
+            "dct_basis": decoder.basis_name,
+            "seed": int(args.seed),
+            "network": {
+                "type": "dctfield_coefficients",
+                "layers": None,
+                "omega": None,
+                "trainable_parameters": int(coeff.numel()),
+            },
         },
         "elapsed_sec": elapsed,
         "peak_mem_gb": peak,
@@ -1187,6 +1436,30 @@ def main() -> None:
         mask_rule = "fixed_t00_lung_mask_sampling_and_metric"
         loss_domain = "fixed_t00_lung_mask_sampled"
         method_note = "IDIR uses the fixed T00 lung mask for sampled-coordinate training."
+    elif method == METHOD_DCTFIELD_FD_BE:
+        result = train_dctfield(args, case, device, out_dir, sampler=sampler)
+        protocol_tag = (
+            "ptv_landmark_crop_1mm_with_idir_fixed_t00_lungmask_sampling+"
+            "dctfield_decoded_dense_fd_be"
+        )
+        mask_rule = "fixed_t00_lung_mask_sampling_and_metric"
+        loss_domain = "fixed_t00_lung_mask_sampled_grid_points"
+        method_note = (
+            "DCTField optimizes low-frequency cosine coefficients and uses fixed T00 "
+            "lung-mask sampled NCC like IDIR; BE is finite-difference on the decoded dense field."
+        )
+    elif method == METHOD_DIRECT_DVF_FD_BE:
+        result = train_direct_dvf(args, case, device, out_dir, sampler=sampler)
+        protocol_tag = (
+            "ptv_landmark_crop_1mm_with_idir_fixed_t00_lungmask_sampling+"
+            "direct_dense_dvf_fd_be"
+        )
+        mask_rule = "fixed_t00_lung_mask_sampling_and_metric"
+        loss_domain = "fixed_t00_lung_mask_sampled_grid_points"
+        method_note = (
+            "Direct dense DVF uses fixed T00 lung-mask sampled NCC like IDIR; "
+            "BE is dense finite-difference because no analytic continuous field exists."
+        )
     elif method == METHOD_IDIR_SAMPLED_PTV_TV:
         result = train_idir_sampled_ptv_tv(args, case, device, out_dir)
         protocol_tag = "ptv_landmark_crop_1mm_idir_sampled_ptv_lcc_tv_border_crop"
