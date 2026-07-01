@@ -50,6 +50,15 @@ uses the existing posthoc `finest_data_loss` diagnostic, not stage-domain
 training loss. Panel B compares target-field fitting MSE curves against the
 SITReg target for OASIS and the pTVReg target for LungCT; LungCT DirectCP
 4-stage field fitting uses the rerun posthoc finest-domain MSE diagnostics.
+
+The final section builds a preliminary field-fit-only figure with relative
+target-field MSE (`rMSE`) and relative target-field RMSE (`rRMSE`). It includes
+both OASIS rank-9 SITReg-field and Greedy-field fitting, then LungCT pTVReg
+case01/case08 field fitting. The relative metrics reuse the same masked
+normalized-grid MSE histories and divide by the target-field power in the same
+mask and coordinate convention. A second rRMSE-only trajectory figure compares
+the requested learning rates for IDIR, SINR cps4, DirectCP cps4, and available
+LungCT DirectCP 4-stage diagnostics.
 """
         ),
         markdown_cell(
@@ -69,6 +78,7 @@ a single cps4 spline solve.
 from pathlib import Path
 import sys
 
+import matplotlib.pyplot as plt
 import pandas as pd
 from IPython.display import Image, Markdown, display
 
@@ -94,12 +104,18 @@ print(REVIEW_ROOT)
         code_cell(
             """
 from fit_modes_method_comparison import (
-    build_outputs,
+    RELATIVE_FIELD_CASE_ORDER,
+    build_rrmse_lr_trajectory_outputs,
     load_curves,
+    load_relative_field_fit_curves,
     make_main_figure,
+    make_relative_field_fit_figure,
+    relative_field_curve_summary,
+    save_relative_field_fit_figure,
     save_main_figure,
     selected_runs,
     curve_summary,
+    target_power_summary,
 )
 """
         ),
@@ -160,21 +176,126 @@ The saved PDF/PNG use the same figure shown inline.
         code_cell(
             """
 fig = make_main_figure(reg_curves, field_curves, smooth=True)
-outputs = save_main_figure(fig)
-display(Markdown("\\n".join([f"- `{name}`: `{path}`" for name, path in outputs.items()])))
-display(Image(filename=str(outputs["png"])))
+display(fig)
+plt.close(fig)
+existing_outputs = {
+    "pdf": REVIEW_ROOT / "fit_modes_method_comparison_curves.pdf",
+    "png": REVIEW_ROOT / "fit_modes_method_comparison_curves.png",
+}
+display(Markdown(
+    "Existing combined-figure files are not rewritten by this cell:\\n"
+    + "\\n".join([f"- `{name}`: `{path}`" for name, path in existing_outputs.items()])
+))
+"""
+        ),
+        markdown_cell(
+            """
+## Preliminary Relative Field-Fit Figure
+
+This section leaves the image-registration panel unchanged and replots only the
+target-field fitting curves. It adds the OASIS Greedy-field target beside the
+OASIS SITReg-field target. The denominator is inferred per target from the
+selected DirectCP cps4 first point: DirectCP starts from zero controls, so its
+epoch-1 masked MSE equals the masked target-field component power.
+"""
+        ),
+        code_cell(
+            """
+relative_field_curves = load_relative_field_fit_curves(selection)
+target_powers = target_power_summary(relative_field_curves, RELATIVE_FIELD_CASE_ORDER)
+display(target_powers)
+target_powers.to_csv(REVIEW_ROOT / "fit_modes_target_power_summary.csv", index=False)
+"""
+        ),
+        code_cell(
+            """
+relative_summary = relative_field_curve_summary(relative_field_curves, target_powers)
+display(
+    relative_summary[
+        [
+            "case",
+            "method",
+            "lr",
+            "target_power_component_mean",
+            "rMSE_start",
+            "rMSE_epoch10",
+            "rMSE_end",
+            "rRMSE_percent_start",
+            "rRMSE_percent_epoch10",
+            "rRMSE_percent_end",
+            "has_epoch10",
+        ]
+    ]
+)
+relative_summary.to_csv(REVIEW_ROOT / "fit_modes_relative_field_fit_curve_summary.csv", index=False)
+"""
+        ),
+        code_cell(
+            """
+relative_fig = make_relative_field_fit_figure(
+    relative_field_curves,
+    target_powers,
+    smooth=True,
+    case_order=RELATIVE_FIELD_CASE_ORDER,
+)
+relative_outputs = save_relative_field_fit_figure(relative_fig)
+display(Markdown("\\n".join([f"- `{name}`: `{path}`" for name, path in relative_outputs.items()])))
+display(Image(filename=str(relative_outputs["png"])))
+"""
+        ),
+        markdown_cell(
+            """
+## rRMSE Learning-Rate Trajectory Figure
+
+This field-fit-only figure compares requested learning-rate trajectories:
+IDIR and SINR cps4 at `1e-3`/`1e-4`, DirectCP cps4 at
+`1e-2`/`1e-3`/`1e-4`, and LungCT DirectCP 4-stage at
+`1e-2`/`1e-3`/`1e-4`. DirectCP 4-stage is not shown for OASIS because no
+OASIS 4-stage field-fit run is included in this comparison. The shared y-axis
+is capped at `100%` rRMSE.
+"""
+        ),
+        code_cell(
+            """
+lr_selected, lr_target_powers, lr_summary, lr_fig, lr_outputs = build_rrmse_lr_trajectory_outputs()
+display(lr_selected.drop(columns=["source"]))
+display(
+    lr_summary[
+        [
+            "case",
+            "method",
+            "lr_label",
+            "points",
+            "rRMSE_percent_start",
+            "rRMSE_percent_epoch10",
+            "rRMSE_percent_epoch50",
+            "rRMSE_percent_end",
+            "has_epoch10",
+            "has_epoch50",
+        ]
+    ]
+)
+display(Markdown("\\n".join([f"- `{name}`: `{path}`" for name, path in lr_outputs.items()])))
+display(Image(filename=str(lr_outputs["png"])))
+plt.close(lr_fig)
 """
         ),
         markdown_cell(
             """
 ## Output Files
 
-The notebook writes:
+The notebook writes or updates:
 
-- `fit_modes_method_comparison_curves.pdf`
-- `fit_modes_method_comparison_curves.png`
 - `fit_modes_method_comparison_selected_runs.csv`
 - `fit_modes_method_comparison_curve_summary.csv`
+- `fit_modes_relative_field_fit_prelim_curves.pdf`
+- `fit_modes_relative_field_fit_prelim_curves.png`
+- `fit_modes_relative_field_fit_curve_summary.csv`
+- `fit_modes_target_power_summary.csv`
+- `fit_modes_rrmse_lr_trajectory_curves.pdf`
+- `fit_modes_rrmse_lr_trajectory_curves.png`
+- `fit_modes_rrmse_lr_trajectory_curve_summary.csv`
+- `fit_modes_rrmse_lr_trajectory_selected_runs.csv`
 """
         ),
     ]

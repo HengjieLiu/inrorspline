@@ -6,6 +6,8 @@ from __future__ import annotations
 import csv
 import json
 import math
+import argparse
+import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,6 +17,22 @@ from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 SPEC_PATH = HERE / "table_specs.json"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from experiments.paper_artifacts.paper_artifact_common import (  # noqa: E402
+    canonical_lr,
+    display_name as artifact_display_name,
+    format_lr,
+    load_nicknames,
+    load_standard,
+    method_family,
+    parse_effective_lr,
+    sanitize_public_records,
+    selected_hypervariant_records,
+    validate_lr_records,
+    validation_report_markdown,
+)
 
 
 NO_SWEEP_COLUMN_MAP = {
@@ -54,7 +72,7 @@ def read_csv(path: Path) -> List[Dict[str, str]]:
 
 def write_csv(path: Path, rows: Sequence[Mapping[str, Any]], fieldnames: Sequence[str]) -> None:
     with path.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for row in rows:
             writer.writerow({key: row.get(key, "") for key in fieldnames})
@@ -75,6 +93,60 @@ def repo_path(path_text: str) -> Path:
     if path.is_absolute():
         return path
     return REPO_ROOT / path
+
+
+def _standard_selected_record(
+    standard: Mapping[str, Any] | None,
+    artifact: str,
+    dataset_key: str,
+    method_id: str,
+) -> Dict[str, Any]:
+    if standard is None:
+        return {}
+    for record in selected_hypervariant_records(artifact, standard):
+        if str(record.get("dataset")) == str(dataset_key) and str(record.get("method_id")) == str(method_id):
+            return dict(record)
+    return {}
+
+
+def _selected_lr(
+    row: Mapping[str, Any],
+    standard: Mapping[str, Any] | None,
+    dataset_key: str,
+    method_id: str,
+) -> float:
+    parsed = parse_effective_lr(row)
+    if parsed is not None:
+        return parsed
+    standard_record = _standard_selected_record(standard, "best_result_table", dataset_key, method_id)
+    return safe_float(standard_record.get("lr"))
+
+
+def _write_validation_outputs(
+    output_dir: Path,
+    validation_rows: Sequence[Mapping[str, Any]],
+    *,
+    stem: str = "standard_validation",
+) -> None:
+    fieldnames = [
+        "artifact",
+        "dataset",
+        "method_id",
+        "method_family",
+        "observed_lr",
+        "observed_lr_label",
+        "canonical_lr",
+        "canonical_lr_label",
+        "status",
+        "selected_setting",
+        "source",
+        "note",
+    ]
+    validation_rows = sanitize_public_records(validation_rows)
+    write_csv(output_dir / f"{stem}.csv", validation_rows, fieldnames)
+    (output_dir / f"{stem}_report.md").write_text(
+        validation_report_markdown("Best Result Table LR Validation", validation_rows)
+    )
 
 
 def transformed_sort_value(row: Mapping[str, Any], criterion: Mapping[str, Any]) -> float:
@@ -313,6 +385,7 @@ def select_rows(
     dataset_key: str,
     spec: Mapping[str, Any],
     candidates: Sequence[Mapping[str, Any]],
+    nicknames: Mapping[str, Mapping[str, str]] | None = None,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[str]]:
     id_column = method_id_column(dataset_key)
     selected: List[Dict[str, Any]] = []
@@ -328,7 +401,8 @@ def select_rows(
             continue
         pool.sort(key=lambda row: selection_key(row, spec["selection"]))
         row = pool[0]
-        row["_display_label"] = str(method_spec["label"])
+        row["_display_label"] = artifact_display_name(method_id, str(method_spec["label"]), nicknames)
+        row["_original_label"] = str(method_spec["label"])
         row["_selected_setting"] = selected_setting(row, dataset_key)
         row["_selection_pool_size"] = len(pool)
         selected.append(row)
@@ -336,7 +410,14 @@ def select_rows(
     return selected, pool_summaries, warnings
 
 
-def build_dataset(dataset_key: str, spec: Mapping[str, Any]) -> Dict[str, Any]:
+def build_dataset(
+    dataset_key: str,
+    spec: Mapping[str, Any],
+    *,
+    output_dir: Path = HERE,
+    nicknames: Mapping[str, Mapping[str, str]] | None = None,
+    standard: Mapping[str, Any] | None = None,
+) -> Dict[str, Any]:
     if dataset_key == "oasis20":
         candidates, sources = load_oasis_rows(spec)
     elif dataset_key == "lungct10":
@@ -344,9 +425,10 @@ def build_dataset(dataset_key: str, spec: Mapping[str, Any]) -> Dict[str, Any]:
     else:
         raise ValueError(f"Unknown dataset key: {dataset_key}")
 
-    selected, pools, warnings = select_rows(dataset_key, spec, candidates)
+    selected, pools, warnings = select_rows(dataset_key, spec, candidates, nicknames)
     table_rows: List[Dict[str, Any]] = []
     selected_json_rows: List[Dict[str, Any]] = []
+    validation_input_rows: List[Dict[str, Any]] = []
     errors: List[str] = []
 
     for row in selected:
@@ -366,16 +448,36 @@ def build_dataset(dataset_key: str, spec: Mapping[str, Any]) -> Dict[str, Any]:
             if display == "":
                 errors.append(f"{dataset_key}: blank display metric {metric_spec['key']} for {row['_display_label']}")
 
+        method_id = str(row.get(method_id_column(dataset_key)))
+        selected_lr = _selected_lr(row, standard, dataset_key, method_id)
+        method_family_name = method_family(method_id, standard) if standard is not None else ""
+        canonical_method_lr = canonical_lr(method_id, standard) if standard is not None else None
+
         table_rows.append(display_row)
+        validation_input_rows.append(
+            {
+                "dataset": dataset_key,
+                "method_id": method_id,
+                "lr": selected_lr,
+                "selected_setting": row["_selected_setting"],
+                "source": row.get("_source_path", ""),
+            }
+        )
         selected_json_rows.append(
             {
-                "method": row.get(method_id_column(dataset_key)),
+                "method": method_id,
                 "label": row["_display_label"],
+                "original_label": row.get("_original_label", row["_display_label"]),
                 "selected_setting": row["_selected_setting"],
                 "selection_pool_size": row["_selection_pool_size"],
                 "source_name": row.get("_source_name"),
                 "source_path": row.get("_source_path"),
                 "cases": int(safe_float(row.get(str(spec["cases_column"])))),
+                "method_family": method_family_name,
+                "lr": selected_lr,
+                "lr_label": format_lr(selected_lr),
+                "canonical_lr": canonical_method_lr,
+                "canonical_lr_label": format_lr(canonical_method_lr),
                 "selection_metric": spec["selection"]["metric"],
                 "selection_metric_value": safe_float(row.get(str(spec["selection"]["metric"]))),
                 "raw_metrics": raw_metrics,
@@ -392,9 +494,17 @@ def build_dataset(dataset_key: str, spec: Mapping[str, Any]) -> Dict[str, Any]:
 
     headers = ["Method", "Selected", "Cases", *[str(metric["label"]) for metric in spec["metrics"]]]
     stem = dataset_key
-    write_csv(HERE / f"{stem}_summary.csv", table_rows, headers)
-    (HERE / f"{stem}_summary.md").write_text(markdown_table(headers, table_rows) + "\n")
-    (HERE / f"{stem}_selected_rows.json").write_text(json.dumps(selected_json_rows, indent=2, sort_keys=True) + "\n")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    write_csv(output_dir / f"{stem}_summary.csv", table_rows, headers)
+    (output_dir / f"{stem}_summary.md").write_text(markdown_table(headers, table_rows) + "\n")
+    selected_json_rows = sanitize_public_records(selected_json_rows)
+    (output_dir / f"{stem}_selected_rows.json").write_text(json.dumps(selected_json_rows, indent=2, sort_keys=True) + "\n")
+
+    validation_rows = (
+        validate_lr_records(validation_input_rows, artifact="best_result_table", standard=standard)
+        if standard is not None
+        else []
+    )
 
     result = {
         "dataset": dataset_key,
@@ -410,14 +520,19 @@ def build_dataset(dataset_key: str, spec: Mapping[str, Any]) -> Dict[str, Any]:
         "errors": errors,
         "table_headers": headers,
         "table_rows": table_rows,
-        "selected_rows": selected_json_rows
+        "selected_rows": selected_json_rows,
+        "validation_rows": validation_rows,
     }
     if dataset_key == "lungct10" and "failure_analysis" in spec:
-        result["failure_analysis"] = build_failure_analysis(spec["failure_analysis"])
+        result["failure_analysis"] = build_failure_analysis(spec["failure_analysis"], nicknames=nicknames)
     return result
 
 
-def build_failure_analysis(spec: Mapping[str, Any]) -> Dict[str, Any]:
+def build_failure_analysis(
+    spec: Mapping[str, Any],
+    *,
+    nicknames: Mapping[str, Mapping[str, str]] | None = None,
+) -> Dict[str, Any]:
     source = repo_path(str(spec["source"]))
     rows = read_csv(source)
     metric = str(spec["metric"])
@@ -428,7 +543,7 @@ def build_failure_analysis(spec: Mapping[str, Any]) -> Dict[str, Any]:
 
     for method_spec in method_specs:
         method_id = str(method_spec["id"])
-        label = str(method_spec["label"])
+        label = artifact_display_name(method_id, str(method_spec["label"]), nicknames)
         method_rows = [row for row in rows if str(row.get("method")) == method_id]
         failures = [
             row
@@ -469,7 +584,7 @@ def build_failure_analysis(spec: Mapping[str, Any]) -> Dict[str, Any]:
     }
 
 
-def write_review_report(results: Sequence[Mapping[str, Any]]) -> None:
+def write_review_report(results: Sequence[Mapping[str, Any]], *, output_dir: Path = HERE) -> None:
     lines: List[str] = [
         "# Automatic Result Selection Tables",
         "",
@@ -484,7 +599,7 @@ def write_review_report(results: Sequence[Mapping[str, Any]]) -> None:
         title = str(result["title"])
         dataset = str(result["dataset"])
         lines.extend([f"## {title}", ""])
-        markdown_path = HERE / f"{dataset}_summary.md"
+        markdown_path = output_dir / f"{dataset}_summary.md"
         lines.append(markdown_path.read_text().strip())
         lines.append("")
         failure_analysis = result.get("failure_analysis")
@@ -514,15 +629,56 @@ def write_review_report(results: Sequence[Mapping[str, Any]]) -> None:
             "",
         ]
     )
-    (HERE / "review_report.md").write_text("\n".join(lines) + "\n")
+    (output_dir / "review_report.md").write_text("\n".join(lines).rstrip() + "\n")
 
 
-def main() -> None:
-    spec = json.loads(SPEC_PATH.read_text())
-    results = [build_dataset(dataset_key, spec[dataset_key]) for dataset_key in ["oasis20", "lungct10"]]
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--spec-path", type=Path, default=SPEC_PATH)
+    parser.add_argument("--output-dir", type=Path, default=HERE)
+    parser.add_argument("--standard-path", type=Path, default=None)
+    parser.add_argument("--nickname-path", type=Path, default=None)
+    return parser.parse_args(argv)
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    args = parse_args(argv)
+    spec_path = repo_path(str(args.spec_path))
+    output_dir = repo_path(str(args.output_dir))
+    standard_path = repo_path(str(args.standard_path)) if args.standard_path is not None else None
+    nickname_path = repo_path(str(args.nickname_path)) if args.nickname_path is not None else None
+    standard = load_standard(standard_path) if standard_path is not None else None
+    nicknames = load_nicknames(nickname_path) if nickname_path is not None else None
+
+    spec = json.loads(spec_path.read_text())
+    results = [
+        build_dataset(
+            dataset_key,
+            spec[dataset_key],
+            output_dir=output_dir,
+            nicknames=nicknames,
+            standard=standard,
+        )
+        for dataset_key in ["oasis20", "lungct10"]
+    ]
     manifest = {
         "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "spec_path": str(SPEC_PATH.relative_to(REPO_ROOT)),
+        "spec_path": str(spec_path.relative_to(REPO_ROOT)),
+        "output_dir": str(output_dir.relative_to(REPO_ROOT)),
+        "standard_path": str(standard_path.relative_to(REPO_ROOT)) if standard_path else "",
+        "nickname_path": str(nickname_path.relative_to(REPO_ROOT)) if nickname_path else "",
+        "display_name_mapping": {
+            str(result["dataset"]): [
+                {
+                    "method_id": row["method"],
+                    "original_name": row["original_label"],
+                    "display_name": row["label"],
+                    "method_family": row["method_family"],
+                }
+                for row in result["selected_rows"]
+            ]
+            for result in results
+        },
         "formatting": {
             "mean_std_separator": "+/-",
             "adaptive_percent": "2 decimals for ordinary percentages, 4 decimals near zero, scientific for tiny nonzero values",
@@ -537,8 +693,17 @@ def main() -> None:
             for result in results
         }
     }
-    (HERE / "selection_manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
-    write_review_report(results)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "selection_manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    write_review_report(results, output_dir=output_dir)
+
+    validation_rows = [
+        row
+        for result in results
+        for row in result.get("validation_rows", [])
+    ]
+    if validation_rows:
+        _write_validation_outputs(output_dir, validation_rows)
 
     errors = [error for result in results for error in result["errors"]]
     if errors:

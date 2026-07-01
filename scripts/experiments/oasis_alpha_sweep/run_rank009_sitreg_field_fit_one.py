@@ -59,6 +59,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--coords-batch-size", type=int, default=10000)
     parser.add_argument("--field-chunk-size", type=int, default=200000)
     parser.add_argument("--eval-chunk-size", type=int, default=200000)
+    parser.add_argument("--stage-full-cps", type=str, default="8,4,2")
+    parser.add_argument("--stage-downsample", type=str, default="4,2,1")
+    parser.add_argument("--stage-epochs", type=str, default="400,800,1300")
+    parser.add_argument("--stage-lr", type=str, default="")
+    parser.add_argument("--finest-mse-diagnostic", action="store_true")
+    parser.add_argument("--finest-mse-every", type=int, default=10)
     parser.add_argument("--out-root", type=Path, default=DEFAULT_OUT_ROOT)
     parser.add_argument("--oasis-root", type=Path, default=c.DEFAULT_OASIS_ROOT)
     parser.add_argument("--pair-file", type=Path, default=c.DEFAULT_PAIR_FILE)
@@ -77,6 +83,14 @@ def parse_args() -> argparse.Namespace:
 def build_run_name(args: argparse.Namespace) -> str:
     if args.run_name:
         return args.run_name
+    if args.method == "direct_cp_8_4_2_be_bspline_analytic_multistage":
+        return (
+            f"sitreg_field_fit_{field_runner.field_method_key(args.method)}_rank{args.case_rank:03d}"
+            f"_sched{args.stage_full_cps.replace(',', '-')}"
+            f"_ds{args.stage_downsample.replace(',', '-')}"
+            f"_e{args.stage_epochs.replace(',', '-')}"
+            f"_a{c.format_float(args.alpha)}_lr{c.format_float(args.lr)}"
+        )
     return (
         f"sitreg_field_fit_{field_runner.field_method_key(args.method)}_rank{args.case_rank:03d}"
         f"_a{c.format_float(args.alpha)}_e{args.epochs}_lr{c.format_float(args.lr)}"
@@ -212,6 +226,8 @@ def main() -> None:
 
     if args.method == "idir_original":
         metrics = field_runner.train_idir_field(args, target_disp, fixed_mask, device)
+    elif args.method == "direct_cp_8_4_2_be_bspline_analytic_multistage":
+        metrics = field_runner.train_multistage_field(args, target_disp, fixed_mask, device)
     else:
         metrics = field_runner.train_spline_field(args, target_disp, fixed_mask, device)
     metrics["started_at"] = started_at

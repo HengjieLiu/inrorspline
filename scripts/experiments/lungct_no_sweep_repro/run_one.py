@@ -26,6 +26,8 @@ METHOD_IDIR = "idir_be_default_lungmask"
 METHOD_IDIR_SAMPLED_PTV_TV = "idir_sampled_ptv_lcc_tv"
 METHOD_SINR_CPS4_PTV = "sinr_cps4_ptv_lcc_isotv"
 METHOD_DIRECT_CP_CPS4_PTV = "direct_cp_cps4_ptv_lcc_isotv"
+METHOD_SINR_CPS4_GLOBAL_NCC_FD_BE = "sinr_cps4_global_ncc_fd_be"
+METHOD_DIRECT_CP_CPS4_GLOBAL_NCC_FD_BE = "direct_cp_cps4_global_ncc_fd_be"
 METHOD_DIRECT_CP_32_PTV = "direct_cp_32_16_8_4_ptv_lcc_isotv"
 METHOD_DIRECT_CP_32_GLOBAL_NCC_BE = "direct_cp_32_16_8_4_global_ncc_bspline_be"
 METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE = "direct_cp_32_16_8_4_global_ncc_fd_be"
@@ -36,6 +38,8 @@ METHODS = [
     METHOD_IDIR_SAMPLED_PTV_TV,
     METHOD_SINR_CPS4_PTV,
     METHOD_DIRECT_CP_CPS4_PTV,
+    METHOD_SINR_CPS4_GLOBAL_NCC_FD_BE,
+    METHOD_DIRECT_CP_CPS4_GLOBAL_NCC_FD_BE,
     METHOD_DIRECT_CP_32_PTV,
     METHOD_DIRECT_CP_32_GLOBAL_NCC_BE,
     METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE,
@@ -57,6 +61,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--eval-chunk-size", type=int, default=200000)
     parser.add_argument("--image-sim-eval-interval", type=int, default=0)
     parser.add_argument("--image-sim-eval-chunk-size", type=int, default=None)
+    parser.add_argument("--global-ncc-diagnostic-interval", type=int, default=0)
+    parser.add_argument("--global-ncc-diagnostic-chunk-size", type=int, default=None)
     parser.add_argument("--save-dense-dvf", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--audit-loader", action="store_true")
@@ -245,6 +251,7 @@ def default_epochs(method: str) -> int:
 def default_lr(method: str) -> float:
     if method in {
         METHOD_DIRECT_CP_CPS4_PTV,
+        METHOD_DIRECT_CP_CPS4_GLOBAL_NCC_FD_BE,
         METHOD_DIRECT_CP_32_PTV,
         METHOD_DIRECT_CP_32_GLOBAL_NCC_BE,
         METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE,
@@ -280,6 +287,11 @@ def run_name(args: argparse.Namespace, method: str, lr: float) -> str:
             f"{method}_case{args.case_id:02d}_k{int(args.dct_size)}_e{epochs}"
             f"_lr{c.format_float(lr)}_bend{c.format_float(args.alpha_bending)}_seed{args.seed}"
         )
+    if method in {METHOD_SINR_CPS4_GLOBAL_NCC_FD_BE, METHOD_DIRECT_CP_CPS4_GLOBAL_NCC_FD_BE}:
+        return (
+            f"{method}_case{args.case_id:02d}_e{epochs}"
+            f"_lr{c.format_float(lr)}_a{c.format_float(args.alpha)}_seed{args.seed}"
+        )
     extra = (
         f"bend{c.format_float(args.alpha_bending)}"
         if method in {METHOD_IDIR, METHOD_DIRECT_DVF_FD_BE}
@@ -308,6 +320,44 @@ def should_image_sim_eval(args: argparse.Namespace, epoch: int, epochs: int) -> 
     if interval <= 0:
         return False
     return int(epoch) == 1 or int(epoch) % interval == 0 or int(epoch) == int(epochs)
+
+
+def should_global_ncc_diagnostic(args: argparse.Namespace, epoch: int, epochs: int) -> bool:
+    interval = int(args.global_ncc_diagnostic_interval)
+    if interval <= 0:
+        return False
+    return int(epoch) == 1 or int(epoch) % interval == 0 or int(epoch) == int(epochs)
+
+
+def global_ncc_diagnostic_row(
+    *,
+    fixed_t: torch.Tensor,
+    moving_t: torch.Tensor,
+    dense_disp: torch.Tensor,
+    id_grid: torch.Tensor,
+    epoch: int,
+    global_epoch: int,
+    eval_domain: str,
+    device: torch.device,
+) -> Dict[str, float | str | bool]:
+    eval_start = time.time()
+    with torch.no_grad():
+        warped = c.warp_full(moving_t, id_grid + dense_disp, mode="bilinear")
+        loss = c.ncc_loss(fixed_t[None, None], warped[None, None])
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    value = float(loss.detach().cpu())
+    del warped, loss
+    return {
+        "epoch": float(epoch),
+        "global_epoch": float(global_epoch),
+        "global_ncc_loss": value,
+        "global_ncc_value": -value,
+        "diagnostic_name": "full_crop_global_ncc",
+        "eval_domain": eval_domain,
+        "affects_training": False,
+        "eval_elapsed_sec": time.time() - eval_start,
+    }
 
 
 def evaluate_idir_ptv_lcc(
@@ -351,6 +401,38 @@ def evaluate_idir_ptv_lcc(
     }
 
 
+def evaluate_idir_global_ncc(
+    model: torch.nn.Module,
+    fixed_t: torch.Tensor,
+    moving_t: torch.Tensor,
+    id_dense: torch.Tensor,
+    image_shape: Sequence[int],
+    device: torch.device,
+    chunk_size: int,
+    epoch: int,
+) -> Dict[str, float | str | bool]:
+    eval_start = time.time()
+    model.eval()
+    with torch.no_grad():
+        dense = evaluate_idir_dense(model, image_shape, device, chunk_size)
+        warped = c.warp_full(moving_t, id_dense + dense, mode="bilinear")
+        loss = c.ncc_loss(fixed_t[None, None], warped[None, None])
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    value = float(loss.detach().cpu())
+    del dense, warped, loss
+    return {
+        "epoch": float(epoch),
+        "global_epoch": float(epoch),
+        "global_ncc_loss": value,
+        "global_ncc_value": -value,
+        "diagnostic_name": "full_crop_global_ncc",
+        "eval_domain": "full_1mm_crop",
+        "affects_training": False,
+        "eval_elapsed_sec": time.time() - eval_start,
+    }
+
+
 def train_idir(
     args: argparse.Namespace,
     case: c.LungCTCase,
@@ -381,6 +463,8 @@ def train_idir(
     history: List[Dict[str, float]] = []
     image_similarity_eval: List[Dict[str, float | str | bool]] = []
     image_sim_chunk_size = int(args.image_sim_eval_chunk_size or args.eval_chunk_size)
+    global_ncc_diagnostic: List[Dict[str, float | str | bool]] = []
+    global_ncc_chunk_size = int(args.global_ncc_diagnostic_chunk_size or args.eval_chunk_size)
     id_dense = c.make_coordinate_grid(image_shape, device).detach()
     border_mask = c.make_border_mask(image_shape, int(args.border_mask_voxels), device, fixed_t.dtype)
     ptv_cache = c.make_ptv_lcc_fixed_cache(
@@ -430,6 +514,19 @@ def train_idir(
             )
             image_similarity_eval.append(sim_row)
             print(json.dumps({"image_similarity_eval": sim_row}), flush=True)
+        if should_global_ncc_diagnostic(args, epoch, epochs):
+            diag_row = evaluate_idir_global_ncc(
+                model,
+                fixed_t,
+                moving_t,
+                id_dense,
+                image_shape,
+                device,
+                global_ncc_chunk_size,
+                epoch,
+            )
+            global_ncc_diagnostic.append(diag_row)
+            print(json.dumps({"global_ncc_diagnostic": diag_row}), flush=True)
         if sampler is not None:
             sampler.record_idir(
                 epoch=epoch,
@@ -452,10 +549,13 @@ def train_idir(
     c.write_csv(out_dir / "loss_history.csv", history)
     if image_similarity_eval:
         c.write_csv(out_dir / "image_similarity_eval.csv", image_similarity_eval)
+    if global_ncc_diagnostic:
+        c.write_csv(out_dir / "global_ncc_diagnostic.csv", global_ncc_diagnostic)
     return {
         "dense_disp_norm_xyz": dense,
         "history_tail": history[-10:],
         "image_similarity_eval_tail": image_similarity_eval[-10:],
+        "global_ncc_diagnostic_tail": global_ncc_diagnostic[-10:],
         "training": {
             "epochs": epochs,
             "lr": lr,
@@ -474,6 +574,15 @@ def train_idir(
             "image_similarity_eval_interval": int(args.image_sim_eval_interval),
             "image_similarity_eval_name": "ptv_lcc_data_loss" if int(args.image_sim_eval_interval) > 0 else None,
             "image_similarity_eval_affects_training": False if int(args.image_sim_eval_interval) > 0 else None,
+            "global_ncc_diagnostic_interval": int(args.global_ncc_diagnostic_interval),
+            "global_ncc_diagnostic_name": (
+                "full_crop_global_ncc"
+                if int(args.global_ncc_diagnostic_interval) > 0
+                else None
+            ),
+            "global_ncc_diagnostic_affects_training": (
+                False if int(args.global_ncc_diagnostic_interval) > 0 else None
+            ),
         },
         "elapsed_sec": elapsed,
         "peak_mem_gb": peak,
@@ -847,6 +956,7 @@ def train_single_stage_spline(
 ) -> Dict[str, object]:
     method_epochs = int(args.epochs if args.epochs is not None else 2500)
     method_lr = float(args.lr if args.lr is not None else (1e-3 if direct_cp else 1e-4))
+    is_global_fdbe = str(args.method) in {METHOD_SINR_CPS4_GLOBAL_NCC_FD_BE, METHOD_DIRECT_CP_CPS4_GLOBAL_NCC_FD_BE}
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
@@ -875,6 +985,7 @@ def train_single_stage_spline(
 
     optimizer = torch.optim.Adam(trainable, lr=method_lr)
     history: List[Dict[str, float]] = []
+    global_ncc_diagnostic: List[Dict[str, float | str | bool]] = []
     if sampler is not None:
         with torch.no_grad():
             if direct_cp:
@@ -900,9 +1011,21 @@ def train_single_stage_spline(
             control = model(control_coords)
         dense_disp = c.expand_bspline_controls(control, control_shape, image_shape, args.cps)
         warped = c.warp_full(moving_t, id_dense + dense_disp, mode="bilinear")
-        data_loss = c.ptv_local_cc_loss_with_cache(warped, border_mask, ptv_cache, (1.0, 1.0, 1.0), args.ptv_lcc_radius_sigma)
-        reg_loss = c.isotv_control_loss(control, control_shape, image_shape, (1.0, 1.0, 1.0), args.cps, args.ptv_csqrt)
-        loss = data_loss + float(args.ptv_isotv_weight) * reg_loss
+        if is_global_fdbe:
+            data_loss = c.ncc_loss(fixed_t[None, None], warped[None, None])
+            reg_loss = c.dense_forward_difference_be(dense_disp, component_reduction="mean")
+            reg_weight = float(args.alpha)
+        else:
+            data_loss = c.ptv_local_cc_loss_with_cache(
+                warped,
+                border_mask,
+                ptv_cache,
+                (1.0, 1.0, 1.0),
+                args.ptv_lcc_radius_sigma,
+            )
+            reg_loss = c.isotv_control_loss(control, control_shape, image_shape, (1.0, 1.0, 1.0), args.cps, args.ptv_csqrt)
+            reg_weight = float(args.ptv_isotv_weight)
+        loss = data_loss + reg_weight * reg_loss
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
@@ -911,9 +1034,24 @@ def train_single_stage_spline(
             "loss": float(loss.detach().cpu()),
             "data_loss": float(data_loss.detach().cpu()),
             "reg_loss": float(reg_loss.detach().cpu()),
-            "reg_weight": float(args.ptv_isotv_weight),
+            "reg_weight": float(reg_weight),
+            "alpha": float(args.alpha) if is_global_fdbe else float("nan"),
         }
         history.append(row)
+        if is_global_fdbe and should_global_ncc_diagnostic(args, epoch, method_epochs):
+            global_ncc_diagnostic.append(
+                {
+                    "epoch": float(epoch),
+                    "global_epoch": float(epoch),
+                    "global_ncc_loss": row["data_loss"],
+                    "global_ncc_value": -row["data_loss"],
+                    "diagnostic_name": "full_crop_global_ncc",
+                    "eval_domain": "full_1mm_crop",
+                    "affects_training": False,
+                    "eval_elapsed_sec": 0.0,
+                }
+            )
+            print(json.dumps({"global_ncc_diagnostic": global_ncc_diagnostic[-1]}), flush=True)
         if sampler is not None and sampler.should_record(epoch):
             with torch.no_grad():
                 if direct_cp:
@@ -942,20 +1080,35 @@ def train_single_stage_spline(
     elapsed = time.time() - start
     peak = torch.cuda.max_memory_allocated() / (1024**3) if device.type == "cuda" else 0.0
     c.write_csv(out_dir / "loss_history.csv", history)
+    if global_ncc_diagnostic:
+        c.write_csv(out_dir / "global_ncc_diagnostic.csv", global_ncc_diagnostic)
     return {
         "dense_disp_norm_xyz": dense_disp.detach(),
         "history_tail": history[-10:],
+        "global_ncc_diagnostic_tail": global_ncc_diagnostic[-10:],
         "training": {
             "epochs": method_epochs,
             "lr": method_lr,
             "optimizer": "Adam",
-            "loss": "pTV-style LCC + isoTV",
+            "loss": "full-crop global NCC + dense forward-difference BE" if is_global_fdbe else "pTV-style LCC + isoTV",
+            "image_loss": "full_crop_global_ncc" if is_global_fdbe else "ptv_lcc",
+            "regularizer": "dense_forward_difference_be" if is_global_fdbe else "ptv_isotv",
+            "alpha": float(args.alpha) if is_global_fdbe else None,
             "cps": int(args.cps),
             "bspline_order": 3,
-            "ptv_lcc_sigma_mm": float(args.ptv_lcc_sigma_mm),
-            "ptv_isotv_weight": float(args.ptv_isotv_weight),
-            "ptv_csqrt": float(args.ptv_csqrt),
-            "border_mask_voxels": int(args.border_mask_voxels),
+            "ptv_lcc_sigma_mm": None if is_global_fdbe else float(args.ptv_lcc_sigma_mm),
+            "ptv_isotv_weight": None if is_global_fdbe else float(args.ptv_isotv_weight),
+            "ptv_csqrt": None if is_global_fdbe else float(args.ptv_csqrt),
+            "border_mask_voxels": 0 if is_global_fdbe else int(args.border_mask_voxels),
+            "global_ncc_diagnostic_interval": int(args.global_ncc_diagnostic_interval),
+            "global_ncc_diagnostic_name": (
+                "full_crop_global_ncc"
+                if int(args.global_ncc_diagnostic_interval) > 0
+                else None
+            ),
+            "global_ncc_diagnostic_affects_training": (
+                False if int(args.global_ncc_diagnostic_interval) > 0 else None
+            ),
             "seed": int(args.seed),
             "network": {
                 "type": "direct_control_points" if direct_cp else "SIREN_control_generator",
@@ -1044,6 +1197,8 @@ def optimize_stage(
     lr: float,
     stage_idx: int,
     global_epoch_offset: int,
+    total_epochs: int,
+    global_ncc_diagnostic: List[Dict[str, float | str | bool]],
     sampler: Optional[CheckpointSampler] = None,
 ) -> Tuple[torch.Tensor, Dict[str, object], List[Dict[str, object]]]:
     fixed_l, blur_sigma, blur_kernel = c.make_loss_volume(
@@ -1077,8 +1232,11 @@ def optimize_stage(
         )
     full_id_grid = None
     full_ptv_cache = None
-    if bool(args.finest_loss_diagnostic) and not is_be_loss and int(downsample) != 1:
+    if int(args.global_ncc_diagnostic_interval) > 0:
         full_id_grid = c.make_coordinate_grid(tuple(int(v) for v in fixed_t.shape), fixed_t.device).detach()
+    if bool(args.finest_loss_diagnostic) and not is_be_loss and int(downsample) != 1:
+        if full_id_grid is None:
+            full_id_grid = c.make_coordinate_grid(tuple(int(v) for v in fixed_t.shape), fixed_t.device).detach()
         full_ptv_cache = c.make_ptv_lcc_fixed_cache(
             fixed_t,
             (1.0, 1.0, 1.0),
@@ -1184,6 +1342,27 @@ def optimize_stage(
         }
         row.update(finest_diag)
         rows.append(row)
+        if should_global_ncc_diagnostic(args, int(row["global_epoch"]), int(total_epochs)):
+            assert full_id_grid is not None
+            with torch.no_grad():
+                dense_full_diag = c.expand_on_shape(control, control_shape, int(full_cps), fixed_t.shape, 1)
+            diag_row = global_ncc_diagnostic_row(
+                fixed_t=fixed_t,
+                moving_t=moving_t,
+                dense_disp=dense_full_diag,
+                id_grid=full_id_grid,
+                epoch=int(epoch),
+                global_epoch=int(row["global_epoch"]),
+                eval_domain="full_1mm_crop",
+                device=fixed_t.device,
+            )
+            diag_row["stage_idx"] = float(stage_idx)
+            diag_row["stage_epoch"] = float(epoch)
+            diag_row["full_cps"] = float(full_cps)
+            diag_row["downsample"] = float(downsample)
+            diag_row["domain_cps"] = float(domain_cps)
+            global_ncc_diagnostic.append(diag_row)
+            print(json.dumps({"global_ncc_diagnostic": diag_row}), flush=True)
         if sampler is not None and sampler.should_record(int(row["global_epoch"])):
             with torch.no_grad():
                 sample_dense_full = c.expand_on_shape(control, control_shape, int(full_cps), fixed_t.shape, 1)
@@ -1266,6 +1445,7 @@ def train_multistage(
 
     stage_summaries: List[Dict[str, object]] = []
     history: List[Dict[str, object]] = []
+    global_ncc_diagnostic: List[Dict[str, float | str | bool]] = []
     prolong_rows: List[Dict[str, object]] = []
     prev_control: Optional[torch.Tensor] = None
     prev_shape: Optional[Tuple[int, int, int]] = None
@@ -1317,6 +1497,8 @@ def train_multistage(
             float(lr),
             int(stage_idx),
             global_epoch_offset,
+            int(sum(stage_epochs)),
+            global_ncc_diagnostic,
             sampler=sampler,
         )
         prev_control = control.detach()
@@ -1336,6 +1518,8 @@ def train_multistage(
     peak = torch.cuda.max_memory_allocated() / (1024**3) if device.type == "cuda" else 0.0
     c.write_csv(out_dir / "stage_history.csv", history)
     c.write_csv(out_dir / "prolongation_metrics.csv", prolong_rows)
+    if global_ncc_diagnostic:
+        c.write_csv(out_dir / "global_ncc_diagnostic.csv", global_ncc_diagnostic)
     analytic_regularity: Dict[str, float] = {}
     if str(args.method) == METHOD_DIRECT_CP_32_GLOBAL_NCC_BE and final_control is not None and final_control_shape is not None:
         mask_t = torch.from_numpy(case.fixed_mask.astype(np.bool_)).to(device=device)
@@ -1368,6 +1552,7 @@ def train_multistage(
     return {
         "dense_disp_norm_xyz": final_dense.detach(),
         "history_tail": history[-10:],
+        "global_ncc_diagnostic_tail": global_ncc_diagnostic[-10:],
         "stage_summaries": stage_summaries,
         "prolongation_diagnostics": prolong_rows,
         "analytic_bspline_regularity_fg_registration_crop": analytic_regularity,
@@ -1396,6 +1581,15 @@ def train_multistage(
             "finest_loss_every": int(args.finest_loss_every) if bool(args.finest_loss_diagnostic) else None,
             "finest_loss_domain": "full_1mm_crop" if bool(args.finest_loss_diagnostic) else None,
             "finest_loss_affects_training": False if bool(args.finest_loss_diagnostic) else None,
+            "global_ncc_diagnostic_interval": int(args.global_ncc_diagnostic_interval),
+            "global_ncc_diagnostic_name": (
+                "full_crop_global_ncc"
+                if int(args.global_ncc_diagnostic_interval) > 0
+                else None
+            ),
+            "global_ncc_diagnostic_affects_training": (
+                False if int(args.global_ncc_diagnostic_interval) > 0 else None
+            ),
             "seed": int(args.seed),
             "nested_control_shapes_zyx": {str(k): list(v) for k, v in nested_shapes.items()},
         },
@@ -1481,6 +1675,24 @@ def main() -> None:
         mask_rule = "fixed_t00_lung_mask_metric_only"
         loss_domain = "border_masked_crop"
         method_note = "pTV loss methods use border-mask loss weighting, not lung-mask loss weighting."
+    elif method == METHOD_SINR_CPS4_GLOBAL_NCC_FD_BE:
+        result = train_single_stage_spline(args, case, device, out_dir, direct_cp=False, sampler=sampler)
+        protocol_tag = (
+            "ptv_landmark_crop_1mm_no_lungmask+single_stage_sinr_cps4+"
+            "full_crop_global_ncc_dense_fd_be+fixed_t00_lung_mask_metric"
+        )
+        mask_rule = "fixed_t00_lung_mask_metric_only"
+        loss_domain = "full_crop_global_ncc"
+        method_note = "This method uses full-crop global NCC with no border-mask or lung-mask loss weighting."
+    elif method == METHOD_DIRECT_CP_CPS4_GLOBAL_NCC_FD_BE:
+        result = train_single_stage_spline(args, case, device, out_dir, direct_cp=True, sampler=sampler)
+        protocol_tag = (
+            "ptv_landmark_crop_1mm_no_lungmask+single_stage_directcp_cps4+"
+            "full_crop_global_ncc_dense_fd_be+fixed_t00_lung_mask_metric"
+        )
+        mask_rule = "fixed_t00_lung_mask_metric_only"
+        loss_domain = "full_crop_global_ncc"
+        method_note = "This method uses full-crop global NCC with no border-mask or lung-mask loss weighting."
     elif method == METHOD_DIRECT_CP_32_PTV:
         result = train_multistage(args, case, device, out_dir, sampler=sampler)
         protocol_tag = "ptv_directcp_multistage+ptv_landmark_crop_1mm_no_lungmask+fixed_t00_lung_mask_metric"
@@ -1541,6 +1753,7 @@ def main() -> None:
         "elapsed_sec": float(result["elapsed_sec"]),
         "peak_mem_gb": float(result["peak_mem_gb"]),
         "history_tail": result.get("history_tail", []),
+        "global_ncc_diagnostic_tail": result.get("global_ncc_diagnostic_tail", []),
         "notes": [
             "Inputs are canonical regenerated pTV-prep cropped 1mm arrays.",
             method_note,

@@ -444,6 +444,54 @@ Next decision:
 - Known limitations: DirectCP 4-stage training still optimizes stage-domain MSE
   at coarse stages. The new curve is posthoc finest-domain diagnostic only.
 
+### P1l: Fit-Modes rRMSE Learning-Rate Trajectory Comparison
+
+- Status: completed 2026-07-01; smoke, four diagnostic reruns, notebook
+  execution, and CSV validation passed.
+- Owner/agent: Codex.
+- Date planned: 2026-07-01.
+- Git commit: `1872fe0` on branch `gpu8` with figure/report edits in the
+  worktree.
+- Docker image tag/digest:
+  `hengjieliu96/dl_dir:py310sitreg_v1@sha256:8a159ba5e7f438cf36ea10d74a4a45fac1b0250d7d70f0dba114eefcbe3416da`.
+- Purpose: create a field-fit-only rRMSE trajectory figure comparing requested
+  learning rates for IDIR, SINR cps4, DirectCP cps4, and LungCT DirectCP
+  4-stage.
+- Dataset/cases: OASIS BrainMR seed-3 rank `9` SITReg-field and Greedy-field
+  targets; LungCT pTV-preprocessed cases `01` and `08` pTVReg-field targets.
+- Reused inputs: existing OASIS single-stage field-fit histories and LungCT
+  single-stage field-fit histories; existing LungCT DirectCP 4-stage
+  `lr=1e-2` finest-domain field-MSE diagnostic.
+- New diagnostic runs: LungCT case01/case08 DirectCP 4-stage pTVReg-field
+  fitting at `lr=1e-3` and `lr=1e-4`, using the same schedule
+  `32,16,8,4`, downsample `8,4,2,1`, stage epochs `400,400,800,900`, seed
+  `1`, and 2500 epochs. Training remains stage-domain MSE-only; posthoc
+  finest-domain masked normalized-grid MSE is logged every 50 epochs during
+  coarse stages and every epoch during the final 1mm stage.
+- Output root:
+  `/database/inrorspline/runs/fit_modes_paper_curves_directcp4stage_field_mse_diag_v1`.
+- Review root:
+  `experiments/2026-06-26_fit_modes_paper_figure/`.
+- Primary metrics: relative target-field RMSE percent,
+  `100 * sqrt(mse / (target_power + 1e-12))`, using the same masked
+  normalized-grid component-MSE convention as the original field-fit losses.
+- Planned review artifacts:
+  `fit_modes_rrmse_lr_trajectory_curves.{png,pdf}`,
+  `fit_modes_rrmse_lr_trajectory_curve_summary.csv`, and
+  `fit_modes_rrmse_lr_trajectory_selected_runs.csv`.
+- Acceptance: two-epoch smoke wrote finite `finest_data_loss` and
+  `finest_field_mse_objective_normalized_grid` columns; all four new full
+  diagnostic histories have `2500` rows and `935` finite finest-domain
+  diagnostic points; final finest-domain history values are within `1%` of the
+  corresponding original-sweep final summaries. The notebook executed in
+  Docker and wrote the requested rRMSE LR trajectory PNG/PDF/CSVs.
+- Final finest-domain history values: case01 lr `1e-3`
+  `2.894892e-08`, case01 lr `1e-4` `3.456253e-08`, case08 lr `1e-3`
+  `9.883180e-08`, case08 lr `1e-4` `3.594418e-05`.
+- Known limitations: no OASIS DirectCP 4-stage runs are added; those panels are
+  marked not run. The DirectCP 4-stage coarse-stage rRMSE curves are posthoc
+  diagnostics and are not the loss used for backpropagation at coarse stages.
+
 ### P1a: OASIS Seed-3 Case-0 Alpha Pre-Run
 
 - Status: completed; aggregation passed with 12/12 runs and no acceptance errors.
@@ -1243,3 +1291,138 @@ Next decision:
   search-space baseline and supports the representation-prior framing, but this
   fixed LR/alpha single-stage DCT sweep does not explain IDIR's LungCT success
   or rescue the hard case08 capture-range failure.
+
+### P9: Fit-Modes Panel A Global-NCC Curve Refresh
+
+- Status: completed.
+- Date planned: 2026-07-01.
+- Purpose: rebuild the fit-modes paper figure Panel A on a consistent global
+  NCC loss scale for OASIS rank9 and LungCT cases `01`/`08`, so all three
+  cases can share the same y-axis while the fitting Panel B uses relative
+  target-field error.
+- Output root:
+  `/database/inrorspline/runs/fit_modes_panelA_global_ncc_v1`.
+- Smoke output root:
+  `/database/inrorspline/runs/fit_modes_panelA_global_ncc_smoke_v1`.
+- Review/artifact root:
+  `experiments/paper_artifacts/fitting_figure/v001/`.
+- Docker target: `py310sitreg_v1_test1`.
+- Common diagnostic: write `global_ncc_diagnostic.csv` with full-image
+  OASIS/global-crop LungCT NCC loss at epoch `1` and every `10` epochs. These
+  diagnostic rows are tagged `affects_training=false` unless the diagnostic is
+  also the optimized data term.
+- OASIS rank9 existing reused Panel A curves:
+  - IDIR `idir_original_dense_siren_be_autograd`, alpha `1`, lr `1e-4`,
+    2500 epochs. Training remains IDIR sampled NCC + BE; diagnostic is
+    full-image global NCC every 10 epochs from the completed matched-eval run.
+  - SINR cps4 `sinr_cps4_be_bspline_analytic`, alpha `1000`, lr `1e-4`,
+    2500 epochs. Optimized loss is full-image global NCC + analytic
+    B-spline BE.
+  - DirectCP cps4 `direct_cp_cps4_be_bspline_analytic`, alpha `1000`,
+    lr `1e-3`, 2500 epochs. Optimized loss is full-image global NCC +
+    analytic B-spline BE.
+- OASIS rank9 new run:
+  - DirectCP 8-4-2
+    `direct_cp_8_4_2_be_bspline_analytic_multistage`, alpha `1000`,
+    lr `1e-3`, total 2500 epochs.
+  - Stage controls: cps `8,4,2`; stage downsample `4,2,1`; stage epochs
+    `400,800,1300`.
+  - Optimized loss is stage-domain global NCC + analytic B-spline BE; plotted
+    diagnostic is full-image global NCC every 10 epochs.
+- LungCT case01/case08 new runs:
+  - IDIR `idir_be_default_lungmask`, `alpha_bending=3`, lr `1e-4`,
+    2500 epochs. Training remains native IDIR sampled NCC + IDIR BE in the
+    fixed T00 lung-mask sampling convention; plotted diagnostic is full-crop
+    global NCC every 10 epochs.
+  - SINR cps4 `sinr_cps4_global_ncc_fd_be`, alpha `10000`, lr `1e-4`,
+    2500 epochs. Optimized loss is full-crop global NCC + dense
+    forward-difference BE.
+  - DirectCP cps4 `direct_cp_cps4_global_ncc_fd_be`, alpha `10000`,
+    lr `1e-3`, 2500 epochs. Optimized loss is full-crop global NCC + dense
+    forward-difference BE.
+  - DirectCP 32-16-8-4 `direct_cp_32_16_8_4_global_ncc_fd_be`,
+    alpha `10000`, lr `1e-3`. Stage controls `32,16,8,4`; stage downsample
+    `8,4,2,1`; stage epochs `200,400,800,1000` for a 2400-epoch run matching
+    the existing Pareto sweep protocol. Optimized loss is full-crop global NCC
+    + dense forward-difference BE; plotted diagnostic is full-crop global NCC
+    every 10 epochs.
+- Standardized artifact outputs planned:
+  - `fit_modes_standardized_global_ncc_panelA_curves.png`
+  - `fit_modes_standardized_global_ncc_panelA_selected_runs.csv`
+  - `fit_modes_standardized_global_ncc_panelA_curve_summary.csv`
+  - `fit_modes_standardized_global_ncc_panelA_manifest.json`
+- Figure rule: one row by three cases, shared global NCC y-axis where possible,
+  and y tick labels plus y-axis label visible on every subplot.
+- Required preflight: Docker `py_compile`, two-epoch or three-epoch smokes
+  covering OASIS multistage, LungCT IDIR diagnostic, LungCT single-stage
+  global-NCC+FD-BE, and LungCT multistage global-NCC+FD-BE.
+- Result: preflight compile and all five smoke paths passed. Full launch
+  completed `9/9` new jobs with all queues returning status `0`.
+- Diagnostic validation: every `global_ncc_diagnostic.csv` has finite losses
+  and expected epoch coverage. 2500-epoch runs have `251` rows; LungCT
+  2400-epoch multistage runs have `241` rows.
+- Final global NCC losses:
+  - OASIS DirectCP 8-4-2: `-0.994035`.
+  - LungCT case01 IDIR/SINR/DirectCP cps4/DirectCP multistage:
+    `-0.946411`, `-0.997760`, `-0.998162`, `-0.998160`.
+  - LungCT case08 IDIR/SINR/DirectCP cps4/DirectCP multistage:
+    `-0.910503`, `-0.993551`, `-0.992049`, `-0.997240`.
+- Standardized artifact generated:
+  `experiments/paper_artifacts/fitting_figure/v001/fit_modes_standardized_global_ncc_panelA_curves.png`.
+
+### P10: OASIS DirectCP 8-4-2 Field-Fit rRMSE Panel B Add-On
+
+- Status: completed.
+- Date planned: 2026-07-01.
+- Date started: 2026-07-01.
+- Date completed: 2026-07-01.
+- Purpose: add the OASIS DirectCP 8-4-2 multistage trajectory to the
+  standardized Panel B target-field rRMSE fitting figure for both OASIS rank9
+  SITReg and Greedy targets.
+- Dataset: OASIS BrainMR seed-3 shuffled rank `9`, original sorted index `88`,
+  fixed/moving `(0173,0136)`.
+- Target fields:
+  - SITReg target: saved `bs4_sitreg_v0` best-Dice dense displacement,
+    normalized-grid units.
+  - Greedy target: canonical Greedy dense displacement, normalized-grid units.
+- Method: `direct_cp_8_4_2_be_bspline_analytic_multistage`, recorded as
+  `direct_cp_8_4_2_field_mse` for field-fit outputs.
+- LR/alpha/schedule: alpha `1000` recorded for operating-point consistency
+  but not used by the MSE-only objective; lr `1e-3`; total 2500 epochs; cps
+  `8,4,2`; stage downsample `4,2,1`; stage epochs `400,800,1300`.
+- Optimized loss: stage-domain target-field MSE over the fixed raw
+  image-positive OASIS brain mask, no image loss and no regularization.
+- Diagnostic loss: finest-domain masked target-field MSE in normalized-grid
+  units at epoch `1`, every `10` global epochs, and final epoch. The Panel B
+  rRMSE curve uses `100 * sqrt(mse / (target_power + 1e-12))`.
+- Output root:
+  `/database/inrorspline/runs/fit_modes_oasis_directcp842_field_fit_v1`.
+- Smoke output root:
+  `/database/inrorspline/runs/fit_modes_oasis_directcp842_field_fit_smoke_v1`.
+- Review/artifact root:
+  `experiments/paper_artifacts/fitting_figure/v001/`.
+- Docker target: `py310sitreg_v1_test1`.
+- Required preflight: Docker `py_compile` for modified OASIS field-fit
+  runners and figure generator; three-epoch smoke runs for both SITReg and
+  Greedy targets with finest-domain MSE diagnostics every epoch.
+- Full commands: run the SITReg and Greedy target fits with
+  `--method direct_cp_8_4_2_be_bspline_analytic_multistage --alpha 1000
+  --lr 1e-3 --epochs 2500 --stage-full-cps 8,4,2 --stage-downsample 4,2,1
+  --stage-epochs 400,800,1300 --finest-mse-diagnostic
+  --finest-mse-every 10`.
+- Known limitations: this is a single OASIS illustrative pair and field-fit-only
+  diagnostic; the field-fit objective uses target-field MSE rather than the
+  image-registration global NCC + BE objective used in Panel A.
+- Result: Docker `py_compile` passed; both three-epoch smoke jobs passed; both
+  full 2500-epoch jobs completed with `DONE` markers.
+- Diagnostic validation: both full `stage_history.csv` files contain 2500 rows
+  and 251 finite finest-domain MSE diagnostics covering epoch `1` plus every
+  `10` epochs through `2500`, with no missing/extra diagnostic epochs.
+- Final masked normalized-grid target-field MSE:
+  - SITReg target: `1.148402e-06`.
+  - Greedy target: `1.004255e-07`.
+- Standardized Panel B rRMSE results:
+  - SITReg target: start `97.33%`, epoch 10 `76.30%`, final `4.50%`.
+  - Greedy target: start `97.58%`, epoch 10 `78.18%`, final `1.23%`.
+- Standardized artifact regenerated:
+  `experiments/paper_artifacts/fitting_figure/v001/fit_modes_standardized_rrmse_field_fit_curves.png`.

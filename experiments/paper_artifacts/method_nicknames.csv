@@ -1,0 +1,31 @@
+method_id,original_name,nickname,method_family,notes
+IDIR,IDIR,INR-Dense,idir,Field-fit display name
+SINR cps2,SINR cps2,SINR cps2,sinr,Compact display name
+SINR cps4,SINR cps4,INR-BSCP,sinr,Compact display name
+DirectCP cps2,DirectCP cps2,DirectCP cps2,directcp,Compact display name
+DirectCP cps4,DirectCP cps4,D-BSCP,directcp,Compact display name
+DirectCP 4stage cps4,DirectCP 4stage cps4,MR-D-BSCP,directcp_multistage,Field-fit display name
+DirectCP 8-4-2,DirectCP 8-4-2,MR-D-BSCP,directcp_multistage,OASIS multistage display name
+panelA_idir,IDIR,INR-Dense,idir,Generic Panel A legend label
+panelA_sinr_cps4,SINR cps4,INR-BSCP,sinr,Generic Panel A legend label
+panelA_direct_cp_cps4,DirectCP cps4,D-BSCP,directcp,Generic Panel A legend label
+panelA_direct_cp_multistage,DirectCP multistage,MR-D-BSCP,directcp_multistage,Generic Panel A legend label
+idir_original_dense_siren_be_autograd,IDIR,INR-Dense,idir,OASIS table/Pareto method id
+sinr_cps2_be_bspline_analytic,SINR cps2,INR-BSCP (cps2),sinr,OASIS table/Pareto method id
+sinr_cps4_be_bspline_analytic,SINR cps4,INR-BSCP (cps4),sinr,OASIS table/Pareto method id
+direct_cp_cps2_be_bspline_analytic,DirectCP cps2,D-BSCP (cps2),directcp,OASIS table/Pareto method id
+direct_cp_cps4_be_bspline_analytic,DirectCP cps4,D-BSCP (cps4),directcp,OASIS table/Pareto method id
+direct_cp_8_4_2_be_bspline_analytic_multistage,DirectCP 8-4-2,MR-D-BSCP (8-4-2),directcp_multistage,Temporary lr=1e-2 exception in v001
+greedy,Greedy,Greedy,reference,OASIS baseline/reference
+bs1_vxm_v0_2,VoxelMorph,VoxelMorph,reference,OASIS baseline/reference
+bs2_tm_v0,TransMorph,TransMorph,reference,OASIS baseline/reference
+bs3_vfa_v0,VFA,VFA,reference,OASIS baseline/reference
+bs4_sitreg_v0,SITReg,SITReg,reference,OASIS baseline/reference
+idir_be_default_lungmask,IDIR,INR-Dense (IDIR loss),idir,LungCT table/Pareto method id
+sinr_cps4_ptv_lcc_isotv,SINR cps4,INR-BSCP (pTVReg loss),sinr,LungCT table/Pareto method id
+sinr_cps4_global_ncc_fd_be,SINR cps4 global-NCC+FD-BE,SINR cps4 global-NCC+FD-BE,sinr,LungCT Panel A global-NCC method id
+direct_cp_cps4_ptv_lcc_isotv,DirectCP cps4,D-BSCP (pTVReg loss),directcp,LungCT table/Pareto method id
+direct_cp_cps4_global_ncc_fd_be,DirectCP cps4 global-NCC+FD-BE,DirectCP cps4 global-NCC+FD-BE,directcp,LungCT Panel A global-NCC method id
+direct_cp_32_16_8_4_ptv_lcc_isotv,DirectCP 4stage pTV-LCC+isoTV,MR-D-BSCP (pTVReg loss),directcp_multistage,LungCT table/Pareto method id
+direct_cp_32_16_8_4_global_ncc_fd_be,DirectCP 4stage global-NCC+FD-BE,MR-D-BSCP (IDIR loss),directcp_multistage,LungCT table/Pareto method id
+ptvreg_reference,pTVReg,pTVReg (pTVReg loss),reference,LungCT protocol reference

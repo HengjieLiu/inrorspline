@@ -9,7 +9,7 @@ import math
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch
@@ -32,6 +32,7 @@ METHODS = [
     "idir_original",
     "sinr_cps4_be_bspline_analytic",
     "direct_cp_cps4_be_bspline_analytic",
+    "direct_cp_8_4_2_be_bspline_analytic_multistage",
 ]
 
 VARIANT = "oasis_rank009_fit_modes_lr_sweep_v1"
@@ -55,6 +56,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--coords-batch-size", type=int, default=10000)
     parser.add_argument("--field-chunk-size", type=int, default=200000)
     parser.add_argument("--eval-chunk-size", type=int, default=200000)
+    parser.add_argument("--stage-full-cps", type=str, default="8,4,2")
+    parser.add_argument("--stage-downsample", type=str, default="4,2,1")
+    parser.add_argument("--stage-epochs", type=str, default="400,800,1300")
+    parser.add_argument("--stage-lr", type=str, default="")
+    parser.add_argument("--finest-mse-diagnostic", action="store_true")
+    parser.add_argument("--finest-mse-every", type=int, default=10)
     parser.add_argument("--out-root", type=Path, default=DEFAULT_OUT_ROOT)
     parser.add_argument("--oasis-root", type=Path, default=c.DEFAULT_OASIS_ROOT)
     parser.add_argument("--pair-file", type=Path, default=c.DEFAULT_PAIR_FILE)
@@ -77,6 +84,8 @@ def field_method_key(method: str) -> str:
         return "sinr_cps4_field_mse"
     if method == "direct_cp_cps4_be_bspline_analytic":
         return "direct_cp_cps4_field_mse"
+    if method == "direct_cp_8_4_2_be_bspline_analytic_multistage":
+        return "direct_cp_8_4_2_field_mse"
     raise ValueError(f"Unsupported field-fit method: {method}")
 
 
@@ -87,12 +96,22 @@ def field_method_label(method: str) -> str:
         return "SINR cps4 field MSE"
     if method == "direct_cp_cps4_be_bspline_analytic":
         return "DirectCP cps4 field MSE"
+    if method == "direct_cp_8_4_2_be_bspline_analytic_multistage":
+        return "DirectCP 8-4-2 field MSE"
     raise ValueError(f"Unsupported field-fit method: {method}")
 
 
 def build_run_name(args: argparse.Namespace) -> str:
     if args.run_name:
         return args.run_name
+    if args.method == "direct_cp_8_4_2_be_bspline_analytic_multistage":
+        return (
+            f"{field_method_key(args.method)}_rank{args.case_rank:03d}"
+            f"_sched{args.stage_full_cps.replace(',', '-')}"
+            f"_ds{args.stage_downsample.replace(',', '-')}"
+            f"_e{args.stage_epochs.replace(',', '-')}"
+            f"_a{c.format_float(args.alpha)}_lr{c.format_float(args.lr)}"
+        )
     return (
         f"{field_method_key(args.method)}_rank{args.case_rank:03d}"
         f"_a{c.format_float(args.alpha)}_e{args.epochs}_lr{c.format_float(args.lr)}"
@@ -330,6 +349,254 @@ def train_spline_field(
     }
 
 
+def downsample_target_and_mask(
+    target_disp: torch.Tensor,
+    fixed_mask: torch.Tensor,
+    eval_shape: Sequence[int],
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    shape = tuple(int(v) for v in eval_shape)
+    if shape == tuple(int(v) for v in target_disp.shape[:3]):
+        return target_disp.detach(), fixed_mask.detach().bool()
+    target_ncdhw = target_disp.detach().permute(3, 0, 1, 2).unsqueeze(0)
+    target_l = F.interpolate(target_ncdhw, size=shape, mode="trilinear", align_corners=True)
+    target_l = target_l.squeeze(0).permute(1, 2, 3, 0).contiguous()
+    mask_l = F.interpolate(fixed_mask.detach().float()[None, None], size=shape, mode="nearest")
+    return target_l, mask_l.squeeze(0).squeeze(0).bool()
+
+
+def should_finest_mse_diagnostic(args: argparse.Namespace, global_epoch: int, total_epochs: int) -> bool:
+    if not bool(args.finest_mse_diagnostic):
+        return False
+    interval = int(args.finest_mse_every)
+    if interval <= 0:
+        return False
+    return int(global_epoch) == 1 or int(global_epoch) % interval == 0 or int(global_epoch) == int(total_epochs)
+
+
+def finest_field_mse_value(
+    control: torch.Tensor,
+    control_shape: Sequence[int],
+    full_cps: int,
+    target_disp: torch.Tensor,
+    fixed_mask: torch.Tensor,
+) -> float:
+    with torch.no_grad():
+        dense_full = c.expand_on_shape(control, control_shape, int(full_cps), c.IMAGE_SHAPE, 1)
+        mask_flat = fixed_mask.detach().reshape(-1).bool()
+        target_flat = target_disp.detach().reshape(-1, 3)
+        value = F.mse_loss(
+            dense_full.reshape(-1, 3)[mask_flat],
+            target_flat[mask_flat],
+            reduction="mean",
+        )
+    return float(value.detach().cpu())
+
+
+def optimize_multistage_field_stage(
+    args: argparse.Namespace,
+    target_disp: torch.Tensor,
+    fixed_mask: torch.Tensor,
+    control: torch.nn.Parameter,
+    control_shape: Sequence[int],
+    full_cps: int,
+    downsample: int,
+    epochs: int,
+    lr: float,
+    stage_idx: int,
+    global_epoch_offset: int,
+    total_epochs: int,
+) -> Tuple[torch.Tensor, Dict[str, object], List[Dict[str, object]]]:
+    eval_shape = c.downsample_shape(c.IMAGE_SHAPE, int(downsample)) if int(downsample) > 1 else c.IMAGE_SHAPE
+    domain_cps = c.domain_cps_from_full(int(full_cps), int(downsample))
+    target_l, mask_l = downsample_target_and_mask(target_disp, fixed_mask, eval_shape)
+    mask_flat = mask_l.reshape(-1).bool()
+    target_flat = target_l.reshape(-1, 3).detach()
+    n_train = int(mask_flat.sum().detach().cpu())
+    optimizer = torch.optim.Adam([control], lr=float(lr))
+    rows: List[Dict[str, object]] = []
+    stage_start = time.time()
+    print(
+        json.dumps(
+            {
+                "stage_start": int(stage_idx),
+                "full_cps": int(full_cps),
+                "downsample": int(downsample),
+                "domain_cps": int(domain_cps),
+                "control_shape_zyx": list(int(v) for v in control_shape),
+                "eval_shape_zyx": list(int(v) for v in eval_shape),
+                "epochs": int(epochs),
+                "lr": float(lr),
+                "objective": "stage_domain_target_field_mse",
+                "finest_mse_diagnostic": bool(args.finest_mse_diagnostic),
+                "finest_mse_every": int(args.finest_mse_every),
+            }
+        ),
+        flush=True,
+    )
+    for epoch in range(1, int(epochs) + 1):
+        dense_disp = c.expand_on_shape(control, control_shape, int(full_cps), eval_shape, int(downsample))
+        loss = F.mse_loss(dense_disp.reshape(-1, 3)[mask_flat], target_flat[mask_flat], reduction="mean")
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
+        value = float(loss.detach().cpu())
+        global_epoch = int(global_epoch_offset) + int(epoch)
+        row: Dict[str, object] = {
+            "stage_idx": float(stage_idx),
+            "epoch": float(epoch),
+            "global_epoch": float(global_epoch),
+            "full_cps": float(full_cps),
+            "downsample": float(downsample),
+            "domain_cps": float(domain_cps),
+            "loss": value,
+            "data_loss": value,
+            "reg_loss": 0.0,
+            "alpha": float(args.alpha),
+            "lr": float(lr),
+            "field_mse_stage_objective_normalized_grid": value,
+            "field_mse_objective_normalized_grid": float("nan"),
+            "finest_field_mse_objective_normalized_grid": float("nan"),
+            "finest_mse_affects_training": False,
+            "train_coords": float(n_train),
+        }
+        if should_finest_mse_diagnostic(args, global_epoch, int(total_epochs)):
+            finest_mse = finest_field_mse_value(control, control_shape, int(full_cps), target_disp, fixed_mask)
+            row["field_mse_objective_normalized_grid"] = finest_mse
+            row["finest_field_mse_objective_normalized_grid"] = finest_mse
+            print(json.dumps({"finest_field_mse_diagnostic": row}, allow_nan=True), flush=True)
+        rows.append(row)
+        if epoch == 1 or epoch % int(args.eval_interval) == 0 or epoch == int(epochs):
+            print(json.dumps(row, allow_nan=True), flush=True)
+    with torch.no_grad():
+        dense_full = c.expand_on_shape(control, control_shape, int(full_cps), c.IMAGE_SHAPE, 1)
+    ctrl_abs = control.detach().abs().reshape(-1)
+    summary = {
+        "stage_idx": int(stage_idx),
+        "full_cps": int(full_cps),
+        "downsample": int(downsample),
+        "domain_cps": int(domain_cps),
+        "control_shape_zyx": list(int(v) for v in control_shape),
+        "eval_shape_zyx": list(int(v) for v in eval_shape),
+        "n_control": int(np.prod(tuple(int(v) for v in control_shape))),
+        "epochs": int(epochs),
+        "lr": float(lr),
+        "alpha_recorded_not_used": float(args.alpha),
+        "loss_mode": "target_field_mse",
+        "elapsed_sec": float(time.time() - stage_start),
+        "control_abs_max_norm": float(ctrl_abs.max().detach().cpu()),
+        "control_abs_p95_norm": float(torch.quantile(ctrl_abs, 0.95).detach().cpu()),
+    }
+    return dense_full.detach(), summary, rows
+
+
+def train_multistage_field(
+    args: argparse.Namespace,
+    target_disp: torch.Tensor,
+    fixed_mask: torch.Tensor,
+    device: torch.device,
+) -> Dict[str, object]:
+    stage_cps = c.parse_int_list(str(args.stage_full_cps))
+    stage_downsample = c.parse_stage_ints(str(args.stage_downsample), len(stage_cps))
+    stage_epochs = c.parse_stage_ints(str(args.stage_epochs), len(stage_cps))
+    if int(sum(stage_epochs)) != int(args.epochs):
+        raise ValueError(f"stage_epochs sum {sum(stage_epochs)} != --epochs {args.epochs}")
+    stage_lr = c.parse_float_list(str(args.stage_lr), len(stage_cps), float(args.lr))
+    base_spacing = int(stage_cps[0])
+    nested_shapes = c.build_nested_cp_shapes(c.IMAGE_SHAPE, base_spacing=base_spacing, spacings=stage_cps)
+    c.assert_nested_schedule(nested_shapes, stage_cps)
+
+    stage_summaries: List[Dict[str, object]] = []
+    history: List[Dict[str, object]] = []
+    prolong_rows: List[Dict[str, object]] = []
+    prev_control: Optional[torch.Tensor] = None
+    prev_shape: Optional[Tuple[int, int, int]] = None
+    prev_dense_full: Optional[torch.Tensor] = None
+    final_dense: Optional[torch.Tensor] = None
+    final_control: Optional[torch.Tensor] = None
+    final_control_shape: Optional[Tuple[int, int, int]] = None
+    final_cps: Optional[int] = None
+
+    torch.cuda.synchronize()
+    torch.cuda.reset_peak_memory_stats()
+    train_start = time.time()
+    for stage_idx, (full_cps, downsample, epochs, stage_lr_value) in enumerate(
+        zip(stage_cps, stage_downsample, stage_epochs, stage_lr)
+    ):
+        global_epoch_offset = int(sum(stage_epochs[:stage_idx]))
+        control_shape = tuple(int(v) for v in nested_shapes[int(full_cps)])
+        control = torch.nn.Parameter(torch.zeros(int(np.prod(control_shape)), 3, device=device, dtype=torch.float32))
+        if prev_control is not None and prev_shape is not None and prev_dense_full is not None:
+            init_flat, rows = image_runner.prolongation_diagnostics(
+                prev_control,
+                prev_shape,
+                prev_dense_full,
+                control_shape,
+                int(full_cps),
+                c.IMAGE_SHAPE,
+                int(stage_idx),
+            )
+            with torch.no_grad():
+                control.copy_(init_flat)
+            prolong_rows.extend(rows)
+            print(json.dumps({"prolongation": rows}, allow_nan=True), flush=True)
+        dense_full, summary, rows = optimize_multistage_field_stage(
+            args,
+            target_disp,
+            fixed_mask,
+            control,
+            control_shape,
+            int(full_cps),
+            int(downsample),
+            int(epochs),
+            float(stage_lr_value),
+            int(stage_idx),
+            global_epoch_offset,
+            int(sum(stage_epochs)),
+        )
+        prev_control = control.detach()
+        prev_shape = control_shape
+        prev_dense_full = dense_full
+        final_dense = dense_full
+        final_control = control.detach()
+        final_control_shape = control_shape
+        final_cps = int(full_cps)
+        stage_summaries.append(summary)
+        history.extend(rows)
+    torch.cuda.synchronize()
+    if final_dense is None or final_control is None or final_control_shape is None or final_cps is None:
+        raise RuntimeError("Multistage field fitting produced no final control field.")
+    final_control_grid = c.flat_to_grid(final_control, final_control_shape).detach()
+    return {
+        "history": [
+            {
+                **row,
+                "epoch": float(row["global_epoch"]),
+                "stage_epoch": float(row["epoch"]),
+            }
+            for row in history
+        ],
+        "stage_history": history,
+        "stage_summaries": stage_summaries,
+        "prolongation_diagnostics": prolong_rows,
+        "control_shape": final_control_shape,
+        "control_coords": torch.empty(0, 3, dtype=torch.float32),
+        "control_disp": final_control_grid,
+        "dense_disp": final_dense.detach(),
+        "training_elapsed_sec": time.time() - train_start,
+        "training_peak_mem_gb": torch.cuda.max_memory_allocated() / (1024**3),
+        "param_count": int(final_control.numel()),
+        "cps": int(final_cps),
+        "stage_full_cps": stage_cps,
+        "stage_downsample": stage_downsample,
+        "stage_epochs": stage_epochs,
+        "stage_lr": stage_lr,
+        "nested_control_shapes_zyx": {str(k): list(v) for k, v in nested_shapes.items()},
+        "prolongation": "exact crop-aligned cubic B-spline dyadic knot insertion",
+        "coords_batch_size": None,
+        "train_coords": int(fixed_mask.detach().reshape(-1).bool().sum().detach().cpu()),
+    }
+
+
 def write_outputs(
     args: argparse.Namespace,
     batch: Dict[str, torch.Tensor | str | int | Dict[str, object]],
@@ -378,6 +645,21 @@ def write_outputs(
     if "generator" in metrics:
         state["generator_state_dict"] = metrics["generator"].state_dict()  # type: ignore[union-attr]
         state["control_shape"] = metrics["control_shape"]
+    if "control_disp" in metrics and "generator" not in metrics:
+        state["control_disp"] = metrics["control_disp"].detach().cpu()  # type: ignore[union-attr]
+        state["control_shape"] = metrics["control_shape"]
+    for key in (
+        "stage_summaries",
+        "prolongation_diagnostics",
+        "stage_full_cps",
+        "stage_downsample",
+        "stage_epochs",
+        "stage_lr",
+        "nested_control_shapes_zyx",
+        "prolongation",
+    ):
+        if key in metrics:
+            state[key] = metrics[key]
     torch.save(state, run_dir / "model_state.pt")
 
     objective_name = str(getattr(args, "field_fit_objective", "greedy_field_fit_mse"))
@@ -401,6 +683,10 @@ def write_outputs(
         )
 
     c.write_csv(run_dir / "history.csv", metrics["history"])  # type: ignore[arg-type]
+    if "stage_history" in metrics:
+        c.write_csv(run_dir / "stage_history.csv", metrics["stage_history"])  # type: ignore[arg-type]
+    if "prolongation_diagnostics" in metrics and metrics["prolongation_diagnostics"]:
+        c.write_csv(run_dir / "prolongation_metrics.csv", metrics["prolongation_diagnostics"])  # type: ignore[arg-type]
     c.write_csv(run_dir / "case_metrics.csv", [c.accuracy_row(eval_metrics, fixed_id, moving_id)])
     c.write_csv(run_dir / "regularity_metrics.csv", [reg_metrics])
     c.write_csv(run_dir / "be_metrics.csv", be_rows)
@@ -453,6 +739,16 @@ def write_outputs(
         "field_chunk_size": metrics.get("field_chunk_size"),
         "field_chunks": metrics.get("field_chunks"),
         "param_count": metrics.get("param_count"),
+        "stage_full_cps": metrics.get("stage_full_cps"),
+        "stage_downsample": metrics.get("stage_downsample"),
+        "stage_epochs": metrics.get("stage_epochs"),
+        "stage_lr": metrics.get("stage_lr"),
+        "stage_summaries": metrics.get("stage_summaries"),
+        "prolongation_diagnostics": metrics.get("prolongation_diagnostics"),
+        "nested_control_shapes_zyx": metrics.get("nested_control_shapes_zyx"),
+        "prolongation": metrics.get("prolongation"),
+        "finest_mse_diagnostic": bool(getattr(args, "finest_mse_diagnostic", False)),
+        "finest_mse_every": int(getattr(args, "finest_mse_every", 0)),
         "started_at": metrics.get("started_at"),
         "completed_at": c.now_text(),
         "training_elapsed_sec": float(metrics["training_elapsed_sec"]),
@@ -544,6 +840,8 @@ def main() -> None:
 
     if args.method == "idir_original":
         metrics = train_idir_field(args, target_disp, fixed_mask, device)
+    elif args.method == "direct_cp_8_4_2_be_bspline_analytic_multistage":
+        metrics = train_multistage_field(args, target_disp, fixed_mask, device)
     else:
         metrics = train_spline_field(args, target_disp, fixed_mask, device)
     metrics["started_at"] = started_at

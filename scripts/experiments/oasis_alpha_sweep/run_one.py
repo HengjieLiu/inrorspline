@@ -56,6 +56,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--eval-chunk-size", type=int, default=200000)
     parser.add_argument("--image-sim-eval-interval", type=int, default=0)
     parser.add_argument("--image-sim-eval-chunk-size", type=int, default=None)
+    parser.add_argument("--global-ncc-diagnostic-interval", type=int, default=0)
+    parser.add_argument("--global-ncc-diagnostic-chunk-size", type=int, default=None)
     parser.add_argument("--autograd-be-chunk-size", type=int, default=20000)
     parser.add_argument("--stage-full-cps", type=str, default="8,4,2")
     parser.add_argument("--stage-downsample", type=str, default="4,2,1")
@@ -352,6 +354,43 @@ def should_image_sim_eval(args: argparse.Namespace, epoch: int) -> bool:
     return int(epoch) == 1 or int(epoch) % interval == 0 or int(epoch) == int(args.epochs)
 
 
+def should_global_ncc_diagnostic(args: argparse.Namespace, epoch: int, total_epochs: int) -> bool:
+    interval = int(args.global_ncc_diagnostic_interval)
+    if interval <= 0:
+        return False
+    return int(epoch) == 1 or int(epoch) % interval == 0 or int(epoch) == int(total_epochs)
+
+
+def global_ncc_diagnostic_row(
+    *,
+    fixed: torch.Tensor,
+    moving: torch.Tensor,
+    dense_coords: torch.Tensor,
+    epoch: int,
+    global_epoch: int,
+    eval_domain: str,
+    device: torch.device,
+) -> Dict[str, float | str | bool]:
+    eval_start = time.time()
+    with torch.no_grad():
+        warped = c.warp_full(moving, dense_coords, mode="bilinear")
+        loss = c.ncc_loss(fixed[None, None], warped[None, None])
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    value = float(loss.detach().cpu())
+    del warped, loss
+    return {
+        "epoch": float(epoch),
+        "global_epoch": float(global_epoch),
+        "global_ncc_loss": value,
+        "global_ncc_value": -value,
+        "diagnostic_name": "full_image_global_ncc",
+        "eval_domain": eval_domain,
+        "affects_training": False,
+        "eval_elapsed_sec": time.time() - eval_start,
+    }
+
+
 def evaluate_idir_full_image_ncc(
     model: torch.nn.Module,
     batch: Dict[str, torch.Tensor | str | int | Dict[str, object]],
@@ -411,6 +450,8 @@ def train_idir(
     history: List[Dict[str, float]] = []
     image_similarity_eval: List[Dict[str, float | str | bool]] = []
     image_sim_chunk_size = int(args.image_sim_eval_chunk_size or args.eval_chunk_size)
+    global_ncc_diagnostic: List[Dict[str, float | str | bool]] = []
+    global_ncc_chunk_size = int(args.global_ncc_diagnostic_chunk_size or args.eval_chunk_size)
 
     torch.cuda.synchronize()
     torch.cuda.reset_peak_memory_stats()
@@ -440,6 +481,21 @@ def train_idir(
             sim_row = evaluate_idir_full_image_ncc(model, batch, device, image_sim_chunk_size, epoch)
             image_similarity_eval.append(sim_row)
             print(json.dumps({"image_similarity_eval": sim_row}), flush=True)
+        if should_global_ncc_diagnostic(args, epoch, int(args.epochs)):
+            diag_row = evaluate_idir_full_image_ncc(model, batch, device, global_ncc_chunk_size, epoch)
+            global_ncc_diagnostic.append(
+                {
+                    "epoch": diag_row["epoch"],
+                    "global_epoch": diag_row["global_epoch"],
+                    "global_ncc_loss": diag_row["similarity_loss"],
+                    "global_ncc_value": diag_row["similarity_value"],
+                    "diagnostic_name": "full_image_global_ncc",
+                    "eval_domain": "full_image",
+                    "affects_training": False,
+                    "eval_elapsed_sec": diag_row["eval_elapsed_sec"],
+                }
+            )
+            print(json.dumps({"global_ncc_diagnostic": global_ncc_diagnostic[-1]}), flush=True)
         if sampler is not None:
             sampler.record_idir(
                 epoch=epoch,
@@ -460,6 +516,7 @@ def train_idir(
     metrics = evaluate_dense_model(model, batch, device, args.eval_chunk_size)
     metrics["history"] = history
     metrics["image_similarity_eval"] = image_similarity_eval
+    metrics["global_ncc_diagnostic"] = global_ncc_diagnostic
     metrics["model"] = model
     metrics["training_elapsed_sec"] = training_elapsed_sec
     metrics["training_peak_mem_gb"] = training_peak_mem_gb
@@ -691,6 +748,7 @@ def train_spline(
     assert isinstance(moving, torch.Tensor)
     assert isinstance(fixed_image, torch.Tensor)
     history: List[Dict[str, float]] = []
+    global_ncc_diagnostic: List[Dict[str, float | str | bool]] = []
     if sampler is not None:
         generator.eval()
         with torch.no_grad():
@@ -729,6 +787,20 @@ def train_spline(
             "reg_loss": float(reg_loss.detach().cpu()),
         }
         history.append(entry)
+        if should_global_ncc_diagnostic(args, epoch, int(args.epochs)):
+            global_ncc_diagnostic.append(
+                {
+                    "epoch": float(epoch),
+                    "global_epoch": float(epoch),
+                    "global_ncc_loss": float(data_loss.detach().cpu()),
+                    "global_ncc_value": float((-data_loss).detach().cpu()),
+                    "diagnostic_name": "full_image_global_ncc",
+                    "eval_domain": "full_image",
+                    "affects_training": False,
+                    "eval_elapsed_sec": 0.0,
+                }
+            )
+            print(json.dumps({"global_ncc_diagnostic": global_ncc_diagnostic[-1]}), flush=True)
         if sampler is not None and sampler.should_record(epoch):
             generator.eval()
             with torch.no_grad():
@@ -758,6 +830,7 @@ def train_spline(
         final_dense_disp = c.expand_bspline_controls(final_output, control_shape, c.IMAGE_SHAPE, cps).detach()
         metrics = c.evaluate_from_dense_coords(id_dense + final_dense_disp, batch)
     metrics["history"] = history
+    metrics["global_ncc_diagnostic"] = global_ncc_diagnostic
     metrics["generator"] = generator
     metrics["control_shape"] = control_shape
     metrics["control_coords"] = control_coords.detach()
@@ -807,6 +880,8 @@ def optimize_multistage_stage(
     lr: float,
     stage_idx: int,
     global_epoch_offset: int,
+    total_epochs: int,
+    global_ncc_diagnostic: List[Dict[str, float | str | bool]],
     sampler: Optional[CheckpointSampler] = None,
 ) -> Tuple[torch.Tensor, Dict[str, object], List[Dict[str, object]]]:
     fixed_l, blur_sigma, blur_kernel = c.make_loss_volume(
@@ -873,6 +948,26 @@ def optimize_multistage_stage(
             "lr": float(lr),
         }
         rows.append(row)
+        if should_global_ncc_diagnostic(args, int(row["global_epoch"]), int(total_epochs)):
+            with torch.no_grad():
+                dense_full_diag = c.expand_on_shape(control, control_shape, int(full_cps), c.IMAGE_SHAPE, 1)
+                dense_coords_diag = c.make_coordinate_grid(c.IMAGE_SHAPE, fixed_image.device).detach() + dense_full_diag
+            diag_row = global_ncc_diagnostic_row(
+                fixed=fixed_image,
+                moving=moving,
+                dense_coords=dense_coords_diag,
+                epoch=int(epoch),
+                global_epoch=int(row["global_epoch"]),
+                eval_domain="full_image",
+                device=fixed_image.device,
+            )
+            diag_row["stage_idx"] = float(stage_idx)
+            diag_row["stage_epoch"] = float(epoch)
+            diag_row["full_cps"] = float(full_cps)
+            diag_row["downsample"] = float(downsample)
+            diag_row["domain_cps"] = float(domain_cps)
+            global_ncc_diagnostic.append(diag_row)
+            print(json.dumps({"global_ncc_diagnostic": diag_row}), flush=True)
         if sampler is not None and sampler.should_record(int(row["global_epoch"])):
             with torch.no_grad():
                 sample_dense_full = c.expand_on_shape(control, control_shape, int(full_cps), c.IMAGE_SHAPE, 1)
@@ -939,6 +1034,7 @@ def train_multistage_direct_cp(
     id_dense = c.make_coordinate_grid(c.IMAGE_SHAPE, device).detach()
     stage_summaries: List[Dict[str, object]] = []
     history: List[Dict[str, object]] = []
+    global_ncc_diagnostic: List[Dict[str, float | str | bool]] = []
     prolong_rows: List[Dict[str, object]] = []
     prev_control: Optional[torch.Tensor] = None
     prev_shape: Optional[Tuple[int, int, int]] = None
@@ -989,6 +1085,8 @@ def train_multistage_direct_cp(
             float(stage_lr_value),
             int(stage_idx),
             global_epoch_offset,
+            int(sum(stage_epochs)),
+            global_ncc_diagnostic,
             sampler=sampler,
         )
         prev_control = control.detach()
@@ -1016,6 +1114,7 @@ def train_multistage_direct_cp(
         for row in history
     ]
     metrics["stage_history"] = history
+    metrics["global_ncc_diagnostic"] = global_ncc_diagnostic
     metrics["stage_summaries"] = stage_summaries
     metrics["prolongation_diagnostics"] = prolong_rows
     metrics["control_shape"] = final_control_shape
@@ -1135,6 +1234,8 @@ def write_outputs(
     c.write_csv(run_dir / "history.csv", metrics["history"])  # type: ignore[arg-type]
     if "image_similarity_eval" in metrics and metrics["image_similarity_eval"]:
         c.write_csv(run_dir / "image_similarity_eval.csv", metrics["image_similarity_eval"])  # type: ignore[arg-type]
+    if "global_ncc_diagnostic" in metrics and metrics["global_ncc_diagnostic"]:
+        c.write_csv(run_dir / "global_ncc_diagnostic.csv", metrics["global_ncc_diagnostic"])  # type: ignore[arg-type]
     if "stage_history" in metrics:
         c.write_csv(run_dir / "stage_history.csv", metrics["stage_history"])  # type: ignore[arg-type]
     if "stage_summaries" in metrics:
@@ -1238,6 +1339,16 @@ def write_outputs(
             else None
         ),
         "image_similarity_eval_affects_training": False if is_idir and int(args.image_sim_eval_interval) > 0 else None,
+        "global_ncc_diagnostic_interval": int(args.global_ncc_diagnostic_interval),
+        "global_ncc_diagnostic_name": (
+            "full_image_global_ncc"
+            if int(args.global_ncc_diagnostic_interval) > 0
+            else None
+        ),
+        "global_ncc_diagnostic_affects_training": (
+            False if int(args.global_ncc_diagnostic_interval) > 0 else None
+        ),
+        "global_ncc_diagnostic_tail": metrics.get("global_ncc_diagnostic", [])[-10:],
         "hidden_dim": int(args.hidden_dim),
         "hidden_layers": int(args.hidden_layers),
         "activation": activation,
