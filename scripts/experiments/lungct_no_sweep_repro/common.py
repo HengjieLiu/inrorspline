@@ -61,13 +61,20 @@ FOURDCT_SPACING_ZYX: Dict[int, Tuple[float, float, float]] = {
 @dataclass(frozen=True)
 class LungCTCase:
     case_id: int
+    dataset: str
     case_dir: Path
+    fixed_label: str
+    moving_label: str
     fixed: np.ndarray
     moving: np.ndarray
     fixed_mask: np.ndarray
     moving_mask: np.ndarray
     landmarks_fixed: np.ndarray
     landmarks_moving: np.ndarray
+    landmarks_fixed_crop: np.ndarray
+    landmarks_moving_crop: np.ndarray
+    native_spacing_zyx: Tuple[float, float, float]
+    crop_shape_zyx: Tuple[int, int, int]
     preprocess_audit: Dict[str, object]
 
     @property
@@ -137,23 +144,62 @@ def parse_stage_ints(value: str, n: int) -> List[int]:
     return vals
 
 
-def case_dir(root: Path, case_id: int) -> Path:
-    return Path(root) / "4dct" / f"case{int(case_id):02d}"
+def case_dir(root: Path, case_id: int, dataset: str = "4dct") -> Path:
+    return Path(root) / str(dataset).lower() / f"case{int(case_id):02d}"
 
 
-def load_case(root: Path, case_id: int) -> LungCTCase:
-    cdir = case_dir(root, case_id)
+def _case_paths(cdir: Path, dataset: str) -> Tuple[Dict[str, Path], str, str]:
+    dataset_norm = str(dataset).lower()
+    if dataset_norm == "4dct":
+        return (
+            {
+                "fixed": cdir / "fixed_T00_reg1mm_trilinear_zyx.npy",
+                "moving": cdir / "moving_T50_reg1mm_trilinear_zyx.npy",
+                "fixed_mask": cdir / "fixed_T00_lungmask_reg1mm_nearest_zyx.npy",
+                "moving_mask": cdir / "moving_T50_lungmask_reg1mm_nearest_zyx.npy",
+                "landmarks_fixed": cdir / "landmarks_fixed_T00_reg1mm_zyx.npy",
+                "landmarks_moving": cdir / "landmarks_moving_T50_reg1mm_zyx.npy",
+                "landmarks_fixed_crop": cdir / "landmarks_fixed_T00_crop_zyx.npy",
+                "landmarks_moving_crop": cdir / "landmarks_moving_T50_crop_zyx.npy",
+                "audit": cdir / "preprocess_audit.json",
+            },
+            "T00",
+            "T50",
+        )
+    if dataset_norm == "copd":
+        return (
+            {
+                "fixed": cdir / "fixed_iBH_reg1mm_trilinear_zyx.npy",
+                "moving": cdir / "moving_eBH_reg1mm_trilinear_zyx.npy",
+                "fixed_mask": cdir / "fixed_iBH_lungmask_reg1mm_nearest_zyx.npy",
+                "moving_mask": cdir / "moving_eBH_lungmask_reg1mm_nearest_zyx.npy",
+                "landmarks_fixed": cdir / "landmarks_fixed_iBH_reg1mm_zyx.npy",
+                "landmarks_moving": cdir / "landmarks_moving_eBH_reg1mm_zyx.npy",
+                "landmarks_fixed_crop": cdir / "landmarks_fixed_iBH_crop_zyx.npy",
+                "landmarks_moving_crop": cdir / "landmarks_moving_eBH_crop_zyx.npy",
+                "audit": cdir / "preprocess_audit.json",
+            },
+            "iBH",
+            "eBH",
+        )
+    raise ValueError(f"Unsupported LungCT dataset: {dataset!r}")
+
+
+def _audit_verification_pass(audit: Dict[str, object]) -> bool:
+    if "verification_pass" in audit:
+        return bool(audit.get("verification_pass"))
+    verification = audit.get("verification")
+    if isinstance(verification, dict) and "pass" in verification:
+        return bool(verification.get("pass"))
+    return True
+
+
+def load_case(root: Path, case_id: int, dataset: str = "4dct") -> LungCTCase:
+    dataset_norm = str(dataset).lower()
+    cdir = case_dir(root, case_id, dataset_norm)
     if not cdir.is_dir():
         raise FileNotFoundError(f"Missing pTV-prep case directory: {cdir}")
-    paths = {
-        "fixed": cdir / "fixed_T00_reg1mm_trilinear_zyx.npy",
-        "moving": cdir / "moving_T50_reg1mm_trilinear_zyx.npy",
-        "fixed_mask": cdir / "fixed_T00_lungmask_reg1mm_nearest_zyx.npy",
-        "moving_mask": cdir / "moving_T50_lungmask_reg1mm_nearest_zyx.npy",
-        "landmarks_fixed": cdir / "landmarks_fixed_T00_reg1mm_zyx.npy",
-        "landmarks_moving": cdir / "landmarks_moving_T50_reg1mm_zyx.npy",
-        "audit": cdir / "preprocess_audit.json",
-    }
+    paths, fixed_label, moving_label = _case_paths(cdir, dataset_norm)
     missing = [str(p) for p in paths.values() if not p.exists()]
     if missing:
         raise FileNotFoundError("Missing pTV-prep files:\n" + "\n".join(missing))
@@ -164,7 +210,19 @@ def load_case(root: Path, case_id: int) -> LungCTCase:
     moving_mask = (np.load(paths["moving_mask"]) > 0).astype(np.uint8, copy=False)
     landmarks_fixed = np.load(paths["landmarks_fixed"]).astype(np.float64, copy=False)
     landmarks_moving = np.load(paths["landmarks_moving"]).astype(np.float64, copy=False)
+    landmarks_fixed_crop = np.load(paths["landmarks_fixed_crop"]).astype(np.float64, copy=False)
+    landmarks_moving_crop = np.load(paths["landmarks_moving_crop"]).astype(np.float64, copy=False)
     audit = json.loads(paths["audit"].read_text())
+    native_spacing = audit.get("native_spacing_zyx_mm")
+    if native_spacing is None and dataset_norm == "4dct":
+        native_spacing = FOURDCT_SPACING_ZYX.get(int(case_id))
+    if native_spacing is None:
+        raise ValueError(f"Missing native spacing in preprocess audit for {dataset_norm} case {case_id}")
+    native_spacing_zyx = tuple(float(v) for v in native_spacing)  # type: ignore[arg-type]
+    crop_shape = audit.get("crop_shape_zyx")
+    if crop_shape is None:
+        crop_shape = tuple(int(v) for v in np.ceil(np.max(landmarks_fixed_crop, axis=0) + 1.0))
+    crop_shape_zyx = tuple(int(v) for v in crop_shape)  # type: ignore[arg-type]
 
     if fixed.shape != moving.shape:
         raise ValueError(f"Image shape mismatch for case {case_id}: {fixed.shape} vs {moving.shape}")
@@ -176,19 +234,33 @@ def load_case(root: Path, case_id: int) -> LungCTCase:
         raise ValueError(
             f"Landmark shape mismatch for case {case_id}: {landmarks_fixed.shape} vs {landmarks_moving.shape}"
         )
+    if landmarks_fixed_crop.shape != landmarks_moving_crop.shape or landmarks_fixed_crop.shape[1] != 3:
+        raise ValueError(
+            f"Crop landmark shape mismatch for case {case_id}: "
+            f"{landmarks_fixed_crop.shape} vs {landmarks_moving_crop.shape}"
+        )
     if int(fixed_mask.sum()) <= 0:
         raise ValueError(f"Fixed lung mask is empty for case {case_id}")
     assert_landmarks_inside(landmarks_fixed, fixed.shape, f"case {case_id} fixed landmarks")
     assert_landmarks_inside(landmarks_moving, moving.shape, f"case {case_id} moving landmarks")
+    assert_landmarks_inside(landmarks_fixed_crop, crop_shape_zyx, f"case {case_id} fixed crop landmarks")
+    assert_landmarks_inside(landmarks_moving_crop, crop_shape_zyx, f"case {case_id} moving crop landmarks")
     return LungCTCase(
         case_id=int(case_id),
+        dataset=dataset_norm,
         case_dir=cdir,
+        fixed_label=fixed_label,
+        moving_label=moving_label,
         fixed=fixed,
         moving=moving,
         fixed_mask=fixed_mask,
         moving_mask=moving_mask,
         landmarks_fixed=landmarks_fixed,
         landmarks_moving=landmarks_moving,
+        landmarks_fixed_crop=landmarks_fixed_crop,
+        landmarks_moving_crop=landmarks_moving_crop,
+        native_spacing_zyx=native_spacing_zyx,
+        crop_shape_zyx=crop_shape_zyx,
         preprocess_audit=audit,
     )
 
@@ -202,15 +274,21 @@ def assert_landmarks_inside(points_zyx: np.ndarray, shape_zyx: Sequence[int], la
         raise ValueError(f"{label} outside image bounds at landmark indices {bad[:10]}")
 
 
-def loader_audit(root: Path, case_ids: Sequence[int]) -> Dict[str, object]:
+def loader_audit(root: Path, case_ids: Sequence[int], dataset: str = "4dct") -> Dict[str, object]:
+    dataset_norm = str(dataset).lower()
     rows: List[Dict[str, object]] = []
     for case_id in case_ids:
-        case = load_case(root, int(case_id))
+        case = load_case(root, int(case_id), dataset=dataset_norm)
         rows.append(
             {
+                "dataset": dataset_norm,
                 "case_id": int(case_id),
                 "case_dir": str(case.case_dir),
                 "shape_zyx": list(case.shape_zyx),
+                "crop_shape_zyx": list(case.crop_shape_zyx),
+                "native_spacing_zyx_mm": list(case.native_spacing_zyx),
+                "fixed_label": case.fixed_label,
+                "moving_label": case.moving_label,
                 "fixed_mask_voxels": int(case.fixed_mask.sum()),
                 "fixed_mask_fraction": float(case.fixed_mask.mean()),
                 "moving_mask_voxels": int(case.moving_mask.sum()),
@@ -218,10 +296,14 @@ def loader_audit(root: Path, case_ids: Sequence[int]) -> Dict[str, object]:
                 "identity_tre_mean_mm": compute_tre_mm(
                     case.landmarks_fixed, case.landmarks_moving, (1.0, 1.0, 1.0)
                 )["tre_mean_mm"],
-                "verification_pass": bool(case.preprocess_audit.get("verification_pass", True)),
+                "native_crop_identity_tre_mean_mm": compute_tre_mm(
+                    case.landmarks_fixed_crop, case.landmarks_moving_crop, case.native_spacing_zyx
+                )["tre_mean_mm"],
+                "verification_pass": _audit_verification_pass(case.preprocess_audit),
             }
         )
     return {
+        "dataset": dataset_norm,
         "root": str(root),
         "case_ids": [int(v) for v in case_ids],
         "n_cases": len(rows),
@@ -1077,6 +1159,8 @@ def landmark_tre_from_dense_disp(
     lm_moving_zyx: np.ndarray,
     sample_mode: str,
     snap_output: bool,
+    spacing_zyx: Sequence[float] = (1.0, 1.0, 1.0),
+    dense_disp_units: str = "cropped_1mm_voxel",
 ) -> Dict[str, object]:
     if sample_mode == "nearest":
         disp_at_points = sample_dense_disp_nearest(disp_vox_zyx, lm_fixed_zyx)
@@ -1087,10 +1171,10 @@ def landmark_tre_from_dense_disp(
     predicted = np.asarray(lm_fixed_zyx, dtype=np.float64) + disp_at_points
     if snap_output:
         predicted = np.rint(predicted)
-    out = compute_tre_mm(predicted, np.asarray(lm_moving_zyx, dtype=np.float64), (1.0, 1.0, 1.0))
+    out = compute_tre_mm(predicted, np.asarray(lm_moving_zyx, dtype=np.float64), spacing_zyx)
     out["snap_output"] = bool(snap_output)
     out["sample_mode"] = sample_mode
-    out["dense_disp_units"] = "cropped_1mm_voxel"
+    out["dense_disp_units"] = dense_disp_units
     return out
 
 
@@ -1099,9 +1183,27 @@ def save_landmark_csv(
     disp_vox_zyx: np.ndarray,
     lm_fixed_zyx: np.ndarray,
     lm_moving_zyx: np.ndarray,
+    spacing_zyx: Sequence[float] = (1.0, 1.0, 1.0),
+    dense_disp_units: str = "cropped_1mm_voxel",
 ) -> None:
-    nearest = landmark_tre_from_dense_disp(disp_vox_zyx, lm_fixed_zyx, lm_moving_zyx, "nearest", True)
-    sub = landmark_tre_from_dense_disp(disp_vox_zyx, lm_fixed_zyx, lm_moving_zyx, "trilinear", False)
+    nearest = landmark_tre_from_dense_disp(
+        disp_vox_zyx,
+        lm_fixed_zyx,
+        lm_moving_zyx,
+        "nearest",
+        True,
+        spacing_zyx=spacing_zyx,
+        dense_disp_units=dense_disp_units,
+    )
+    sub = landmark_tre_from_dense_disp(
+        disp_vox_zyx,
+        lm_fixed_zyx,
+        lm_moving_zyx,
+        "trilinear",
+        False,
+        spacing_zyx=spacing_zyx,
+        dense_disp_units=dense_disp_units,
+    )
     snap_tre = np.asarray(nearest["per_landmark_tre_mm"], dtype=np.float64)
     sub_tre = np.asarray(sub["per_landmark_tre_mm"], dtype=np.float64)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1118,10 +1220,25 @@ def save_landmark_csv(
                 "target_x",
                 "snap_tre_mm",
                 "subvoxel_tre_mm",
+                "spacing_z_mm",
+                "spacing_y_mm",
+                "spacing_x_mm",
+                "dense_disp_units",
             ]
         )
+        spacing = [float(v) for v in spacing_zyx]
         for i in range(lm_fixed_zyx.shape[0]):
-            writer.writerow([i, *lm_fixed_zyx[i].tolist(), *lm_moving_zyx[i].tolist(), snap_tre[i], sub_tre[i]])
+            writer.writerow(
+                [
+                    i,
+                    *lm_fixed_zyx[i].tolist(),
+                    *lm_moving_zyx[i].tolist(),
+                    snap_tre[i],
+                    sub_tre[i],
+                    *spacing,
+                    dense_disp_units,
+                ]
+            )
 
 
 def _mean_sq(arr: np.ndarray) -> float:
@@ -1258,6 +1375,24 @@ def displacement_regularities(
     return metrics
 
 
+def resize_reg1mm_disp_to_native_crop_vox(
+    disp_vox_reg_zyx: np.ndarray,
+    crop_shape_zyx: Sequence[int],
+    native_spacing_zyx: Sequence[float],
+) -> np.ndarray:
+    disp_phys_reg_zyx = np.asarray(disp_vox_reg_zyx, dtype=np.float32)
+    field = torch.from_numpy(disp_phys_reg_zyx).permute(3, 0, 1, 2).unsqueeze(0)
+    resized = F.interpolate(
+        field,
+        size=tuple(int(v) for v in crop_shape_zyx),
+        mode="trilinear",
+        align_corners=True,
+    )
+    disp_phys_crop_zyx = resized.squeeze(0).permute(1, 2, 3, 0).numpy().astype(np.float32, copy=False)
+    spacing = np.asarray(native_spacing_zyx, dtype=np.float32).reshape(1, 1, 1, 3)
+    return (disp_phys_crop_zyx / spacing).astype(np.float32, copy=False)
+
+
 def final_metrics_from_dense(
     dense_disp_norm_xyz: torch.Tensor,
     case: LungCTCase,
@@ -1272,8 +1407,39 @@ def final_metrics_from_dense(
     tre_sub = landmark_tre_from_dense_disp(
         disp_vox_reg_zyx, case.landmarks_fixed, case.landmarks_moving, sample_mode="trilinear", snap_output=False
     )
+    disp_vox_native_crop_zyx = resize_reg1mm_disp_to_native_crop_vox(
+        disp_vox_reg_zyx,
+        case.crop_shape_zyx,
+        case.native_spacing_zyx,
+    )
+    native_tre_snap = landmark_tre_from_dense_disp(
+        disp_vox_native_crop_zyx,
+        case.landmarks_fixed_crop,
+        case.landmarks_moving_crop,
+        sample_mode="nearest",
+        snap_output=True,
+        spacing_zyx=case.native_spacing_zyx,
+        dense_disp_units="native_crop_voxel",
+    )
+    native_tre_sub = landmark_tre_from_dense_disp(
+        disp_vox_native_crop_zyx,
+        case.landmarks_fixed_crop,
+        case.landmarks_moving_crop,
+        sample_mode="trilinear",
+        snap_output=False,
+        spacing_zyx=case.native_spacing_zyx,
+        dense_disp_units="native_crop_voxel",
+    )
     regularity = displacement_regularities(disp_vox_reg_zyx, foreground_mask=case.fixed_mask.astype(bool), log_base=log_base)
     save_landmark_csv(out_dir / "per_landmark_tre.csv", disp_vox_reg_zyx, case.landmarks_fixed, case.landmarks_moving)
+    save_landmark_csv(
+        out_dir / "per_landmark_tre_native_crop.csv",
+        disp_vox_native_crop_zyx,
+        case.landmarks_fixed_crop,
+        case.landmarks_moving_crop,
+        spacing_zyx=case.native_spacing_zyx,
+        dense_disp_units="native_crop_voxel",
+    )
     if save_dense_dvf:
         np.save(out_dir / "disp_vox_reg1mm_zyx.npy", disp_vox_reg_zyx.astype(np.float32))
         np.save(out_dir / "disp_norm_xyz_reg1mm.npy", dense_disp_norm_xyz.detach().cpu().numpy().astype(np.float32))
@@ -1281,6 +1447,14 @@ def final_metrics_from_dense(
         "identity_tre": compute_tre_mm(case.landmarks_fixed, case.landmarks_moving, (1.0, 1.0, 1.0)),
         "tre_snap_to_voxel": tre_snap,
         "tre_subvoxel": tre_sub,
+        "native_crop_identity_tre": compute_tre_mm(
+            case.landmarks_fixed_crop,
+            case.landmarks_moving_crop,
+            case.native_spacing_zyx,
+        ),
+        "native_crop_tre_snap_to_voxel": native_tre_snap,
+        "native_crop_tre_subvoxel": native_tre_sub,
+        "headline_tre_metric": "native_crop_tre_snap_to_voxel",
         "regularity_fg_registration_crop": regularity,
         "dense_field_shape_zyx": list(disp_vox_reg_zyx.shape[:3]),
     }

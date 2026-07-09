@@ -51,6 +51,7 @@ METHODS = [
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--method", choices=METHODS, default=None)
+    parser.add_argument("--dataset", choices=["4dct", "copd"], default="4dct")
     parser.add_argument("--case-id", type=int, default=1)
     parser.add_argument("--data-root", type=Path, default=c.DEFAULT_PTVPREP_ROOT)
     parser.add_argument("--out-root", type=Path, default=c.DEFAULT_RUN_ROOT)
@@ -130,7 +131,7 @@ class CheckpointSampler:
             return
         eligible = np.flatnonzero(case.fixed_mask.reshape(-1).astype(bool))
         if eligible.size == 0:
-            raise RuntimeError("Cannot sample checkpoints from an empty LungCT fixed T00 mask.")
+            raise RuntimeError(f"Cannot sample checkpoints from an empty LungCT fixed {case.fixed_label} mask.")
         count = min(int(args.checkpoint_sample_count), int(eligible.size))
         rng = np.random.default_rng(int(args.checkpoint_sample_seed))
         chosen = eligible if count >= eligible.size else rng.choice(eligible, size=count, replace=False)
@@ -157,14 +158,14 @@ class CheckpointSampler:
             self.out_dir / "checkpoint_sample_metadata.json",
             {
                 "enabled": True,
-                "dataset": "lungct",
+                "dataset": case.dataset,
                 "case_id": int(case.case_id),
                 "sample_seed": int(args.checkpoint_sample_seed),
                 "requested_sample_count": int(args.checkpoint_sample_count),
                 "actual_sample_count": int(self.flat_indices_np.size),
-                "sample_domain": "fixed_t00_lung_mask_reg1mm",
+                "sample_domain": f"fixed_{case.fixed_label.lower()}_lung_mask_reg1mm",
                 "field_units_saved": ["normalized_grid_xyz", "reg1mm_voxel_xyz"],
-                "field_direction": "fixed_T00_to_moving_T50",
+                "field_direction": f"fixed_{case.fixed_label}_to_moving_{case.moving_label}",
                 "component_order": "x,y,z",
                 "grid_shape_zyx": list(self.shape),
                 "checkpoint_epochs": sorted(self.epochs),
@@ -263,33 +264,37 @@ def default_lr(method: str) -> float:
 def run_name(args: argparse.Namespace, method: str, lr: float) -> str:
     if args.run_name:
         return args.run_name
+    dataset = str(getattr(args, "dataset", "4dct")).lower()
+    case_token = f"case{args.case_id:02d}" if dataset == "4dct" else f"{dataset}_case{args.case_id:02d}"
+    stage_full_name = str(getattr(args, "stage_full_cps", "32,16,8,4")).replace(" ", "").replace(",", "-")
+    stage_downsample_name = str(getattr(args, "stage_downsample", "8,4,2,1")).replace(" ", "").replace(",", "-")
     if method == METHOD_DIRECT_CP_32_PTV:
-        epoch_name = args.stage_epochs.replace(",", "-")
+        epoch_name = args.stage_epochs.replace(" ", "").replace(",", "-")
         return (
-            f"{method}_case{args.case_id:02d}_sched32-16-8-4_ds8-4-2-1_"
+            f"{method}_{case_token}_sched{stage_full_name}_ds{stage_downsample_name}_"
             f"e{epoch_name}_lr{c.format_float(lr)}_w{c.format_float(args.ptv_isotv_weight)}_seed{args.seed}"
         )
     if method == METHOD_DIRECT_CP_32_GLOBAL_NCC_BE:
-        epoch_name = args.stage_epochs.replace(",", "-")
+        epoch_name = args.stage_epochs.replace(" ", "").replace(",", "-")
         return (
-            f"{method}_case{args.case_id:02d}_sched32-16-8-4_ds8-4-2-1_"
+            f"{method}_{case_token}_sched{stage_full_name}_ds{stage_downsample_name}_"
             f"e{epoch_name}_lr{c.format_float(lr)}_a{c.format_float(args.alpha)}_seed{args.seed}"
         )
     if method == METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE:
-        epoch_name = args.stage_epochs.replace(",", "-")
+        epoch_name = args.stage_epochs.replace(" ", "").replace(",", "-")
         return (
-            f"{method}_case{args.case_id:02d}_sched32-16-8-4_ds8-4-2-1_"
+            f"{method}_{case_token}_sched{stage_full_name}_ds{stage_downsample_name}_"
             f"e{epoch_name}_lr{c.format_float(lr)}_a{c.format_float(args.alpha)}_seed{args.seed}"
         )
     epochs = int(args.epochs if args.epochs is not None else default_epochs(method))
     if method == METHOD_DCTFIELD_FD_BE:
         return (
-            f"{method}_case{args.case_id:02d}_k{int(args.dct_size)}_e{epochs}"
+            f"{method}_{case_token}_k{int(args.dct_size)}_e{epochs}"
             f"_lr{c.format_float(lr)}_bend{c.format_float(args.alpha_bending)}_seed{args.seed}"
         )
     if method in {METHOD_SINR_CPS4_GLOBAL_NCC_FD_BE, METHOD_DIRECT_CP_CPS4_GLOBAL_NCC_FD_BE}:
         return (
-            f"{method}_case{args.case_id:02d}_e{epochs}"
+            f"{method}_{case_token}_e{epochs}"
             f"_lr{c.format_float(lr)}_a{c.format_float(args.alpha)}_seed{args.seed}"
         )
     extra = (
@@ -297,7 +302,7 @@ def run_name(args: argparse.Namespace, method: str, lr: float) -> str:
         if method in {METHOD_IDIR, METHOD_DIRECT_DVF_FD_BE}
         else f"w{c.format_float(args.ptv_isotv_weight)}"
     )
-    return f"{method}_case{args.case_id:02d}_e{epochs}_lr{c.format_float(lr)}_{extra}_seed{args.seed}"
+    return f"{method}_{case_token}_e{epochs}_lr{c.format_float(lr)}_{extra}_seed{args.seed}"
 
 
 def make_out_dir(args: argparse.Namespace, method: str, lr: float) -> Path:
@@ -678,7 +683,7 @@ def train_direct_dvf(
             "alpha_bending": float(args.alpha_bending),
             "batch_size": batch_size,
             "train_coords": n_train,
-            "sample_domain": "fixed_t00_lung_mask_reg1mm_grid_points",
+            "sample_domain": f"fixed_{case.fixed_label.lower()}_lung_mask_reg1mm_grid_points",
             "be_type": "dense_forward_difference_be",
             "native_analytic_be_formula": "not_available_dense_grid_dvf",
             "seed": int(args.seed),
@@ -799,7 +804,7 @@ def train_dctfield(
             "alpha_bending": float(args.alpha_bending),
             "batch_size": batch_size,
             "train_coords": n_train,
-            "sample_domain": "fixed_t00_lung_mask_reg1mm_grid_points",
+            "sample_domain": f"fixed_{case.fixed_label.lower()}_lung_mask_reg1mm_grid_points",
             "be_type": "dct_decoded_dense_forward_difference_be",
             "native_analytic_be_formula": "not_used_dct_spectral_be_possible",
             "dct_size_zyx": list(dct_size),
@@ -1601,7 +1606,7 @@ def train_multistage(
 def main() -> None:
     args = parse_args()
     if args.audit_loader:
-        audit = c.loader_audit(args.data_root, c.parse_int_list(args.audit_cases))
+        audit = c.loader_audit(args.data_root, c.parse_int_list(args.audit_cases), dataset=args.dataset)
         print(json.dumps(audit, indent=2), flush=True)
         return
     if args.method is None:
@@ -1622,7 +1627,7 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     device = c.set_cuda_device(args.gpu)
-    case = c.load_case(args.data_root, args.case_id)
+    case = c.load_case(args.data_root, args.case_id, dataset=args.dataset)
     sampler = CheckpointSampler(args=args, case=case, device=device, out_dir=out_dir)
     if method == METHOD_IDIR:
         result = train_idir(args, case, device, out_dir, sampler=sampler)
@@ -1720,6 +1725,15 @@ def main() -> None:
     else:
         raise ValueError(f"Unknown method: {method}")
 
+    fixed_mask_token = "fixed_t00" if case.dataset == "4dct" else f"fixed_{case.fixed_label.lower()}"
+    fixed_label_text = case.fixed_label
+    moving_label_text = case.moving_label
+    if case.dataset != "4dct":
+        protocol_tag = protocol_tag.replace("fixed_t00", fixed_mask_token)
+        mask_rule = mask_rule.replace("fixed_t00", fixed_mask_token)
+        loss_domain = loss_domain.replace("fixed_t00", fixed_mask_token)
+        method_note = method_note.replace("T00", fixed_label_text).replace("T50", moving_label_text)
+
     sampler.save()
     metrics = c.final_metrics_from_dense(
         result["dense_disp_norm_xyz"],
@@ -1732,7 +1746,7 @@ def main() -> None:
         "run_name": out_dir.name,
         "status": "completed",
         "method": method,
-        "dataset": "4dct",
+        "dataset": case.dataset,
         "case_id": int(args.case_id),
         "seed": int(args.seed),
         "data_root": str(args.data_root),
@@ -1740,8 +1754,9 @@ def main() -> None:
         "case_dir": str(case.case_dir),
         "image_domain": "pTVReg landmark crop",
         "spacing": "isotropic_1mm",
-        "fixed_phase": "T00",
-        "moving_phase": "T50",
+        "fixed_phase": case.fixed_label,
+        "moving_phase": case.moving_label,
+        "direction": f"{case.moving_label} -> {case.fixed_label}",
         "mask_rule": mask_rule,
         "loss_domain": loss_domain,
         "protocol_tag": protocol_tag,
@@ -1757,8 +1772,8 @@ def main() -> None:
         "notes": [
             "Inputs are canonical regenerated pTV-prep cropped 1mm arrays.",
             method_note,
-            "Foreground regularity metrics use the fixed T00 lung mask on the cropped 1mm grid.",
-            "TRE is measured directly in cropped 1mm landmark coordinates.",
+            f"Foreground regularity metrics use the fixed {case.fixed_label} lung mask on the cropped 1mm grid.",
+            "Headline TRE is native_crop_tre_snap_to_voxel; reg-1mm TRE is retained as a diagnostic.",
         ],
     }
     summary.update(
@@ -1770,14 +1785,19 @@ def main() -> None:
     )
     summary.update(metrics)
     c.write_json(summary_path, summary)
+    headline_tre = summary.get("native_crop_tre_snap_to_voxel", summary["tre_snap_to_voxel"])
+    assert isinstance(headline_tre, dict)
     print(
         json.dumps(
             {
                 "summary_path": str(summary_path),
                 "method": method,
+                "dataset": case.dataset,
                 "case_id": int(args.case_id),
-                "tre_snap_mean_mm": summary["tre_snap_to_voxel"]["tre_mean_mm"],
-                "tre_subvoxel_mean_mm": summary["tre_subvoxel"]["tre_mean_mm"],
+                "headline_tre_metric": summary.get("headline_tre_metric", "tre_snap_to_voxel"),
+                "headline_snap_mean_mm": headline_tre["tre_mean_mm"],
+                "reg1mm_snap_mean_mm": summary["tre_snap_to_voxel"]["tre_mean_mm"],
+                "reg1mm_subvoxel_mean_mm": summary["tre_subvoxel"]["tre_mean_mm"],
                 "elapsed_sec": summary["elapsed_sec"],
                 "peak_mem_gb": summary["peak_mem_gb"],
             },

@@ -1,0 +1,23 @@
+{
+  "dataset": "copd",
+  "method": "direct_cp_32_16_8_4_ptv_lcc_isotv",
+  "display_name": "MR-D-BSCP 64-32-16-8-4 e400x4+900 (pTVReg loss)",
+  "n_completed": 10,
+  "requested_cases": "1,2,3,4,5,6,7,8,9,10",
+  "missing_cases": "",
+  "native_crop_snap_tre_mean_mm": 1.0504783589430442,
+  "native_crop_snap_tre_std_across_cases_mm": 0.767339373650889,
+  "native_crop_sub_tre_mean_mm": 1.1567151873702528,
+  "native_crop_sub_tre_std_across_cases_mm": 0.7370254208354657,
+  "reg1mm_snap_tre_mean_mm": 1.2914383127088125,
+  "reg1mm_snap_tre_std_across_cases_mm": 0.7296746174702917,
+  "reg1mm_sub_tre_mean_mm": 1.152765095441208,
+  "reg1mm_sub_tre_std_across_cases_mm": 0.7375463048698394,
+  "fg_log_jdet_std_mean": 0.4021154792590894,
+  "fg_log_jdet_std_across_cases": 0.10927859895771579,
+  "fg_jdet_le0_pct_mean": 0.7251491547400926,
+  "fg_bending_energy_mean": 0.008935377568102264,
+  "fg_diffusion_l2_mean": 0.03892178804261023,
+  "elapsed_sec_mean": 382.90085022449495,
+  "peak_mem_gb_mean": 6.370936346054077
+}
