@@ -36,24 +36,54 @@ from paper_artifact_common import (
 OUTPUT_FORMATS = ("png",)
 
 OASIS_INCLUDE_DIRECTCP842 = True
-OASIS_COHORT = "first20"
+OASIS_DATASET = "oasis100"
+OASIS_COHORT = "first100"
+OASIS_PANEL_N = 100
 OASIS_DPI = 300
 OASIS_TICK_LABEL_SIZE = 12
 OASIS_AXIS_LABEL_SIZE = 16
 OASIS_LEGEND_FONT_SIZE = 12
-OASIS_ANNOTATED_DIRNAME = "oasis20"
-OASIS_PAPER_NO_ANNOTATIONS_DIRNAME = "oasis20_paper_no_annotations"
+OASIS_ANNOTATED_DIRNAME = "oasis100"
+OASIS_PAPER_NO_ANNOTATIONS_DIRNAME = "oasis100_paper_no_annotations"
+OASIS_SOURCE_ROWS_FILENAME = f"{OASIS_DATASET}_pareto_source_rows.csv"
 OASIS_SOURCE_WITH_DIRECTCP842 = repo_path(
-    "experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/"
-    "pareto_first10_first20_alpha5_saved_baselines_plus_directcp842_paper_v1/"
-    "first20/population_summary_first20_with_saved_baselines.csv"
+    "experiments/2026-07-04_oasis_seed3_first100_extension/"
+    "first100_artifacts/oasis100/population_summary_oasis100_with_saved_baselines.csv"
 )
 OASIS_SOURCE_FIVE_SWEEP = repo_path(
-    "experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/"
-    "pareto_first10_first20_alpha5_saved_baselines_paper_v1/"
-    "first20/population_summary_first20_with_saved_baselines.csv"
+    "experiments/2026-07-04_oasis_seed3_first100_extension/"
+    "first100_artifacts/oasis100/population_summary_oasis100_with_saved_baselines.csv"
 )
-OASIS_SOURCE_OVERRIDE_KEY = "oasis20_population_summary"
+OASIS_SOURCE_OVERRIDE_KEY = "oasis100_population_summary"
+COMPOSITE_DIRNAME = "four_panel_composite"
+COMPOSITE_OUTPUTS = {
+    "no_annotations": {
+        "filename": "pareto_four_panel_composite_no_annotations.png",
+        "annotate": False,
+    },
+    "annotated_review": {
+        "filename": "pareto_four_panel_composite_annotated_review.png",
+        "annotate": True,
+    },
+}
+COMPOSITE_STYLE = {
+    "figsize": (14.0, 10.0),
+    "dpi": 300,
+    "title_fontsize": 18,
+    "axis_label_fontsize": 14,
+    "tick_label_fontsize": 12,
+    "legend_fontsize": 8.5,
+    "legend_frame": True,
+    "line_width": 1.55,
+    "marker_size": 4.8,
+    "lung_marker_size": 50,
+    "ptvreg_marker_size": 120,
+    "ellipse_alpha": 0.14,
+    "lung_ellipse_alpha": 0.12,
+    "grid_alpha": 0.25,
+    "wspace": 0.18,
+    "hspace": 0.30,
+}
 OASIS_ACCURACY_METRICS = [
     ("dice_mean", "Mean Dice", True),
     ("hd95_mean", "Mean HD95", False),
@@ -256,6 +286,7 @@ def _clean_output_dir(output_dir: Path) -> None:
         output_dir / OASIS_PAPER_NO_ANNOTATIONS_DIRNAME,
         output_dir / LUNGCT_ANNOTATED_DIRNAME,
         output_dir / LUNGCT_PAPER_NO_ANNOTATIONS_DIRNAME,
+        output_dir / COMPOSITE_DIRNAME,
         output_dir / ".ipynb_checkpoints",
     ]:
         if child.exists():
@@ -272,7 +303,7 @@ def load_oasis_rows(
 ) -> pd.DataFrame:
     source = _oasis_source(standard)
     rows = pd.read_csv(source)
-    rows["dataset"] = "oasis20"
+    rows["dataset"] = OASIS_DATASET
     rows["method_id"] = rows["method_key"].astype(str)
     rows["display_method"] = [
         display_name(method_id, original_name, nicknames)
@@ -355,9 +386,9 @@ def _configure_oasis_plot_module(
     import plot_first10_first20_alpha5_saved_baselines as oasis_plot  # type: ignore
 
     if OASIS_INCLUDE_DIRECTCP842:
-        import plot_first10_first20_alpha5_saved_baselines_plus_directcp842 as oasis_plus  # type: ignore
+        import plot_first10_first20_alpha5_saved_baselines_plus_directcp842_lr1e3 as oasis_plus  # type: ignore
 
-        oasis_plus.configure_plot_module()
+        oasis_plus.configure_plot_module(1e-3)
 
     oasis_plot.ACCURACY_METRICS = list(OASIS_ACCURACY_METRICS)
     oasis_plot.REGULARITY_METRICS = list(OASIS_REGULARITY_METRICS)
@@ -680,6 +711,285 @@ def generate_lung_plots(
     return paths
 
 
+def _patch_oasis_composite_ellipse(oasis_plot: Any, alpha: float) -> None:
+    def add_ellipse(ax: plt.Axes, row: Mapping[str, Any], x: float, y: float, reg_key: str, acc_key: str, color: str) -> None:
+        x_std = max(oasis_plot.as_float(row.get(oasis_plot.metric_std(reg_key))), 0.0)
+        y_std = max(oasis_plot.as_float(row.get(oasis_plot.metric_std(acc_key))), 0.0)
+        if not math.isfinite(x_std) or not math.isfinite(y_std) or (x_std <= 0 and y_std <= 0):
+            return
+        ax.add_patch(
+            Ellipse(
+                (x, y),
+                width=2.0 * x_std,
+                height=2.0 * y_std,
+                facecolor=color,
+                edgecolor=color,
+                linewidth=0.9,
+                alpha=alpha,
+                zorder=1,
+            )
+        )
+
+    oasis_plot.add_ellipse = add_ellipse
+
+
+def _apply_composite_axis_style(ax: plt.Axes) -> None:
+    ax.tick_params(axis="both", labelsize=COMPOSITE_STYLE["tick_label_fontsize"])
+    ax.xaxis.label.set_size(COMPOSITE_STYLE["axis_label_fontsize"])
+    ax.yaxis.label.set_size(COMPOSITE_STYLE["axis_label_fontsize"])
+    ax.grid(True, alpha=COMPOSITE_STYLE["grid_alpha"])
+
+
+def _normalize_composite_legend(ax: plt.Axes, *, ncol: int) -> None:
+    handles, labels = ax.get_legend_handles_labels()
+    legend = ax.get_legend()
+    if legend is not None:
+        legend.remove()
+    seen = set()
+    unique_handles = []
+    unique_labels = []
+    for handle, label in zip(handles, labels):
+        if label in seen:
+            continue
+        seen.add(label)
+        unique_handles.append(handle)
+        unique_labels.append(label)
+    ax.legend(
+        unique_handles,
+        unique_labels,
+        loc="best",
+        ncol=ncol,
+        fontsize=COMPOSITE_STYLE["legend_fontsize"],
+        frameon=COMPOSITE_STYLE["legend_frame"],
+    )
+
+
+def _draw_composite_oasis_panel(
+    ax: plt.Axes,
+    oasis_plot: Any,
+    oasis: pd.DataFrame,
+    *,
+    title: str,
+    acc_key: str,
+    annotate: bool,
+) -> None:
+    oasis_plot.REGULARITY_METRICS = [("log_jdet_std_fg", "SDlogJ")]
+    _patch_oasis_composite_ellipse(oasis_plot, float(COMPOSITE_STYLE["ellipse_alpha"]))
+    oasis_plot.draw_panel(
+        ax,
+        oasis.to_dict("records"),
+        acc_key=acc_key,
+        reg_key="log_jdet_std_fg",
+        style="ellipses",
+        show_legend=True,
+        annotate=annotate,
+    )
+    ax.set_title(title, fontsize=COMPOSITE_STYLE["title_fontsize"])
+    _apply_composite_axis_style(ax)
+    _normalize_composite_legend(ax, ncol=2)
+
+
+def _draw_composite_lung_panel(
+    ax: plt.Axes,
+    lung_subset: pd.DataFrame,
+    *,
+    title: str,
+    acc_key: str,
+    acc_label: str,
+    acc_higher_is_better: bool,
+    reg_key: str,
+    reg_label: str,
+    nicknames: dict[str, dict[str, str]],
+    annotate: bool,
+) -> None:
+    x_col = _metric_mean(reg_key)
+    y_col = _metric_mean(acc_key)
+    x_std_col = _metric_std(reg_key)
+    y_std_col = _metric_std(acc_key)
+    for method in LUNGCT_PLOT_METHOD_ORDER:
+        method_rows = lung_subset[lung_subset["method_id"].astype(str) == method].copy()
+        if method_rows.empty:
+            continue
+        method_rows = _finite_pair_rows(method_rows, x_col, y_col)
+        if method_rows.empty:
+            continue
+        color = LUNGCT_METHOD_COLORS.get(method, "#444444")
+        marker = LUNGCT_METHOD_MARKERS.get(method, "o")
+        xs = method_rows[x_col].to_numpy(dtype=float)
+        ys = method_rows[y_col].to_numpy(dtype=float)
+        if method != "ptvreg_reference" and len(xs) > 1:
+            ax.plot(xs, ys, color=color, linewidth=COMPOSITE_STYLE["line_width"], alpha=0.75, zorder=2)
+        for _, row in method_rows.iterrows():
+            x = safe_float(row[x_col])
+            y = safe_float(row[y_col])
+            xe = max(safe_float(row.get(x_std_col)), 0.0)
+            ye = max(safe_float(row.get(y_std_col)), 0.0)
+            if math.isfinite(xe) and math.isfinite(ye) and (xe > 0 or ye > 0):
+                ax.add_patch(
+                    Ellipse(
+                        (x, y),
+                        width=2.0 * xe,
+                        height=2.0 * ye,
+                        facecolor=color,
+                        edgecolor=color,
+                        alpha=COMPOSITE_STYLE["lung_ellipse_alpha"],
+                        linewidth=1.0,
+                        zorder=1,
+                    )
+                )
+        size = COMPOSITE_STYLE["ptvreg_marker_size"] if method == "ptvreg_reference" else COMPOSITE_STYLE["lung_marker_size"]
+        ax.scatter(
+            xs,
+            ys,
+            s=size,
+            color=color,
+            marker=marker,
+            edgecolor="white",
+            linewidth=0.7,
+            label=_lung_display_label(method, nicknames),
+            zorder=3,
+        )
+        if annotate:
+            for _, row in method_rows.iterrows():
+                x = safe_float(row[x_col])
+                y = safe_float(row[y_col])
+                if math.isfinite(x) and math.isfinite(y):
+                    ax.annotate(
+                        _annotation_text(row),
+                        (x, y),
+                        xytext=(4, 4),
+                        textcoords="offset points",
+                        fontsize=max(COMPOSITE_STYLE["legend_fontsize"] - 2, 6),
+                        color=color,
+                    )
+    ax.set_xlabel(reg_label)
+    ax.set_ylabel(acc_label)
+    ax.set_title(title, fontsize=COMPOSITE_STYLE["title_fontsize"])
+    if acc_higher_is_better:
+        ax.invert_yaxis()
+    ax.autoscale_view()
+    _apply_composite_axis_style(ax)
+    _normalize_composite_legend(ax, ncol=1)
+
+
+def generate_four_panel_composite(
+    output_dir: Path,
+    oasis: pd.DataFrame,
+    lung: pd.DataFrame,
+    nicknames: dict[str, dict[str, str]],
+) -> list[Path]:
+    composite_dir = output_dir / COMPOSITE_DIRNAME
+    if composite_dir.exists():
+        shutil.rmtree(composite_dir)
+    composite_dir.mkdir(parents=True, exist_ok=True)
+    lung_subset = lung.loc[[not _should_exclude_lung(row) for _, row in lung.iterrows()]].copy()
+    panels = [
+        {
+            "dataset": "oasis",
+            "title": f"Dice vs SDlogJ (OASIS N={OASIS_PANEL_N})",
+            "acc_key": "dice_mean",
+            "reg_key": "log_jdet_std_fg",
+            "style": "ellipses",
+            "legend": {"show": True, "loc": "best", "ncol": 2},
+        },
+        {
+            "dataset": "oasis",
+            "title": f"HD95 vs SDlogJ (OASIS N={OASIS_PANEL_N})",
+            "acc_key": "hd95_mean",
+            "reg_key": "log_jdet_std_fg",
+            "style": "ellipses",
+            "legend": {"show": True, "loc": "best", "ncol": 2},
+        },
+        {
+            "dataset": "lungct",
+            "title": "TRE vs SDlogJ (4DCT N=10)",
+            "acc_key": "original_snap_tre_mean_mm",
+            "acc_label": "TRE (mm)",
+            "acc_higher_is_better": False,
+            "reg_key": "fg_logj_std",
+            "reg_label": "Foreground SDlogJ",
+            "legend": {"show": True, "loc": "best", "ncol": 1},
+        },
+        {
+            "dataset": "lungct",
+            "title": "TRE vs bending energy (4DCT N=10)",
+            "acc_key": "original_snap_tre_mean_mm",
+            "acc_label": "TRE (mm)",
+            "acc_higher_is_better": False,
+            "reg_key": "fg_bending_energy",
+            "reg_label": "Foreground bending energy",
+            "legend": {"show": True, "loc": "best", "ncol": 1},
+        },
+    ]
+    saved_outputs: list[Path] = []
+    for _mode_name, mode in COMPOSITE_OUTPUTS.items():
+        fig, axes = plt.subplots(2, 2, figsize=COMPOSITE_STYLE["figsize"], squeeze=False)
+        oasis_plot = _configure_oasis_plot_module(nicknames, annotate=bool(mode["annotate"]))
+        for ax, panel in zip(axes.ravel(), panels):
+            if panel["dataset"] == "oasis":
+                _draw_composite_oasis_panel(
+                    ax,
+                    oasis_plot,
+                    oasis,
+                    title=str(panel["title"]),
+                    acc_key=str(panel["acc_key"]),
+                    annotate=bool(mode["annotate"]),
+                )
+            else:
+                _draw_composite_lung_panel(
+                    ax,
+                    lung_subset,
+                    title=str(panel["title"]),
+                    acc_key=str(panel["acc_key"]),
+                    acc_label=str(panel["acc_label"]),
+                    acc_higher_is_better=bool(panel["acc_higher_is_better"]),
+                    reg_key=str(panel["reg_key"]),
+                    reg_label=str(panel["reg_label"]),
+                    nicknames=nicknames,
+                    annotate=bool(mode["annotate"]),
+                )
+        fig.subplots_adjust(wspace=COMPOSITE_STYLE["wspace"], hspace=COMPOSITE_STYLE["hspace"])
+        output_path = composite_dir / str(mode["filename"])
+        fig.savefig(output_path, dpi=COMPOSITE_STYLE["dpi"], bbox_inches="tight")
+        plt.close(fig)
+        saved_outputs.append(output_path)
+    manifest = {
+        "artifact": "pareto_four_panel_composite",
+        "source_version": f"{standard_version_for_manifest(output_dir)}",
+        "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "source_files": {
+            OASIS_DATASET: repo_relative(output_dir / OASIS_SOURCE_ROWS_FILENAME),
+            "lungct10": repo_relative(output_dir / "lungct10_pareto_source_rows.csv"),
+            "method_nicknames": "experiments/paper_artifacts/method_nicknames.csv",
+        },
+        "outputs": [repo_relative(path) for path in saved_outputs],
+        "output_formats": list(OUTPUT_FORMATS),
+        "annotation_modes": {
+            name: {"annotate": bool(spec["annotate"]), "filename": spec["filename"]}
+            for name, spec in COMPOSITE_OUTPUTS.items()
+        },
+        "panels": panels,
+        "style": COMPOSITE_STYLE,
+        "label_conventions": {
+            "logj_label_style": "compact",
+            "logj_label": "SDlogJ",
+            "lungct_y_label": "TRE (mm)",
+        },
+        "lungct_exclusion_rule": {
+            "exclude_by_ratio": LUNGCT_EXCLUDE_BY_RATIO,
+            "exclude_by_weight": LUNGCT_EXCLUDE_BY_WEIGHT,
+        },
+    }
+    (composite_dir / "pareto_four_panel_composite_manifest.json").write_text(
+        json.dumps(sanitize_public_value(manifest), indent=2) + "\n"
+    )
+    return saved_outputs
+
+
+def standard_version_for_manifest(output_dir: Path) -> str:
+    return output_dir.name
+
+
 def write_selected_hypervariants(output_dir: Path, standard: Mapping[str, Any]) -> None:
     records = selected_hypervariant_records("pareto_figure", standard)
     summary_rows = [
@@ -711,13 +1021,15 @@ def write_manifest(
     oasis_paper_paths: Sequence[Path],
     lung_paths: Sequence[Path],
     lung_paper_paths: Sequence[Path],
+    composite_paths: Sequence[Path],
 ) -> None:
     records = selected_hypervariant_records("pareto_figure", standard)
     outputs = {
-        "oasis20_annotated": _relative_paths(oasis_paths, output_dir),
-        "oasis20_paper_no_annotations": _relative_paths(oasis_paper_paths, output_dir),
+        f"{OASIS_DATASET}_annotated": _relative_paths(oasis_paths, output_dir),
+        f"{OASIS_DATASET}_paper_no_annotations": _relative_paths(oasis_paper_paths, output_dir),
         "lungct10_annotated": _relative_paths(lung_paths, output_dir),
         "lungct10_paper_no_annotations": _relative_paths(lung_paper_paths, output_dir),
+        "four_panel_composite": _relative_paths(composite_paths, output_dir),
     }
     manifest = {
         "artifact": "pareto_figure",
@@ -727,19 +1039,20 @@ def write_manifest(
         "nickname_path": nickname_path,
         "output_formats": list(OUTPUT_FORMATS),
         "source_files": {
-            "oasis20": repo_relative(_oasis_source(standard)),
+            OASIS_DATASET: repo_relative(_oasis_source(standard)),
             "lungct10_mean_rows": repo_relative(LUNG_MEAN_SOURCE),
             "lungct10_single_stage_rows": repo_relative(LUNG_NO_SWEEP_SOURCE),
         },
         "plot_counts": {
-            "oasis20_annotated_png": len(oasis_paths),
-            "oasis20_paper_no_annotations_png": len(oasis_paper_paths),
+            f"{OASIS_DATASET}_annotated_png": len(oasis_paths),
+            f"{OASIS_DATASET}_paper_no_annotations_png": len(oasis_paper_paths),
             "lungct10_annotated_png": len(lung_paths),
             "lungct10_paper_no_annotations_png": len(lung_paper_paths),
-            "total_png": len(oasis_paths) + len(oasis_paper_paths) + len(lung_paths) + len(lung_paper_paths),
+            "four_panel_composite_png": len(composite_paths),
+            "total_png": len(oasis_paths) + len(oasis_paper_paths) + len(lung_paths) + len(lung_paper_paths) + len(composite_paths),
         },
         "metric_pair_coverage": {
-            "oasis20": {
+            OASIS_DATASET: {
                 "accuracy_metrics": [item[0] for item in OASIS_ACCURACY_METRICS],
                 "regularity_metrics": [item[0] for item in OASIS_REGULARITY_METRICS],
                 "styles": list(OASIS_STYLES),
@@ -764,7 +1077,7 @@ def write_manifest(
             "lungct10_markers": LUNGCT_METHOD_MARKERS,
         },
         "font_sizes": {
-            "oasis20": {
+            OASIS_DATASET: {
                 "tick_labels": OASIS_TICK_LABEL_SIZE,
                 "axis_labels": OASIS_AXIS_LABEL_SIZE,
                 "legend": OASIS_LEGEND_FONT_SIZE,
@@ -792,6 +1105,7 @@ def write_review_report(
     oasis_paper_paths: Sequence[Path],
     lung_paths: Sequence[Path],
     lung_paper_paths: Sequence[Path],
+    composite_paths: Sequence[Path],
 ) -> None:
     lines = [
         f"# Pareto Figure {version} Plot Package",
@@ -801,6 +1115,7 @@ def write_review_report(
         f"- OASIS paper no-annotation PNGs: `{len(oasis_paper_paths)}`",
         f"- LungCT annotated PNGs: `{len(lung_paths)}`",
         f"- LungCT paper no-annotation PNGs: `{len(lung_paper_paths)}`",
+        f"- Four-panel composite PNGs: `{len(composite_paths)}`",
         f"- OASIS DirectCP 8-4-2 included: `{OASIS_INCLUDE_DIRECTCP842}`",
         f"- LungCT subset: `{LUNGCT_SUBSET_NAME}`",
         f"- LungCT plotted methods: `{LUNGCT_PLOT_METHOD_ORDER}`",
@@ -821,6 +1136,7 @@ def write_review_report(
         f"- `{OASIS_PAPER_NO_ANNOTATIONS_DIRNAME}/big_plots/`: OASIS contact sheets and spotlight plots without alpha/reference text annotations.",
         f"- `{LUNGCT_ANNOTATED_DIRNAME}/{LUNGCT_SUBSET_NAME}/`: annotated original snap TRE against each LungCT regularity metric.",
         f"- `{LUNGCT_PAPER_NO_ANNOTATIONS_DIRNAME}/{LUNGCT_SUBSET_NAME}/`: original snap TRE plots without ratio/pTVReg text annotations.",
+        f"- `{COMPOSITE_DIRNAME}/`: combined OASIS100/LungCT paper panels.",
         "",
     ]
     (output_dir / "review_report.md").write_text("\n".join(lines))
@@ -843,7 +1159,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     standard_records = selected_hypervariant_records("pareto_figure", standard)
     oasis = load_oasis_rows(nicknames, standard_records, standard)
     lung = load_lung_rows(nicknames, standard_records)
-    _sanitize_dataframe(oasis).to_csv(output_dir / "oasis20_pareto_source_rows.csv", index=False)
+    _sanitize_dataframe(oasis).to_csv(output_dir / OASIS_SOURCE_ROWS_FILENAME, index=False)
     _sanitize_dataframe(lung).to_csv(output_dir / "lungct10_pareto_source_rows.csv", index=False)
 
     oasis_paths = generate_oasis_plots(
@@ -874,6 +1190,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         dirname=LUNGCT_PAPER_NO_ANNOTATIONS_DIRNAME,
         annotate=False,
     )
+    composite_paths = generate_four_panel_composite(output_dir, oasis, lung, nicknames)
 
     validation_rows = validate_lr_records(standard_records, artifact="pareto_figure", standard=standard)
     validation_rows = [sanitize_public_value(row) for row in validation_rows]
@@ -894,6 +1211,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         oasis_paper_paths=oasis_paper_paths,
         lung_paths=lung_paths,
         lung_paper_paths=lung_paper_paths,
+        composite_paths=composite_paths,
     )
     write_review_report(
         output_dir,
@@ -903,12 +1221,14 @@ def main(argv: Sequence[str] | None = None) -> None:
         oasis_paper_paths=oasis_paper_paths,
         lung_paths=lung_paths,
         lung_paper_paths=lung_paper_paths,
+        composite_paths=composite_paths,
     )
     print(
         f"wrote {repo_relative(output_dir)} "
         f"({len(oasis_paths)} OASIS annotated PNGs, "
         f"{len(oasis_paper_paths)} OASIS paper PNGs, "
-        f"{len(lung_paths)} LungCT annotated PNGs, {len(lung_paper_paths)} LungCT paper PNGs)"
+        f"{len(lung_paths)} LungCT annotated PNGs, {len(lung_paper_paths)} LungCT paper PNGs, "
+        f"{len(composite_paths)} composite PNGs)"
     )
 
 

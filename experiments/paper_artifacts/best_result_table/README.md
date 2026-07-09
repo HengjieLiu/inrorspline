@@ -3,7 +3,15 @@
 Each versioned subfolder contains generated final-paper best-result tables,
 selected-row manifests, and LR validation reports.
 
-Current version: `v001`.
+Automatic-selection versions: `v001`, `v002_candidate`.
+
+Publication-formatted tables: `v002_publication`.
+
+Rebuild the publication tables with:
+
+```bash
+python experiments/paper_artifacts/best_result_table/build_publication_tables.py
+```
 
 Display names come from `../method_nicknames.csv`. OASIS rows use compact model
 names with explicit control spacing, for example `INR-BSCP (cps4)` and
