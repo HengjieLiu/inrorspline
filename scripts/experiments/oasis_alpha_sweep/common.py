@@ -1401,13 +1401,21 @@ def regularity_metrics(
     return reg, be_rows, diffusion_rows
 
 
-def dice_per_label(warped_seg: torch.Tensor, fixed_seg: torch.Tensor) -> List[float]:
+def dice_per_label(
+    warped_seg: torch.Tensor,
+    fixed_seg: torch.Tensor,
+    moving_seg: torch.Tensor | None = None,
+) -> List[float]:
     warped_np = warped_seg.detach().cpu().numpy()
     fixed_np = fixed_seg.detach().cpu().numpy()
+    moving_np = None if moving_seg is None else moving_seg.detach().cpu().numpy()
     out: List[float] = []
     for label in OASIS_LABELS:
         pred = warped_np == label
         true = fixed_np == label
+        if moving_np is not None and not ((moving_np == label).any() and pred.any() and true.any()):
+            out.append(float("nan"))
+            continue
         denom = int(pred.sum()) + int(true.sum())
         out.append(float((2.0 * np.logical_and(pred, true).sum()) / (denom + 1e-5)))
     return out
@@ -1498,7 +1506,7 @@ def evaluate_from_dense_coords(
     assert isinstance(fixed_seg, torch.Tensor)
     warped = warp_full(moving, dense_coords, mode="bilinear")
     warped_seg = warp_full(moving_seg, dense_coords, mode="nearest")
-    dice = dice_per_label(warped_seg, fixed_seg)
+    dice = dice_per_label(warped_seg, fixed_seg, moving_seg)
     surface = surface_metrics_per_label(warped_seg, fixed_seg, moving_seg)
     metrics: Dict[str, object] = {
         "image_loss": float(ncc_loss(fixed[None, None], warped[None, None]).detach().cpu()),

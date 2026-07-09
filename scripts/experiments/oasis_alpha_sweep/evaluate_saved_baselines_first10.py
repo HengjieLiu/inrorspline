@@ -117,6 +117,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", choices=["cuda", "cpu"], default="cuda")
     parser.add_argument("--out-root", type=Path, default=DEFAULT_OUT_ROOT)
     parser.add_argument("--review-root", type=Path, default=DEFAULT_REVIEW_ROOT)
+    parser.add_argument("--variant", type=str, default=VARIANT)
     parser.add_argument("--dl-root", type=Path, default=DEFAULT_DL_ROOT)
     parser.add_argument("--greedy-root", type=Path, default=DEFAULT_GREEDY_ROOT)
     parser.add_argument("--oasis-root", type=Path, default=c.DEFAULT_OASIS_ROOT)
@@ -124,6 +125,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--skip-aggregate", action="store_true")
+    parser.add_argument("--no-manifest", action="store_true")
+    parser.add_argument("--no-evaluation-summary", action="store_true")
     return parser.parse_args()
 
 
@@ -299,7 +302,7 @@ def evaluate_job(args: argparse.Namespace, job: Job, device: torch.device) -> No
     summary: Dict[str, object] = {
         "run_name": run_name(job),
         "run_dir": str(out_dir),
-        "variant": VARIANT,
+        "variant": str(args.variant),
         "method": job.method_key,
         "method_key": job.method_key,
         "method_label": job.method_label,
@@ -392,7 +395,7 @@ def write_manifest(args: argparse.Namespace, jobs: Sequence[Job]) -> None:
         args.out_root / "job_manifest.json",
         {
             "created_at": c.now_text(),
-            "variant": VARIANT,
+            "variant": str(args.variant),
             "job_count": len(rows),
             "case_ranks": parse_case_ranks(str(args.case_ranks)),
             "methods": [spec.method_key for spec in selected_specs(str(args.methods))],
@@ -437,7 +440,8 @@ def aggregate(args: argparse.Namespace) -> None:
 def main() -> None:
     args = parse_args()
     jobs = build_jobs(args)
-    write_manifest(args, jobs)
+    if not args.no_manifest:
+        write_manifest(args, jobs)
     preflight(jobs)
     print(
         json.dumps(
@@ -468,15 +472,16 @@ def main() -> None:
         except Exception as exc:
             failures.append({"job": asdict(job), "error": repr(exc)})
             raise
-    c.write_json(
-        args.out_root / "evaluation_summary.json",
-        {
-            "completed_at": c.now_text(),
-            "job_count": len(jobs),
-            "failures": failures,
-            "elapsed_sec": time.time() - started,
-        },
-    )
+    if not args.no_evaluation_summary:
+        c.write_json(
+            args.out_root / "evaluation_summary.json",
+            {
+                "completed_at": c.now_text(),
+                "job_count": len(jobs),
+                "failures": failures,
+                "elapsed_sec": time.time() - started,
+            },
+        )
     if not args.skip_aggregate:
         aggregate(args)
 
