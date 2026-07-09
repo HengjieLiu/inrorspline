@@ -1,8 +1,8 @@
 method_id,original_name,nickname,method_family,notes
 IDIR,IDIR,INR-Dense,idir,Field-fit display name
-SINR cps2,SINR cps2,SINR cps2,sinr,Compact display name
+SINR cps2,SINR cps2,INR-BSCP,sinr,Panel A/B final-cps matched display alias
 SINR cps4,SINR cps4,INR-BSCP,sinr,Compact display name
-DirectCP cps2,DirectCP cps2,DirectCP cps2,directcp,Compact display name
+DirectCP cps2,DirectCP cps2,D-BSCP,directcp,Panel A/B final-cps matched display alias
 DirectCP cps4,DirectCP cps4,D-BSCP,directcp,Compact display name
 DirectCP 4stage cps4,DirectCP 4stage cps4,MR-D-BSCP,directcp_multistage,Field-fit display name
 DirectCP 8-4-2,DirectCP 8-4-2,MR-D-BSCP,directcp_multistage,OASIS multistage display name
@@ -29,3 +29,5 @@ direct_cp_cps4_global_ncc_fd_be,DirectCP cps4 global-NCC+FD-BE,DirectCP cps4 glo
 direct_cp_32_16_8_4_ptv_lcc_isotv,DirectCP 4stage pTV-LCC+isoTV,MR-D-BSCP (pTVReg loss),directcp_multistage,LungCT table/Pareto method id
 direct_cp_32_16_8_4_global_ncc_fd_be,DirectCP 4stage global-NCC+FD-BE,MR-D-BSCP (IDIR loss),directcp_multistage,LungCT table/Pareto method id
 ptvreg_reference,pTVReg,pTVReg (pTVReg loss),reference,LungCT protocol reference
+panelA_sinr_cps2,SINR cps2,INR-BSCP,sinr,Generic Panel A legend label for OASIS final-cps matched run
+panelA_direct_cp_cps2,DirectCP cps2,D-BSCP,directcp,Generic Panel A legend label for OASIS final-cps matched run

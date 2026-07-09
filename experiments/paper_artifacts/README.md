@@ -12,6 +12,8 @@ names, hyperparameter-variant selection, and versioned review artifacts.
 - `best_result_table/v001/`: standardized best-result table outputs.
 - `pareto_figure/v001/`: standardized Pareto figure outputs.
 - `fitting_figure/v001/`: standardized field-fit rRMSE figure outputs.
+- `motion_pattern_figure/v001/`: standardized coronal fixed/moving/deformed/grid
+  motion-pattern panels for reference fields.
 
 ## Current LR Standard
 
@@ -19,6 +21,21 @@ names, hyperparameter-variant selection, and versioned review artifacts.
 - SINR: `1e-4`
 - DirectCP: `1e-3`
 - DirectCP multistage: `1e-3`
+
+## Final-Control-Spacing Standard
+
+For the merged Panel A/B fitting figure, compare single-stage spline methods at
+the same final control spacing as the multiresolution DirectCP curve whenever
+the data are available. For OASIS, `MR-D-BSCP` uses the `8-4-2` schedule and
+therefore ends at `cps2`; the matched Panel A/B comparison uses OASIS
+`INR-BSCP`/`D-BSCP` cps2 curves. For LungCT, `MR-D-BSCP` uses the
+`32-16-8-4` schedule and ends at `cps4`; the existing LungCT
+`INR-BSCP`/`D-BSCP` cps4 curves are already final-spacing matched.
+
+For OASIS Pareto figures and best-result tables, cps2 is the matched main
+comparison against `MR-D-BSCP (8-4-2)`. cps4 rows may remain as
+spacing-ablation or supplemental context, but should be labeled with explicit
+`(cps4)` suffixes.
 
 The current OASIS DirectCP 8-4-2 row remains a documented v001 exception at
 `lr=1e-2` because the canonical `lr=1e-3` rerun is not yet available. Replace

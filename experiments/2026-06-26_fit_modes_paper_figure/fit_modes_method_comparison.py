@@ -36,6 +36,19 @@ LUNG01_REVIEW = REVIEW_ROOT.parent / "2026-06-26_lungct_case01_ptvreg_fit_modes_
 LUNG08_REVIEW = REVIEW_ROOT.parent / "2026-06-26_lungct_case08_ptvreg_fit_modes_lr_sweep"
 IDIR_EVAL_ROOT = Path("/database/inrorspline/runs/fit_modes_paper_curves_idir_eval_v1")
 PANELA_GLOBAL_NCC_ROOT = Path("/database/inrorspline/runs/fit_modes_panelA_global_ncc_v1")
+OASIS_CPS2_IMAGE_ROOTS = {
+    "sinr_cps2_be_bspline_analytic": (
+        Path("/database/inrorspline/runs/oasis_seed3_first10_alpha_sweep_be_2500e_v1")
+        / "sinr_cps2_be_bspline_analytic"
+        / "sinr_cps2_be_bspline_analytic_rank009_a1000_e2500_lr0p0001"
+    ),
+    "direct_cp_cps2_be_bspline_analytic": (
+        Path("/database/inrorspline/runs/oasis_seed3_first10_direct_cp_cps2_prelim_a100_1000_10000_v1")
+        / "direct_cp_cps2_be_bspline_analytic"
+        / "direct_cp_cps2_be_bspline_analytic_rank009_a1000_e2500_lr0p001"
+    ),
+}
+OASIS_CPS2_FIELD_FIT_ROOT = Path("/database/inrorspline/runs/oasis_rank009_final_cps2_field_fit_v1")
 OASIS_842_FIELD_FIT_ROOT = Path("/database/inrorspline/runs/fit_modes_oasis_directcp842_field_fit_v1")
 LUNG_4STAGE_FINEST_DIAG_ROOT = (
     Path("/database/inrorspline/runs/lungct_directcp4stage_lr0p01_finest_loss_diag_case01_case08_v1")
@@ -49,21 +62,27 @@ CASE_ORDER = ["OASIS rank-9", "LungCT case01", "LungCT case08"]
 PANELA_CASE_ORDER = CASE_ORDER
 PANELA_PLOT_METHOD_ORDER = [
     "panelA_idir",
+    "panelA_sinr_cps2",
     "panelA_sinr_cps4",
+    "panelA_direct_cp_cps2",
     "panelA_direct_cp_cps4",
     "panelA_direct_cp_multistage",
 ]
 PANELA_STYLE_METHOD_BY_PLOT_ID = {
     "panelA_idir": "IDIR",
+    "panelA_sinr_cps2": "SINR cps2",
     "panelA_sinr_cps4": "SINR cps4",
+    "panelA_direct_cp_cps2": "DirectCP cps2",
     "panelA_direct_cp_cps4": "DirectCP cps4",
     "panelA_direct_cp_multistage": "DirectCP 4stage cps4",
 }
 PANELA_PLOT_ID_BY_SOURCE_METHOD = {
     "idir_original_dense_siren_be_autograd": "panelA_idir",
     "idir_be_default_lungmask": "panelA_idir",
+    "sinr_cps2_be_bspline_analytic": "panelA_sinr_cps2",
     "sinr_cps4_be_bspline_analytic": "panelA_sinr_cps4",
     "sinr_cps4_global_ncc_fd_be": "panelA_sinr_cps4",
+    "direct_cp_cps2_be_bspline_analytic": "panelA_direct_cp_cps2",
     "direct_cp_cps4_be_bspline_analytic": "panelA_direct_cp_cps4",
     "direct_cp_cps4_global_ncc_fd_be": "panelA_direct_cp_cps4",
     "direct_cp_8_4_2_be_bspline_analytic_multistage": "panelA_direct_cp_multistage",
@@ -73,21 +92,27 @@ RELATIVE_FIELD_CASE_ORDER = ["OASIS SITReg", "OASIS Greedy", "LungCT case01", "L
 METHOD_ORDER = ["IDIR", "SINR cps4", "DirectCP cps4", "DirectCP 4stage cps4"]
 STANDARDIZED_FIELD_FIT_METHOD_ORDER = [
     "IDIR",
+    "SINR cps2",
     "SINR cps4",
+    "DirectCP cps2",
     "DirectCP cps4",
     "DirectCP 8-4-2",
     "DirectCP 4stage cps4",
 ]
 METHOD_STYLE = {
     "IDIR": {"color": "#2C7BB6", "linestyle": "-", "marker": None, "zorder": 5},
+    "SINR cps2": {"color": "#F28E2B", "linestyle": "-", "marker": None, "zorder": 4},
     "SINR cps4": {"color": "#F28E2B", "linestyle": "-", "marker": None, "zorder": 4},
+    "DirectCP cps2": {"color": "#D62728", "linestyle": "-", "marker": None, "zorder": 3},
     "DirectCP cps4": {"color": "#D62728", "linestyle": "-", "marker": None, "zorder": 3},
     "DirectCP 8-4-2": {"color": "#CC79A7", "linestyle": "-", "marker": None, "zorder": 2},
     "DirectCP 4stage cps4": {"color": "#CC79A7", "linestyle": "-", "marker": None, "zorder": 2},
 }
 LR_TRAJECTORY_METHOD_LRS = {
     "IDIR": [1e-3, 1e-4],
+    "SINR cps2": [1e-4],
     "SINR cps4": [1e-3, 1e-4],
+    "DirectCP cps2": [1e-3],
     "DirectCP cps4": [1e-2, 1e-3, 1e-4],
     "DirectCP 4stage cps4": [1e-2, 1e-3, 1e-4],
 }
@@ -834,6 +859,62 @@ def _append_oasis_directcp842_field_fit_curve(
     )
 
 
+def _oasis_cps2_field_fit_run_dir(case: str, method: str) -> Path:
+    method_key_by_method = {
+        "SINR cps2": "sinr_cps2_field_mse",
+        "DirectCP cps2": "direct_cp_cps2_field_mse",
+    }
+    lr_by_method = {
+        "SINR cps2": 1e-4,
+        "DirectCP cps2": 1e-3,
+    }
+    if method not in method_key_by_method:
+        raise ValueError(f"Unsupported OASIS cps2 field-fit method: {method}")
+    if case not in {"OASIS SITReg", "OASIS Greedy"}:
+        raise ValueError(f"Unsupported OASIS cps2 field-fit case: {case}")
+
+    method_key = method_key_by_method[method]
+    lr = lr_by_method[method]
+    prefix = "sitreg_field_fit" if case == "OASIS SITReg" else "greedy_field_fit"
+    return (
+        OASIS_CPS2_FIELD_FIT_ROOT
+        / method_key
+        / f"{prefix}_{method_key}_rank009_a1000_e2500_lr{_format_lr_tag(lr)}"
+    )
+
+
+def _append_oasis_cps2_field_fit_curve(
+    curves: list[Curve],
+    *,
+    case: str,
+    task: str,
+    y_label: str,
+    method: str,
+) -> None:
+    lr_by_method = {
+        "SINR cps2": 1e-4,
+        "DirectCP cps2": 1e-3,
+    }
+    run_dir = _oasis_cps2_field_fit_run_dir(case, method)
+    hist = _history_from_run_dir(run_dir)
+    curves.append(
+        _curve_from_dataframe(
+            hist,
+            case=case,
+            task=task,
+            method=method,
+            lr=lr_by_method[method],
+            y_col="field_mse_objective_normalized_grid",
+            y_label=y_label,
+            source=str(run_dir),
+            note=(
+                "Final-control-spacing matched OASIS cps2 field-fit add-on: "
+                "alpha 1000, canonical LR, masked normalized-grid MSE."
+            ),
+        )
+    )
+
+
 def _finest_field_mse_column(df: pd.DataFrame, source: str) -> str:
     for column in ["finest_data_loss", "finest_field_mse_objective_normalized_grid"]:
         if column in df.columns and df[column].notna().any():
@@ -897,6 +978,14 @@ def load_rrmse_lr_trajectory_curves() -> list[Curve]:
         task="SITReg field fit",
         y_label="SITReg field MSE",
     )
+    for method in ["SINR cps2", "DirectCP cps2"]:
+        _append_oasis_cps2_field_fit_curve(
+            curves,
+            case="OASIS SITReg",
+            task="SITReg field fit",
+            y_label="SITReg field MSE",
+            method=method,
+        )
     _append_oasis_directcp842_field_fit_curve(
         curves,
         case="OASIS SITReg",
@@ -911,6 +1000,14 @@ def load_rrmse_lr_trajectory_curves() -> list[Curve]:
         task="Greedy field fit",
         y_label="Greedy field MSE",
     )
+    for method in ["SINR cps2", "DirectCP cps2"]:
+        _append_oasis_cps2_field_fit_curve(
+            curves,
+            case="OASIS Greedy",
+            task="Greedy field fit",
+            y_label="Greedy field MSE",
+            method=method,
+        )
     _append_oasis_directcp842_field_fit_curve(
         curves,
         case="OASIS Greedy",
@@ -1654,19 +1751,12 @@ def _append_oasis_panelA_curves(curves: list[PanelACurve]) -> None:
         )
     )
 
-    history = pd.read_csv(OASIS_REVIEW / "loss_history_augmented.csv")
     for source_method_id, lr in [
-        ("sinr_cps4_be_bspline_analytic", 1e-4),
-        ("direct_cp_cps4_be_bspline_analytic", 1e-3),
+        ("sinr_cps2_be_bspline_analytic", 1e-4),
+        ("direct_cp_cps2_be_bspline_analytic", 1e-3),
     ]:
-        hist = history[
-            (history["objective_group"] == "image_registration")
-            & (history["method_key"] == source_method_id)
-            & np.isclose(history["lr"].astype(float), float(lr))
-            & np.isclose(history["alpha"].astype(float), 1000.0)
-        ].copy()
-        if hist.empty:
-            raise ValueError(f"Missing OASIS Panel A history for {source_method_id} lr={lr:g}")
+        history_path = OASIS_CPS2_IMAGE_ROOTS[source_method_id] / "history.csv"
+        hist = pd.read_csv(history_path)
         curves.append(
             _panelA_curve_from_dataframe(
                 hist,
@@ -1674,10 +1764,13 @@ def _append_oasis_panelA_curves(curves: list[PanelACurve]) -> None:
                 source_method_id=source_method_id,
                 lr=lr,
                 y_col="data_loss",
-                source=_source_from_history_subset(hist, str(OASIS_REVIEW / "loss_history_augmented.csv")),
+                source=str(history_path),
                 optimized_loss="full-image global NCC + analytic B-spline BE",
                 diagnostic_loss="full-image global NCC",
-                note="Existing OASIS lr-sweep history; plotted data loss is the optimized image term.",
+                note=(
+                    "Existing compatible OASIS cps2 image-registration history; "
+                    "plotted data loss is the optimized image term."
+                ),
             )
         )
 
@@ -2251,7 +2344,9 @@ def standardized_panelAB_selected_runs(
     panelA_method_order = {method: idx for idx, method in enumerate(PANELA_PLOT_METHOD_ORDER)}
     field_method_order = {
         "IDIR": 0,
+        "SINR cps2": 1,
         "SINR cps4": 1,
+        "DirectCP cps2": 2,
         "DirectCP cps4": 2,
         "DirectCP 8-4-2": 3,
         "DirectCP 4stage cps4": 3,
@@ -2324,7 +2419,9 @@ def standardized_panelAB_curve_summary(
     method_order = {
         **{method: idx for idx, method in enumerate(PANELA_PLOT_METHOD_ORDER)},
         "IDIR": 0,
+        "SINR cps2": 1,
         "SINR cps4": 1,
+        "DirectCP cps2": 2,
         "DirectCP cps4": 2,
         "DirectCP 8-4-2": 3,
         "DirectCP 4stage cps4": 3,

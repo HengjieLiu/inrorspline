@@ -30,7 +30,9 @@ from evaluate_saved_baselines_first10 import (  # noqa: E402
 
 METHODS = [
     "idir_original",
+    "sinr_cps2_be_bspline_analytic",
     "sinr_cps4_be_bspline_analytic",
+    "direct_cp_cps2_be_bspline_analytic",
     "direct_cp_cps4_be_bspline_analytic",
     "direct_cp_8_4_2_be_bspline_analytic_multistage",
 ]
@@ -80,8 +82,12 @@ def parse_args() -> argparse.Namespace:
 def field_method_key(method: str) -> str:
     if method == "idir_original":
         return "idir_original_dense_siren_field_mse"
+    if method == "sinr_cps2_be_bspline_analytic":
+        return "sinr_cps2_field_mse"
     if method == "sinr_cps4_be_bspline_analytic":
         return "sinr_cps4_field_mse"
+    if method == "direct_cp_cps2_be_bspline_analytic":
+        return "direct_cp_cps2_field_mse"
     if method == "direct_cp_cps4_be_bspline_analytic":
         return "direct_cp_cps4_field_mse"
     if method == "direct_cp_8_4_2_be_bspline_analytic_multistage":
@@ -92,8 +98,12 @@ def field_method_key(method: str) -> str:
 def field_method_label(method: str) -> str:
     if method == "idir_original":
         return "IDIR field MSE"
+    if method == "sinr_cps2_be_bspline_analytic":
+        return "SINR cps2 field MSE"
     if method == "sinr_cps4_be_bspline_analytic":
         return "SINR cps4 field MSE"
+    if method == "direct_cp_cps2_be_bspline_analytic":
+        return "DirectCP cps2 field MSE"
     if method == "direct_cp_cps4_be_bspline_analytic":
         return "DirectCP cps4 field MSE"
     if method == "direct_cp_8_4_2_be_bspline_analytic_multistage":

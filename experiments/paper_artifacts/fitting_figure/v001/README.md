@@ -37,3 +37,10 @@ To rebuild it with the Greedy target instead, edit
 `artifact_figure_options.fitting_figure.merged_panel_b_oasis_target` in
 `experiments/paper_artifacts/artifact_standard.json` from `OASIS SITReg` to
 `OASIS Greedy`, then rerun the generator above.
+
+For paper-layout customization, use
+`panelAB_composite/fit_modes_panelAB_composite.ipynb`. The notebook rebuilds
+the merged Panel A/B figure from the same standardized trajectories, displays
+the result inline, and exposes figure size, colors, font sizes, row titles,
+subplot titles, y-labels, inter-panel spacing, legend placement, and the OASIS
+Panel B target (`OASIS SITReg` or `OASIS Greedy`) in one configuration cell.
