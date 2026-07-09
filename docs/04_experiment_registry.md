@@ -41,6 +41,105 @@ Next decision:
 - Protocol tag: `repo_scaffold_no_experiments`.
 - Notes: no data, Docker, rsync, or package/test scaffold.
 
+### P2c: COPD DirectCP32 pTV-LCC + isoTV Sanity
+
+- Status: completed 2026-07-07 after COPD mask generation, pTV-prep, case `01`
+  smoke, all-GPU launch, and aggregation passed with `10/10` completed
+  summaries.
+- Purpose: generate the COPD replacement curve/row for the lower-right
+  TRE-vs-SDlogJ figure sanity check using
+  `MR-D-BSCP (pTVReg loss)`.
+- Dataset: COPD cases `01-10`, fixed `iBHCT`, moving `eBHCT`, direction
+  `eBHCT -> iBHCT`.
+- Preprocessing: pTV-style landmark crop, intensity clamp `[80,900] -> [0,1]`,
+  crop margin xyz `[10,10,5]`, 1mm target grid
+  `round(crop_shape_zyx * native_spacing_zyx)`, masks propagated for QA and
+  foreground regularity metrics only.
+- Method: `direct_cp_32_16_8_4_ptv_lcc_isotv`; stage full cps `32,16,8,4`;
+  downsample `8,4,2,1`; stage epochs `200,400,800,1000`; `lr=1e-3`;
+  `seed=1`; pTV LCC sigma `2.1mm`; isoTV weight `0.11`; `csqrt=5e-3`;
+  border mask `5`; save dense DVF.
+- Output root:
+  `/database/inrorspline/runs/copd_directcp32_ptvlcc_w0p11_sanity_v1`.
+- Review root:
+  `experiments/2026-07-07_copd_directcp32_ptvlcc_w0p11_sanity/`.
+- Launch environment: Docker container `py310sitreg_v1_test1`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1`; requested GPUs `0,1,2,3`.
+- Primary metrics: native-crop/original-domain snap-to-voxel TRE mean and
+  per-case TRE; diagnostic native subvoxel TRE, reg-1mm TREs, foreground
+  SDlogJ, folding percentage, BE, diffusion, runtime, and peak memory.
+- Actual headline result: native-crop/original snap TRE mean
+  `6.8486 +/- 5.4261 mm` across cases `01-10`; per-case TREs
+  `6.683, 5.304, 0.824, 16.298, 15.952, 9.044, 0.849, 5.070, 0.635, 7.825`.
+- Actual regularity result: mean foreground SDlogJ `0.6267`, mean
+  foreground `J<=0` percentage `4.7831`.
+- Known limitation: COPD official pTVReg best/fine-tuned settings are closer to
+  an `8 -> 4` refinement path; this run intentionally tests the 4DCT-selected
+  `32,16,8,4` workflow and `ptv_isotv_weight=0.11`.
+- Interpretation: the 4DCT-selected workflow is not robust on COPD as-is;
+  high-error cases `04`, `05`, `06`, and `10` motivate a COPD-tuned follow-up
+  before using this as a final figure curve.
+
+### P2d: COPD DirectCP64-32-16-8-4 pTV-LCC + isoTV Sanity
+
+- Status: completed 2026-07-07.
+- Purpose: test whether adding a coarser `64` stage improves the COPD failures
+  from P2c while keeping all other pTVReg-loss settings fixed.
+- Dataset: COPD cases `01-10`, fixed `iBHCT`, moving `eBHCT`, direction
+  `eBHCT -> iBHCT`, using the completed COPD pTV-prep root.
+- Method: `direct_cp_32_16_8_4_ptv_lcc_isotv` runner with custom stages;
+  stage full cps `64,32,16,8,4`; downsample `16,8,4,2,1`; stage epochs
+  `100,200,400,800,1000`; total epochs `2500`; `lr=1e-3`; `seed=1`;
+  pTV LCC sigma `2.1mm`; isoTV weight `0.11`; `csqrt=5e-3`; border mask `5`;
+  save dense DVF.
+- Output root:
+  `/database/inrorspline/runs/copd_directcp64_32_16_8_4_ptvlcc_w0p11_sanity_v1`.
+- Review root:
+  `experiments/2026-07-07_copd_directcp64_32_16_8_4_ptvlcc_w0p11_sanity/`.
+- Launch environment: Docker container `py310sitreg_v1_test1`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1`; requested GPUs `0,1,2,3`.
+- Primary metrics: native-crop/original-domain snap-to-voxel TRE mean and
+  per-case TRE; diagnostic native subvoxel TRE, reg-1mm TREs, foreground
+  SDlogJ, folding percentage, BE, diffusion, runtime, and peak memory.
+- Actual headline result: native-crop/original snap TRE mean
+  `2.5026 +/- 2.2543 mm` across cases `01-10`; per-case TREs
+  `1.303, 3.335, 0.823, 7.261, 5.873, 0.986, 0.849, 3.164, 0.639, 0.793`.
+- Actual regularity result: mean foreground SDlogJ `0.4778`, mean
+  foreground `J<=0` percentage `2.1468`.
+- Decision use: compared with P2c, the coarser `64` stage substantially reduces
+  the COPD failures while keeping total epochs fixed at `2500`; cases `04` and
+  `05` remain the hardest.
+
+### P2e: COPD DirectCP64-32-16-8-4 pTV-LCC + isoTV E400x4+900
+
+- Status: completed 2026-07-07.
+- Purpose: rerun P2d with the same total `2500` epochs but front-load more
+  optimization into the coarser stages using `400,400,400,400,900`.
+- Dataset: COPD cases `01-10`, fixed `iBHCT`, moving `eBHCT`, direction
+  `eBHCT -> iBHCT`, using the completed COPD pTV-prep root.
+- Method: `direct_cp_32_16_8_4_ptv_lcc_isotv` runner with custom stages;
+  stage full cps `64,32,16,8,4`; downsample `16,8,4,2,1`; stage epochs
+  `400,400,400,400,900`; total epochs `2500`; `lr=1e-3`; `seed=1`;
+  pTV LCC sigma `2.1mm`; isoTV weight `0.11`; `csqrt=5e-3`; border mask `5`;
+  save dense DVF.
+- Output root:
+  `/database/inrorspline/runs/copd_directcp64_32_16_8_4_ptvlcc_w0p11_e400x4_900_sanity_v1`.
+- Review root:
+  `experiments/2026-07-07_copd_directcp64_32_16_8_4_ptvlcc_w0p11_e400x4_900_sanity/`.
+- Launch environment: Docker container `py310sitreg_v1_test1`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1`; requested GPUs `0,1,2,3`.
+- Primary metrics: native-crop/original-domain snap-to-voxel TRE mean and
+  per-case TRE; diagnostic native subvoxel TRE, reg-1mm TREs, foreground
+  SDlogJ, folding percentage, BE, diffusion, runtime, and peak memory.
+- Actual headline result: native-crop/original snap TRE mean
+  `1.0505 +/- 0.7673 mm` across cases `01-10`; per-case TREs
+  `0.714, 3.348, 0.823, 0.732, 0.740, 0.851, 0.836, 0.820, 0.851, 0.789`.
+- Actual regularity result: mean foreground SDlogJ `0.4021`, mean
+  foreground `J<=0` percentage `0.7251`.
+- Decision use: compared with P2d, front-loading the same total epoch budget
+  improves mean TRE from `2.5026` to `1.0505 mm`; cases `04`, `05`, and `08`
+  are rescued, while case `02` remains the main outlier.
+
 ### P1: OASIS Seed-3 First10 Main Pareto
 
 - Status: completed; full launch started and completed 2026-06-25 on shenggpu9
@@ -243,6 +342,50 @@ Next decision:
   cps4 at lr `1e-2` with MSE `7.77649e-06`.
 - Next decision: inspect whether SITReg-field fitting changes the relative
   optimization behavior compared with Greedy-field fitting.
+
+### P1g2: OASIS Rank-9 Final-CPS Matched Panel A/B Field-Fit Add-On
+
+- Status: completed 2026-07-01; smoke `4/4` and full run `4/4` completed.
+- Owner/agent: Codex.
+- Date planned: 2026-07-01.
+- Server: current workstation/container host using default Docker container
+  `py310sitreg_v1_test1`.
+- GPU model/count: 4 x NVIDIA RTX 6000 Ada Generation visible in Docker.
+- Git commit: `0ceda03` at planning time, with local uncommitted artifact/code
+  changes for this add-on.
+- Branch: `gpu8`.
+- Docker image tag: `hengjieliu96/dl_dir:py310sitreg_v1`.
+- Purpose: switch OASIS Panel A/B fitting comparison from single-stage cps4 to
+  single-stage cps2 for final-control-spacing matching against OASIS
+  DirectCP `8-4-2`, while leaving LungCT cps4/`32-16-8-4` unchanged.
+- Dataset: OASIS BrainMR seed-3 shuffled rank `9`, original sorted index `88`,
+  fixed/moving `(0173,0136)`.
+- New methods/objectives: `sinr_cps2_be_bspline_analytic` and
+  `direct_cp_cps2_be_bspline_analytic` direct field fitting to both saved BS4
+  SITReg and canonical Greedy dense displacement targets.
+- Reused rows: compatible OASIS cps2 image-registration histories from the
+  first10/DirectCP-cps2 add-on roots, plus existing IDIR and DirectCP `8-4-2`
+  Panel A/B rows.
+- LR/alpha: SINR cps2 `lr=1e-4`, alpha `1000`; DirectCP cps2 `lr=1e-3`,
+  alpha `1000`.
+- Field-fit loss: masked normalized-grid target-field MSE over fixed raw
+  image-positive foreground, no regularizer.
+- Epochs/eval: `2500` epochs, eval interval `250`, seed `1`.
+- Output root:
+  `${DATA_ROOT}/runs/oasis_rank009_final_cps2_field_fit_v1`.
+- Review root:
+  `experiments/2026-07-01_oasis_panelAB_final_cps2_standardization/`.
+- Paper artifact output:
+  `experiments/paper_artifacts/fitting_figure/v002_candidate/`.
+- Standards preflight: OASIS raw image-positive foreground rule; final-control
+  spacing policy in `experiments/paper_artifacts/artifact_standard.json`.
+- Known limitations: single illustrative OASIS pair only; field-fit IDIR is not
+  rerun because the matching issue concerns spline final control spacing.
+- Next decision: compare v001 cps4-vs-v002 cps2 Panel A/B curves and decide
+  whether to promote v002 candidate.
+- Acceptance: all four new cps2 field-fit histories reached `2500` epochs with
+  finite final MSE values; v002 candidate and comparison artifacts were
+  generated under `experiments/paper_artifacts/`.
 
 ### P1h: OASIS Seed-3 First20 DirectCP 8-4-2 Alpha1000 Preliminary
 
@@ -1469,3 +1612,61 @@ Next decision:
   `matches_standard` rows plus `4` references; Pareto validation has `11`
   `matches_standard` rows; no `temporary_exception`, `mismatch`, or blocking
   LR issue remains in `v002_candidate`.
+
+### P12: OASIS Seed-3 First100 Paper-Figure Extension
+
+- Status: production launch started 2026-07-04 after Docker compile, dry-run,
+  and smoke verification passed; not yet marked complete.
+- Purpose: extend the OASIS seed-3 first20 publication-figure results to
+  first100 by reusing ranks `0-19` and running ranks `20-99`.
+- Dataset: OASIS BrainMR seed-3 shuffled ranks `0-99`; foreground regularity
+  metrics use `fixed raw image > 0`; segmentation is used only for Dice,
+  HD95, and ASD.
+- Common sweep settings: epochs `2500`, eval interval `250`, seed `1`.
+- Reference evaluation first: `bs1_vxm_v0_2`, `bs2_tm_v0`, `bs3_vfa_v0`,
+  `bs4_sitreg_v0`, and canonical `greedy` saved fields.
+- Sweep matrix:
+  - `direct_cp_8_4_2_be_bspline_analytic_multistage`, alpha
+    `0,10,100,1000,10000,100000`, lr `1e-3`, cps `8,4,2`, downsample
+    `4,2,1`, stage epochs `400,800,1300`.
+  - `direct_cp_cps2_be_bspline_analytic`, alpha
+    `0,10,100,1000,10000,100000`, lr `1e-3`.
+  - `sinr_cps2_be_bspline_analytic`, alpha
+    `0,10,100,1000,10000,100000`, lr `1e-4`.
+  - `idir_original_dense_siren_be_autograd`, alpha
+    `0,0.01,0.1,1,10,100`, lr `1e-4`.
+  - `direct_cp_cps4_be_bspline_analytic`, alpha
+    `0,10,100,1000,10000,100000`, lr `1e-3`.
+  - `sinr_cps4_be_bspline_analytic`, alpha
+    `0,10,100,1000,10000,100000`, lr `1e-4`.
+- New job count: `3280` jobs = `400` saved baseline/reference evaluations,
+  `480` MR-D-BSCP 8-4-2 jobs, and `2400` remaining single-stage sweep jobs.
+- Launch environment: Docker container `py310sitreg_v1_test1`; all visible
+  GPUs, one job per GPU by default.
+- Output roots:
+  - `/database/inrorspline/runs/oasis_seed3_ranks020_099_saved_baselines_v1`
+  - `/database/inrorspline/runs/oasis_seed3_ranks020_099_alpha_sweep_be_2500e_5models_v1`
+  - `/database/inrorspline/runs/oasis_seed3_ranks020_099_directcp842_lr1e3_alpha_sweep_v1`
+- Review root:
+  `experiments/2026-07-04_oasis_seed3_first100_extension/`.
+- Main progress log:
+  `experiments/2026-07-04_oasis_seed3_first100_extension/progress_log.md`.
+- Tracker figure:
+  `experiments/2026-07-04_oasis_seed3_first100_extension/tracker/oasis_first100_progress_tracker.png`.
+- Hourly watchdog:
+  `experiments/2026-07-04_oasis_seed3_first100_extension/hourly_watchdog.md`.
+- Final first100 paper plots:
+  `experiments/2026-07-04_oasis_seed3_first100_extension/first100_artifacts/oasis100/`.
+- Metric convention update: if fixed, moving, or warped voxels for an OASIS
+  label are absent, Dice/HD95/ASD are recorded as `NaN`; case/population means
+  use finite-only `nanmean`.
+- Implementation entry point:
+  `scripts/experiments/oasis_alpha_sweep/launch_oasis_first100_extension.py`.
+- Launch command:
+  `python scripts/experiments/oasis_alpha_sweep/launch_oasis_first100_extension.py --stage all --gpus auto --max-concurrent 0`.
+- Launch log:
+  `experiments/2026-07-04_oasis_seed3_first100_extension/launch_all_20260703_215334.log`.
+- Acceptance: planned method/rank/alpha/reference combinations report `DONE`,
+  failures are `0`, first100 aggregation has no missing or duplicate
+  combinations, final figures use only complete first100 rows, and the tracker
+  and progress log agree on counts.
