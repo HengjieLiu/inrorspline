@@ -1,0 +1,11 @@
+{
+  "artifact": "oasis20_vs_oasis100_complete_all_methods",
+  "generated_utc": "2026-07-06T14:11:51+00:00",
+  "paper_artifact_manifest": "experiments/paper_artifacts/pareto_figure/v002_candidate/oasis20_vs_oasis100_complete_all_methods/oasis20_vs_oasis100_complete_pareto_2x2_manifest.json",
+  "paper_artifact_output_dir": "experiments/paper_artifacts/pareto_figure/v002_candidate/oasis20_vs_oasis100_complete_all_methods",
+  "outputs": [
+    "experiments/paper_artifacts/pareto_figure/v002_candidate/oasis20_vs_oasis100_complete_all_methods/oasis20_vs_oasis100_complete_pareto_2x2_ellipses_no_annotations.png",
+    "experiments/paper_artifacts/pareto_figure/v002_candidate/oasis20_vs_oasis100_complete_all_methods/oasis20_vs_oasis100_complete_pareto_2x2_ellipses_annotated_review.png"
+  ],
+  "source_rows": "experiments/paper_artifacts/pareto_figure/v002_candidate/oasis20_vs_oasis100_complete_all_methods/oasis20_vs_oasis100_complete_source_rows.csv"
+}
