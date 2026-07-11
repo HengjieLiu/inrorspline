@@ -60,6 +60,13 @@ METHOD_SPECS = {
         "color": "#d62728",
     },
 }
+DIRECT_CP_CPS2_METHOD_SPEC = {
+    "label": "DirectCP cps2 lr1e-3",
+    "method": "direct_cp_cps2_be_bspline_analytic",
+    "lr": 1e-3,
+    "alphas": SPLINE_ALPHAS,
+    "color": "#ff7f0e",
+}
 
 ACCURACY_METRICS: List[Tuple[str, str, bool]] = [
     ("dice_mean", "Mean Dice", True),
@@ -134,9 +141,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-epochs", type=int, default=2500)
     parser.add_argument("--expected-eval-interval", type=int, default=250)
     parser.add_argument("--expected-seed", type=int, default=1)
+    parser.add_argument("--expected-variant", type=str, default="oasis_seed3_first10_alpha_sweep_be_2500e_v1")
+    parser.add_argument("--include-direct-cp-cps2", action="store_true")
     parser.add_argument("--allow-incomplete", action="store_true")
     parser.add_argument("--skip-history", action="store_true")
     return parser.parse_args()
+
+
+def configure_method_specs(args: argparse.Namespace) -> None:
+    global METHOD_SPECS
+    if args.include_direct_cp_cps2:
+        specs = dict(METHOD_SPECS)
+        specs["direct_cp_cps2_be_bspline_analytic"] = dict(DIRECT_CP_CPS2_METHOD_SPEC)
+        METHOD_SPECS = specs
 
 
 def parse_case_ranks(text: str) -> List[int]:
@@ -166,6 +183,8 @@ def case_ranks_short_label(case_ranks: Sequence[int]) -> str:
     ranks = [int(rank) for rank in case_ranks]
     if ranks == list(range(10)):
         return "first10"
+    if ranks == list(range(10, 20)):
+        return "next10"
     if ranks and ranks == list(range(ranks[0], ranks[-1] + 1)):
         return f"preliminary ranks {ranks[0]:03d}-{ranks[-1]:03d}"
     return "preliminary ranks " + ",".join(f"{rank:03d}" for rank in ranks)
@@ -175,6 +194,8 @@ def case_ranks_report_label(case_ranks: Sequence[int]) -> str:
     ranks = [int(rank) for rank in case_ranks]
     if ranks == list(range(10)):
         return "First10"
+    if ranks == list(range(10, 20)):
+        return "Next10"
     if ranks and ranks == list(range(ranks[0], ranks[-1] + 1)):
         return f"Preliminary Ranks {ranks[0]:03d}-{ranks[-1]:03d}"
     return "Preliminary Ranks " + ",".join(f"{rank:03d}" for rank in ranks)
@@ -228,6 +249,10 @@ def expected_combos(case_ranks: Sequence[int]) -> Dict[Tuple[int, str, str, str]
                     "lr": float(spec["lr"]),
                 }
     return expected
+
+
+def expected_run_count(case_ranks: Sequence[int]) -> int:
+    return int(len(case_ranks) * sum(len(spec["alphas"]) for spec in METHOD_SPECS.values()))  # type: ignore[arg-type]
 
 
 def collect_summaries(out_root: Path) -> List[Dict[str, object]]:
@@ -308,8 +333,8 @@ def check_expected(rows: Sequence[Dict[str, object]], args: argparse.Namespace) 
             errors.append(f"{run_name}: eval_interval {row.get('eval_interval')} != {args.expected_eval_interval}")
         if int(as_float(row.get("seed"))) != int(args.expected_seed):
             errors.append(f"{run_name}: seed {row.get('seed')} != {args.expected_seed}")
-        if str(row.get("variant")) != "oasis_seed3_first10_alpha_sweep_be_2500e_v1":
-            errors.append(f"{run_name}: variant {row.get('variant')} != oasis_seed3_first10_alpha_sweep_be_2500e_v1")
+        if str(row.get("variant")) != str(args.expected_variant):
+            errors.append(f"{run_name}: variant {row.get('variant')} != {args.expected_variant}")
         if str(row.get("grid_order")) != "pytorch":
             errors.append(f"{run_name}: grid_order {row.get('grid_order')} != pytorch")
         if str(row.get("foreground_metric_mask")) != "fixed_image_positive":
@@ -706,10 +731,10 @@ def write_report(
         f"- Generated: `{c.now_text()}`",
         f"- Large output root: `{out_root}`",
         f"- Review root: `{review_root}`",
-        f"- Expected runs: `{len(case_ranks) * 24}`",
+        f"- Expected runs: `{expected_run_count(case_ranks)}`",
         f"- Completed summaries: `{len(summary_rows)}`",
         f"- Case ranks: `{','.join(str(rank) for rank in case_ranks)}`",
-        "- Split: seed-3 shuffled `pair_test_200`; selected ranks are from the first10-after-shuffle protocol.",
+        "- Split: seed-3 shuffled `pair_test_200`; selected ranks follow the shuffled protocol order.",
         "- Population ARC convention: aggregate each method/alpha across cases first, then draw the Pareto/front curves.",
         "- Native analytic regularity: IDIR uses coordinate-autograd BE/diffusion; spline methods use B-spline analytic BE/diffusion.",
         "- Contact sheets plot native analytic BE/diffusion; spline-only analytic columns remain in CSV/JSON for audit.",
@@ -765,6 +790,7 @@ def write_csv_stream(path: Path, rows: Sequence[Dict[str, object]]) -> None:
 
 def main() -> None:
     args = parse_args()
+    configure_method_specs(args)
     case_ranks = parse_case_ranks(str(args.case_ranks))
     scope_label = case_ranks_short_label(case_ranks)
     summary_rows = filter_summaries_by_case_rank(collect_summaries(Path(args.out_root)), case_ranks)

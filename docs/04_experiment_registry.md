@@ -634,6 +634,55 @@ Next decision:
 - Known limitations: no OASIS DirectCP 4-stage runs are added; those panels are
   marked not run. The DirectCP 4-stage coarse-stage rRMSE curves are posthoc
   diagnostics and are not the loss used for backpropagation at coarse stages.
+### P1m: OASIS Seed-3 First10 DirectCP cps2 Six-Alpha Completion
+
+- Status: completed; completion launch ran 2026-06-25 15:18-15:41 Pacific
+  after a 2-epoch smoke passed, and full overlay aggregation completed
+  2026-06-25 15:43 Pacific.
+- Purpose: complete DirectCP cps2 from the preliminary alpha subset to the full
+  six-alpha spline grid without overwriting P1 or P1c review artifacts.
+- Dataset: OASIS BrainMR seed-3 shuffled ranks `0-9`, original sorted indices
+  `158,62,14,69,47,137,110,6,116,88`.
+- Method: DirectCP cps2 with cubic B-spline analytic BE/diffusion.
+- Completion grid: alpha `0,10,100000`; combine with P1c alpha
+  `100,1000,10000` for the full cps2 grid.
+- Fixed settings: 2500 epochs; seed `1`; eval interval `250`; lr `1e-3`.
+- Output root:
+  `/database/inrorspline/runs/oasis_seed3_first10_direct_cp_cps2_completion_a0_10_100000_v1`.
+- Full overlay review root:
+  `experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/direct_cp_cps2_full_overlay/`.
+- Launch environment: Docker container
+  `inrorspline_oasis_seed3_first10_run_20260625`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1_251008`; requested GPUs `1,2,3`.
+- Acceptance: completion root `30/30` with `failures=[]`, combined DirectCP
+  cps2 `60/60`, six alphas by ten ranks, full overlay report PASS.
+
+### P1n: OASIS Seed-3 Next10 Five-Model Alpha Sweep
+
+- Status: completed; dry-run and 30-job smoke passed on 2026-06-26, full
+  launch completed 2026-06-26 04:16 Pacific on shenggpu9 with aggregation PASS.
+- Purpose: extend the OASIS seed-3 BE alpha sweep to the next ten shuffled
+  ranks, with DirectCP cps2 included as a first-class fifth model.
+- Dataset: OASIS BrainMR seed-3 shuffled ranks `10-19`, original sorted
+  indices `130,100,118,67,79,56,142,199,36,12`.
+- Methods: IDIR original, SINR cps4, SINR cps2, DirectCP cps4, DirectCP cps2.
+- Grid: IDIR alpha `0,0.01,0.1,1,10,100`; spline alpha
+  `0,10,100,1000,10000,100000`; 2500 epochs; seed `1`; eval interval `250`.
+- LR: IDIR `1e-4`; SINR cps4/cps2 `1e-4`; DirectCP cps4/cps2 `1e-3`.
+- Regularizer: BE-trained sweep. IDIR uses coordinate-autograd analytic BE;
+  spline/DirectCP methods use cubic B-spline analytic BE.
+- Launch pattern: method phases run sequentially, starting with slower SINR
+  cps2, and each phase dynamically distributes its `10 x 6` case/alpha jobs
+  across four GPUs.
+- Expected jobs: `300`.
+- Output root:
+  `/database/inrorspline/runs/oasis_seed3_next10_alpha_sweep_be_2500e_5models_v1`.
+- Review root:
+  `experiments/2026-06-26_oasis_seed3_next10_alpha_sweep/`.
+- Launch environment: Docker image `hengjieliu96/dl_dir:py310sitreg_v1_251008`;
+  container `inrorspline_oasis_seed3_next10_run_20260626`.
+- Acceptance: `300/300` summaries, `300/300` `DONE` markers, `failures=[]`,
+  and review report PASS.
 
 ### P1a: OASIS Seed-3 Case-0 Alpha Pre-Run
 
