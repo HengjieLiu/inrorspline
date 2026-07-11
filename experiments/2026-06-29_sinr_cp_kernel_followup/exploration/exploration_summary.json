@@ -1,0 +1,12 @@
+{
+  "status": "completed",
+  "prior_rows": 16,
+  "schedule_rows": 10,
+  "standard_probe_rows": 4,
+  "refinement_probe_rows": 4,
+  "update_similarity_rows": 3,
+  "proxy_rows": 9,
+  "tables_dir": "/homebase/code_sync/inrorspline/experiments/2026-06-29_sinr_cp_kernel_followup/exploration/tables",
+  "plots_dir": "/homebase/code_sync/inrorspline/experiments/2026-06-29_sinr_cp_kernel_followup/exploration/plots",
+  "paper_section": "/homebase/code_sync/inrorspline/experiments/2026-06-29_sinr_cp_kernel_followup/exploration/paper_section_draft.md"
+}

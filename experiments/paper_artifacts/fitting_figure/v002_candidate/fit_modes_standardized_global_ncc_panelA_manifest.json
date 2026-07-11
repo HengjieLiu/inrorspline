@@ -1,0 +1,24 @@
+{
+  "artifact": "panelA_global_ncc_figure",
+  "curve_summary_csv": "fit_modes_standardized_global_ncc_panelA_curve_summary.csv",
+  "global_ncc_ylim": [
+    -1.0,
+    -0.8
+  ],
+  "metric": "global NCC loss = -NCC over the full OASIS image or full LungCT pTV crop",
+  "nickname_path": "experiments/paper_artifacts/method_nicknames.csv",
+  "one_minus_ncc_log_ylim": [
+    0.001,
+    0.5
+  ],
+  "one_minus_ncc_metric": "1 - NCC = 1 + global_ncc_loss",
+  "outputs": {
+    "global_ncc_loss_png": "fit_modes_standardized_global_ncc_panelA_curves.png",
+    "one_minus_ncc_log_png": "fit_modes_standardized_global_ncc_panelA_1minusncc_log_curves.png"
+  },
+  "selected_runs_csv": "fit_modes_standardized_global_ncc_panelA_selected_runs.csv",
+  "standard_path": "experiments/paper_artifacts/artifact_standard.json",
+  "validation_csv": "fit_modes_standardized_global_ncc_panelA_standard_validation.csv",
+  "validation_report": "fit_modes_standardized_global_ncc_panelA_standard_validation_report.md",
+  "version": "v002_candidate"
+}

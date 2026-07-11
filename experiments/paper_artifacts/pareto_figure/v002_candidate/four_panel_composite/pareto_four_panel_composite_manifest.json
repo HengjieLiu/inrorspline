@@ -1,0 +1,137 @@
+{
+  "artifact": "pareto_four_panel_composite",
+  "source_version": "v002_candidate",
+  "generated_utc": "2026-07-01T18:33:31+00:00",
+  "source_files": {
+    "oasis20": "experiments/paper_artifacts/pareto_figure/v002_candidate/oasis20_pareto_source_rows.csv",
+    "lungct10": "experiments/paper_artifacts/pareto_figure/v002_candidate/lungct10_pareto_source_rows.csv",
+    "method_nicknames": "experiments/paper_artifacts/method_nicknames.csv"
+  },
+  "outputs": [
+    "experiments/paper_artifacts/pareto_figure/v002_candidate/four_panel_composite/pareto_four_panel_composite_no_annotations.png",
+    "experiments/paper_artifacts/pareto_figure/v002_candidate/four_panel_composite/pareto_four_panel_composite_annotated_review.png"
+  ],
+  "output_formats": [
+    "png"
+  ],
+  "annotation_modes": {
+    "no_annotations": {
+      "annotate": false,
+      "filename": "pareto_four_panel_composite_no_annotations.png"
+    },
+    "annotated_review": {
+      "annotate": true,
+      "filename": "pareto_four_panel_composite_annotated_review.png"
+    }
+  },
+  "panels": [
+    {
+      "dataset": "oasis",
+      "title": "Dice vs SDlogJ (OASIS N=20)",
+      "acc_key": "dice_mean",
+      "reg_key": "log_jdet_std_fg",
+      "style": "ellipses",
+      "legend": {
+        "show": true,
+        "loc": "best",
+        "ncol": 2
+      }
+    },
+    {
+      "dataset": "oasis",
+      "title": "HD95 vs SDlogJ (OASIS N=20)",
+      "acc_key": "hd95_mean",
+      "reg_key": "log_jdet_std_fg",
+      "style": "ellipses",
+      "legend": {
+        "show": true,
+        "loc": "best",
+        "ncol": 2
+      }
+    },
+    {
+      "dataset": "lungct",
+      "title": "TRE vs SDlogJ (4DCT N=10)",
+      "acc_key": "original_snap_tre_mean_mm",
+      "acc_label": "TRE (mm)",
+      "acc_higher_is_better": false,
+      "reg_key": "fg_logj_std",
+      "reg_label": "Foreground SDlogJ",
+      "legend": {
+        "show": true,
+        "loc": "best",
+        "ncol": 1
+      }
+    },
+    {
+      "dataset": "lungct",
+      "title": "TRE vs bending energy (4DCT N=10)",
+      "acc_key": "original_snap_tre_mean_mm",
+      "acc_label": "TRE (mm)",
+      "acc_higher_is_better": false,
+      "reg_key": "fg_bending_energy",
+      "reg_label": "Foreground bending energy",
+      "legend": {
+        "show": true,
+        "loc": "best",
+        "ncol": 1
+      }
+    }
+  ],
+  "style": {
+    "figsize": [
+      14.0,
+      10.0
+    ],
+    "dpi": 300,
+    "title_fontsize": 18,
+    "axis_label_fontsize": 14,
+    "tick_label_fontsize": 12,
+    "legend_fontsize": 8.5,
+    "legend_frame": true,
+    "line_width": 1.55,
+    "marker_size": 4.8,
+    "lung_marker_size": 50,
+    "ptvreg_marker_size": 120,
+    "ellipse_alpha": 0.14,
+    "lung_ellipse_alpha": 0.12,
+    "grid_alpha": 0.25,
+    "wspace": 0.18,
+    "hspace": 0.3
+  },
+  "label_conventions": {
+    "logj_label_style": "compact",
+    "logj_label": "SDlogJ",
+    "logj_label_options": {
+      "compact": "SDlogJ",
+      "explicit": "SD(log Jdet)"
+    },
+    "lungct_y_label": "TRE (mm)"
+  },
+  "oasis_method_color_overrides": {},
+  "lungct_method_color_overrides": {},
+  "lungct_method_marker_overrides": {},
+  "lungct_display_label_overrides": {
+    "idir_be_default_lungmask": "INR-Dense/IDIR (IDIR loss)"
+  },
+  "lungct_exclusion_rule": {
+    "exclude_by_ratio": {
+      "idir_be_default_lungmask": [],
+      "direct_cp_32_16_8_4_ptv_lcc_isotv": [
+        0.01,
+        10.0,
+        100.0
+      ],
+      "direct_cp_32_16_8_4_global_ncc_fd_be": [
+        0.0,
+        0.001,
+        0.01
+      ]
+    },
+    "exclude_by_weight": {
+      "idir_be_default_lungmask": [],
+      "direct_cp_32_16_8_4_ptv_lcc_isotv": [],
+      "direct_cp_32_16_8_4_global_ncc_fd_be": []
+    }
+  }
+}

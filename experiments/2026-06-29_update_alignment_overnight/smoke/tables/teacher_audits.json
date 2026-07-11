@@ -1,0 +1,163 @@
+{
+  "oasis_rank009": {
+    "source_kind": "dl_pretrained",
+    "source_family": "bs",
+    "source_method_key": "bs4_sitreg_v0",
+    "source_method_label": "BS4 SITReg",
+    "source_selector": "bestdice",
+    "source_disp_path": "/database/wavereg/wipmidl_0407/OASIS_v1/round1_MIDL/gpu8_OASIS_v1_bs4_sitreg_v0_run1_20250407165940/inference/inference_bestdice/disp_0173_0136.nii.gz",
+    "source_disp_component_order": "zyx_voxel",
+    "source_disp_raw_shape": "3,160,224,192",
+    "source_disp_shape": "1,3,160,224,192",
+    "source_disp_storage_layout": "channel_first_zyx_repo_ras",
+    "source_disp_reorientation": "none",
+    "source_displacement_units": "voxel",
+    "field_fit_target_units": "normalized_grid",
+    "field_fit_target_shape": "160,224,192,3",
+    "field_fit_target_extent": "full_dense_field_available"
+  },
+  "lungct_case01": {
+    "source_kind": "ptvreg_saved_deformation_mat",
+    "source_family": "ptvreg",
+    "source_disp_path": "/database/inrorspline/ptvreg/4DCT/case01_T50_to_T00_deformation.mat",
+    "source_disp_h5py_shape": [
+      3,
+      94,
+      256,
+      256
+    ],
+    "source_disp_matlab_layout": "Tptv_rsz(x,y,z,component)",
+    "source_disp_h5py_layout": "component,z,y,x",
+    "source_disp_component_order": "x,y,z",
+    "source_displacement_units": "physical_mm",
+    "source_transform_direction": "fixed_T00_to_moving_T50",
+    "source_spacing_xyz_mm": [
+      0.97,
+      0.97,
+      2.5
+    ],
+    "source_spacing_zyx_mm": [
+      2.5,
+      0.97,
+      0.97
+    ],
+    "crop_v_saved_xyz_1based_inclusive": [
+      [
+        17,
+        46,
+        4
+      ],
+      [
+        255,
+        200,
+        87
+      ]
+    ],
+    "crop_bounds_zyx_0based_inclusive": [
+      [
+        3,
+        86
+      ],
+      [
+        45,
+        199
+      ],
+      [
+        16,
+        254
+      ]
+    ],
+    "source_saved_tre_phys_mean_mm": 0.7671410824122017,
+    "source_saved_trestd_case_mm": 0.8917488133788821,
+    "source_recomputed_snap_tre_mean_mm": 0.7671410824122021,
+    "source_recomputed_snap_tre_std_mm": 0.8917488133788818,
+    "source_tre_validation_abs_err": 4.440892098500626e-16,
+    "field_fit_target_units": "normalized_grid",
+    "field_fit_target_shape_zyx3": [
+      210,
+      150,
+      232,
+      3
+    ],
+    "field_fit_target_extent": "reg1mm_crop_reconstructed_from_saved_native_full_ptvreg_field",
+    "field_fit_target_interpolation": "crop_native_to_reg1mm_trilinear_align_corners_true",
+    "field_fit_domain": "fixed_t00_lung_mask_reg1mm",
+    "field_fit_mask_definition": "fixed T00 lung mask on canonical pTVReg 1mm crop",
+    "field_fit_domain_voxels": 2318467,
+    "field_fit_domain_fraction": 0.31725054734537494,
+    "target_reg1mm_snap_tre_mean_mm": 1.0679976253932162,
+    "target_reg1mm_subvoxel_tre_mean_mm": 0.943608727183583
+  },
+  "lungct_case08": {
+    "source_kind": "ptvreg_saved_deformation_mat",
+    "source_family": "ptvreg",
+    "source_disp_path": "/database/inrorspline/ptvreg/4DCT/case08_T50_to_T00_deformation.mat",
+    "source_disp_h5py_shape": [
+      3,
+      128,
+      512,
+      512
+    ],
+    "source_disp_matlab_layout": "Tptv_rsz(x,y,z,component)",
+    "source_disp_h5py_layout": "component,z,y,x",
+    "source_disp_component_order": "x,y,z",
+    "source_displacement_units": "physical_mm",
+    "source_transform_direction": "fixed_T00_to_moving_T50",
+    "source_spacing_xyz_mm": [
+      0.97,
+      0.97,
+      2.5
+    ],
+    "source_spacing_zyx_mm": [
+      2.5,
+      0.97,
+      0.97
+    ],
+    "crop_v_saved_xyz_1based_inclusive": [
+      [
+        122,
+        90,
+        21
+      ],
+      [
+        383,
+        302,
+        111
+      ]
+    ],
+    "crop_bounds_zyx_0based_inclusive": [
+      [
+        20,
+        110
+      ],
+      [
+        89,
+        301
+      ],
+      [
+        121,
+        382
+      ]
+    ],
+    "source_saved_tre_phys_mean_mm": 1.014219831733267,
+    "source_saved_trestd_case_mm": 1.2922227355399813,
+    "source_recomputed_snap_tre_mean_mm": 1.0142198317332671,
+    "source_recomputed_snap_tre_std_mm": 1.2922227355399807,
+    "source_tre_validation_abs_err": 2.220446049250313e-16,
+    "field_fit_target_units": "normalized_grid",
+    "field_fit_target_shape_zyx3": [
+      228,
+      207,
+      254,
+      3
+    ],
+    "field_fit_target_extent": "reg1mm_crop_reconstructed_from_saved_native_full_ptvreg_field",
+    "field_fit_target_interpolation": "crop_native_to_reg1mm_trilinear_align_corners_true",
+    "field_fit_domain": "fixed_t00_lung_mask_reg1mm",
+    "field_fit_mask_definition": "fixed T00 lung mask on canonical pTVReg 1mm crop",
+    "field_fit_domain_voxels": 5313087,
+    "field_fit_domain_fraction": 0.4432084361880394,
+    "target_reg1mm_snap_tre_mean_mm": 1.2400977803457793,
+    "target_reg1mm_subvoxel_tre_mean_mm": 1.1068666239089695
+  }
+}

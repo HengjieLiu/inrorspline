@@ -7,6 +7,8 @@ Before coding, syncing, dataset movement, Docker work, paper writing, or experim
 - `docs/00_index.md` for the project map and current status.
 - `docs/01_project_brief.md` for the scientific goal and expected claims.
 - `docs/03_methods.md` for method and protocol definitions.
+- `docs/implementation/README.md` for code-derived implementation summaries
+  used in method review and paper writing.
 - `docs/04_experiment_registry.md` before planning or launching real runs.
 - `docs/05_results_summary.md` before writing conclusions.
 - `docs/06_decision_log.md` before changing major design choices.
@@ -54,7 +56,8 @@ PROJECT_OBJECT = {
 Use these bracket commands in prompts:
 
 ```text
-[use plan mode]              # do not edit files, stop jobs, launch jobs, remove artifacts, or run destructive commands. Convert the request into a concrete plan, summarize assumptions and risks, recommend defaults, list files likely to change, identify verification steps, ask concise clarifying questions if needed, suggest recommendations if any, and wait for explicit approval before acting. This command should not be superceded.
+[use plan mode]              # do not edit files, stop jobs, launch jobs, remove artifacts, or run destructive commands. Convert the request into a concrete plan, summarize assumptions and risks, recommend defaults, list files likely to change, identify verification steps, ask concise clarifying questions if needed, suggest recommendations if any, and wait for explicit approval before acting. This command should not be superseded.
+[adapt and plan]             # reuse rules of [use plan mode], but more specifically understand the project context and adapt the current plan files into a new concrete plan, summarize key adaptation needed, ask a series of clarifying questions and if appropriate provide selection answers, suggest recommendations if any, and wait for explicit approval before acting. This command should not be superseded.
 [adapt project]              # adapt instructions/docs when assumptions change; plan first
 [adapt AGENTS.md]            # revise AGENTS.md after classifying legacy rules
 [agents sync]                # propose AGENTS.md updates from current repo/conversation context
@@ -133,6 +136,19 @@ commit plan for approval. Include:
 - Files or folders intentionally excluded.
 - Submodule status and planned handling.
 - Verification already run or recommended.
+- Large generated-artifact handling. Inspect untracked files with sizes before
+  deciding what to exclude, for example with
+  `git ls-files --others --exclude-standard -z | xargs -0 du -h | sort -h`.
+  Do not exclude or ignore files solely because they are CSV, JSON, notebook, or
+  image files; small review tables, summaries, figures, and paper artifacts may
+  belong in Git. When a large or transient generated artifact should remain out
+  of Git and should stop appearing in future commit audits, propose an
+  exact-path or tightly scoped `.gitignore` entry with a short comment naming
+  the approximate size, purpose, and tracked summary/report that replaces it.
+  Use `.git/info/exclude` instead of committed `.gitignore` for host-local
+  clutter that should not become repo policy. If the artifact is already
+  tracked, do not remove it from Git without explicit approval for
+  `git rm --cached`.
 - One comprehensive but concise commit message. "Concise" means no filler, not
   vague. The subject should identify the concrete deliverable and the main
   protocol/behavioral change, for example `Add OASIS first10 BE sweep runner and

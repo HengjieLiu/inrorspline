@@ -1,0 +1,445 @@
+{
+  "schema_version": 1,
+  "artifact_standard_version": "v002_candidate_panelAB_final_cps2",
+  "description": "Final-paper artifact standard for method display names and selected hyperparameter variants.",
+  "canonical_lr_by_family": {
+    "idir": 0.0001,
+    "sinr": 0.0001,
+    "directcp": 0.001,
+    "directcp_multistage": 0.001
+  },
+  "method_family_by_id": {
+    "IDIR": "idir",
+    "SINR cps2": "sinr",
+    "SINR cps4": "sinr",
+    "DirectCP cps2": "directcp",
+    "DirectCP cps4": "directcp",
+    "DirectCP 4stage cps4": "directcp_multistage",
+    "DirectCP 8-4-2": "directcp_multistage",
+    "panelA_idir": "idir",
+    "panelA_sinr_cps4": "sinr",
+    "panelA_direct_cp_cps4": "directcp",
+    "panelA_direct_cp_multistage": "directcp_multistage",
+    "idir_original_dense_siren_be_autograd": "idir",
+    "sinr_cps2_be_bspline_analytic": "sinr",
+    "sinr_cps4_be_bspline_analytic": "sinr",
+    "direct_cp_cps2_be_bspline_analytic": "directcp",
+    "direct_cp_cps4_be_bspline_analytic": "directcp",
+    "direct_cp_8_4_2_be_bspline_analytic_multistage": "directcp_multistage",
+    "idir_be_default_lungmask": "idir",
+    "sinr_cps4_ptv_lcc_isotv": "sinr",
+    "sinr_cps4_global_ncc_fd_be": "sinr",
+    "direct_cp_cps4_ptv_lcc_isotv": "directcp",
+    "direct_cp_cps4_global_ncc_fd_be": "directcp",
+    "direct_cp_32_16_8_4_ptv_lcc_isotv": "directcp_multistage",
+    "direct_cp_32_16_8_4_global_ncc_fd_be": "directcp_multistage",
+    "panelA_sinr_cps2": "sinr",
+    "panelA_direct_cp_cps2": "directcp"
+  },
+  "reference_method_ids": [
+    "greedy",
+    "bs1_vxm_v0_2",
+    "bs2_tm_v0",
+    "bs3_vfa_v0",
+    "bs4_sitreg_v0",
+    "ptvreg_reference",
+    "Greedy",
+    "VoxelMorph",
+    "TransMorph",
+    "VFA",
+    "SITReg",
+    "pTVReg"
+  ],
+  "artifact_versions": {
+    "best_result_table": {
+      "current": "v001",
+      "output_dir": "experiments/paper_artifacts/best_result_table/v001"
+    },
+    "pareto_figure": {
+      "current": "v003_candidate_oasis100",
+      "output_dir": "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100"
+    },
+    "fitting_figure": {
+      "current": "v002_candidate",
+      "output_dir": "experiments/paper_artifacts/fitting_figure/v002_candidate"
+    },
+    "motion_pattern_figure": {
+      "current": "v001",
+      "output_dir": "experiments/paper_artifacts/motion_pattern_figure/v001"
+    }
+  },
+  "artifact_figure_options": {
+    "fitting_figure": {
+      "merged_panel_b_oasis_target": "OASIS SITReg",
+      "merged_panel_b_oasis_target_options": [
+        "OASIS SITReg",
+        "OASIS Greedy"
+      ],
+      "merged_panel_b_oasis_target_note": "Edit merged_panel_b_oasis_target to OASIS Greedy and rerun the fitting-figure generator to build the merged Panel A/B figure with the Greedy field-fit target instead of SITReg."
+    }
+  },
+  "artifact_selected_hypervariants": {
+    "best_result_table": [
+      {
+        "dataset": "oasis20",
+        "method_id": "idir_original_dense_siren_be_autograd",
+        "lr": 0.0001,
+        "selected_setting": "alpha=1"
+      },
+      {
+        "dataset": "oasis20",
+        "method_id": "sinr_cps2_be_bspline_analytic",
+        "lr": 0.0001,
+        "selected_setting": "alpha=1000"
+      },
+      {
+        "dataset": "oasis20",
+        "method_id": "sinr_cps4_be_bspline_analytic",
+        "lr": 0.0001,
+        "selected_setting": "alpha=1000"
+      },
+      {
+        "dataset": "oasis20",
+        "method_id": "direct_cp_cps2_be_bspline_analytic",
+        "lr": 0.001,
+        "selected_setting": "alpha=1000"
+      },
+      {
+        "dataset": "oasis20",
+        "method_id": "direct_cp_cps4_be_bspline_analytic",
+        "lr": 0.001,
+        "selected_setting": "alpha=1000"
+      },
+      {
+        "dataset": "oasis20",
+        "method_id": "direct_cp_8_4_2_be_bspline_analytic_multistage",
+        "lr": 0.01,
+        "selected_setting": "alpha=1000"
+      },
+      {
+        "dataset": "lungct10",
+        "method_id": "idir_be_default_lungmask",
+        "lr": 0.0001,
+        "selected_setting": "a=3"
+      },
+      {
+        "dataset": "lungct10",
+        "method_id": "sinr_cps4_ptv_lcc_isotv",
+        "lr": 0.0001,
+        "selected_setting": "default"
+      },
+      {
+        "dataset": "lungct10",
+        "method_id": "direct_cp_cps4_ptv_lcc_isotv",
+        "lr": 0.001,
+        "selected_setting": "default"
+      },
+      {
+        "dataset": "lungct10",
+        "method_id": "direct_cp_32_16_8_4_ptv_lcc_isotv",
+        "lr": 0.001,
+        "selected_setting": "w=0.11"
+      },
+      {
+        "dataset": "lungct10",
+        "method_id": "direct_cp_32_16_8_4_global_ncc_fd_be",
+        "lr": 0.001,
+        "selected_setting": "a=10000"
+      }
+    ],
+    "pareto_figure": [
+      {
+        "dataset": "oasis100",
+        "method_id": "idir_original_dense_siren_be_autograd",
+        "lr": 0.0001,
+        "variant": "BE alpha sweep"
+      },
+      {
+        "dataset": "oasis100",
+        "method_id": "sinr_cps2_be_bspline_analytic",
+        "lr": 0.0001,
+        "variant": "BE alpha sweep"
+      },
+      {
+        "dataset": "oasis100",
+        "method_id": "sinr_cps4_be_bspline_analytic",
+        "lr": 0.0001,
+        "variant": "BE alpha sweep"
+      },
+      {
+        "dataset": "oasis100",
+        "method_id": "direct_cp_cps2_be_bspline_analytic",
+        "lr": 0.001,
+        "variant": "BE alpha sweep"
+      },
+      {
+        "dataset": "oasis100",
+        "method_id": "direct_cp_cps4_be_bspline_analytic",
+        "lr": 0.001,
+        "variant": "BE alpha sweep"
+      },
+      {
+        "dataset": "oasis100",
+        "method_id": "direct_cp_8_4_2_be_bspline_analytic_multistage",
+        "lr": 0.001,
+        "variant": "canonical lr=1e-3 multistage BE alpha sweep"
+      },
+      {
+        "dataset": "lungct10",
+        "method_id": "idir_be_default_lungmask",
+        "lr": 0.0001,
+        "variant": "pTV-prep/native IDIR alpha sweep rows"
+      },
+      {
+        "dataset": "lungct10",
+        "method_id": "sinr_cps4_ptv_lcc_isotv",
+        "lr": 0.0001,
+        "variant": "single-stage pTV LCC+isoTV"
+      },
+      {
+        "dataset": "lungct10",
+        "method_id": "direct_cp_cps4_ptv_lcc_isotv",
+        "lr": 0.001,
+        "variant": "single-stage pTV LCC+isoTV"
+      },
+      {
+        "dataset": "lungct10",
+        "method_id": "direct_cp_32_16_8_4_ptv_lcc_isotv",
+        "lr": 0.001,
+        "variant": "32-16-8-4 pTV LCC+isoTV sweep"
+      },
+      {
+        "dataset": "lungct10",
+        "method_id": "direct_cp_32_16_8_4_global_ncc_fd_be",
+        "lr": 0.001,
+        "variant": "32-16-8-4 global NCC+FD-BE sweep"
+      }
+    ],
+    "fitting_figure": [
+      {
+        "dataset": "OASIS SITReg",
+        "method_id": "IDIR",
+        "lr": 0.0001
+      },
+      {
+        "dataset": "OASIS SITReg",
+        "method_id": "SINR cps2",
+        "lr": 0.0001
+      },
+      {
+        "dataset": "OASIS SITReg",
+        "method_id": "DirectCP cps2",
+        "lr": 0.001
+      },
+      {
+        "dataset": "OASIS SITReg",
+        "method_id": "DirectCP 8-4-2",
+        "lr": 0.001
+      },
+      {
+        "dataset": "OASIS Greedy",
+        "method_id": "IDIR",
+        "lr": 0.0001
+      },
+      {
+        "dataset": "OASIS Greedy",
+        "method_id": "SINR cps2",
+        "lr": 0.0001
+      },
+      {
+        "dataset": "OASIS Greedy",
+        "method_id": "DirectCP cps2",
+        "lr": 0.001
+      },
+      {
+        "dataset": "OASIS Greedy",
+        "method_id": "DirectCP 8-4-2",
+        "lr": 0.001
+      },
+      {
+        "dataset": "LungCT case01",
+        "method_id": "IDIR",
+        "lr": 0.0001
+      },
+      {
+        "dataset": "LungCT case01",
+        "method_id": "SINR cps4",
+        "lr": 0.0001
+      },
+      {
+        "dataset": "LungCT case01",
+        "method_id": "DirectCP cps4",
+        "lr": 0.001
+      },
+      {
+        "dataset": "LungCT case01",
+        "method_id": "DirectCP 4stage cps4",
+        "lr": 0.001
+      },
+      {
+        "dataset": "LungCT case08",
+        "method_id": "IDIR",
+        "lr": 0.0001
+      },
+      {
+        "dataset": "LungCT case08",
+        "method_id": "SINR cps4",
+        "lr": 0.0001
+      },
+      {
+        "dataset": "LungCT case08",
+        "method_id": "DirectCP cps4",
+        "lr": 0.001
+      },
+      {
+        "dataset": "LungCT case08",
+        "method_id": "DirectCP 4stage cps4",
+        "lr": 0.001
+      }
+    ],
+    "panelA_global_ncc_figure": [
+      {
+        "dataset": "OASIS rank-9",
+        "method_id": "idir_original_dense_siren_be_autograd",
+        "lr": 0.0001,
+        "selected_setting": "alpha=1, diagnostic full-image global NCC every 10 epochs"
+      },
+      {
+        "dataset": "OASIS rank-9",
+        "method_id": "sinr_cps2_be_bspline_analytic",
+        "lr": 0.0001,
+        "selected_setting": "alpha=1000, optimized full-image global NCC + BE; reused compatible rank-9 cps2 history"
+      },
+      {
+        "dataset": "OASIS rank-9",
+        "method_id": "direct_cp_cps2_be_bspline_analytic",
+        "lr": 0.001,
+        "selected_setting": "alpha=1000, optimized full-image global NCC + BE; reused compatible rank-9 cps2 history"
+      },
+      {
+        "dataset": "OASIS rank-9",
+        "method_id": "direct_cp_8_4_2_be_bspline_analytic_multistage",
+        "lr": 0.001,
+        "selected_setting": "alpha=1000, cps 8/4/2, downsample 4/2/1, stage epochs 400/800/1300, diagnostic full-image global NCC every 10 epochs"
+      },
+      {
+        "dataset": "LungCT case01",
+        "method_id": "idir_be_default_lungmask",
+        "lr": 0.0001,
+        "selected_setting": "alpha_bending=3, optimized native IDIR sampled NCC + BE, diagnostic full-crop global NCC every 10 epochs"
+      },
+      {
+        "dataset": "LungCT case01",
+        "method_id": "sinr_cps4_global_ncc_fd_be",
+        "lr": 0.0001,
+        "selected_setting": "alpha=10000, optimized full-crop global NCC + dense FD-BE"
+      },
+      {
+        "dataset": "LungCT case01",
+        "method_id": "direct_cp_cps4_global_ncc_fd_be",
+        "lr": 0.001,
+        "selected_setting": "alpha=10000, optimized full-crop global NCC + dense FD-BE"
+      },
+      {
+        "dataset": "LungCT case01",
+        "method_id": "direct_cp_32_16_8_4_global_ncc_fd_be",
+        "lr": 0.001,
+        "selected_setting": "alpha=10000, cps 32/16/8/4, downsample 8/4/2/1, stage epochs 200/400/800/1000"
+      },
+      {
+        "dataset": "LungCT case08",
+        "method_id": "idir_be_default_lungmask",
+        "lr": 0.0001,
+        "selected_setting": "alpha_bending=3, optimized native IDIR sampled NCC + BE, diagnostic full-crop global NCC every 10 epochs"
+      },
+      {
+        "dataset": "LungCT case08",
+        "method_id": "sinr_cps4_global_ncc_fd_be",
+        "lr": 0.0001,
+        "selected_setting": "alpha=10000, optimized full-crop global NCC + dense FD-BE"
+      },
+      {
+        "dataset": "LungCT case08",
+        "method_id": "direct_cp_cps4_global_ncc_fd_be",
+        "lr": 0.001,
+        "selected_setting": "alpha=10000, optimized full-crop global NCC + dense FD-BE"
+      },
+      {
+        "dataset": "LungCT case08",
+        "method_id": "direct_cp_32_16_8_4_global_ncc_fd_be",
+        "lr": 0.001,
+        "selected_setting": "alpha=10000, cps 32/16/8/4, downsample 8/4/2/1, stage epochs 200/400/800/1000"
+      }
+    ]
+  },
+  "temporary_exceptions": [
+    {
+      "artifact": "best_result_table",
+      "dataset": "oasis20",
+      "method_id": "direct_cp_8_4_2_be_bspline_analytic_multistage",
+      "field": "lr",
+      "current_value": 0.01,
+      "canonical_value": 0.001,
+      "status": "todo_replace_after_rerun",
+      "note": "OASIS DirectCP 8-4-2 currently exists only at lr=1e-2 in current paper-facing artifacts."
+    }
+  ],
+  "todos": [
+    {
+      "id": "rerun_oasis_directcp842_lr1e-3",
+      "status": "pending",
+      "reason": "Replace temporary OASIS DirectCP 8-4-2 lr=1e-2 exception with canonical lr=1e-3."
+    },
+    {
+      "id": "optional_directcp_1e-2_fitting_supplement",
+      "status": "future_optional",
+      "reason": "May add DirectCP and multistage DirectCP lr=1e-2 fitting curves as a separate sensitivity figure."
+    },
+    {
+      "id": "add_oasis_directcp842_to_fitting_figure",
+      "status": "completed",
+      "reason": "Added OASIS DirectCP 8-4-2 multistage fitting trajectories to the standardized rRMSE fitting figure using the canonical lr=1e-3 cps8/cps4/cps2 schedule."
+    },
+    {
+      "id": "panelA_global_ncc_oasis_directcp842_lr1e-3",
+      "status": "completed",
+      "reason": "For the new Panel A global-NCC curve, run OASIS DirectCP 8-4-2 at lr=1e-3 with cps8/cps4/cps2 stage epochs 400/800/1300 and alpha=1000."
+    },
+    {
+      "id": "panelA_global_ncc_lungct_full_crop_global_ncc_fd_be",
+      "status": "completed",
+      "reason": "For the new Panel A global-NCC curves, run LungCT SINR/DirectCP/multistage DirectCP with full-crop global NCC + dense FD-BE, alpha=10000, and canonical LRs."
+    },
+    {
+      "id": "panelAB_oasis_final_cps2_standardization",
+      "status": "completed",
+      "reason": "Generated fitting_figure/v002_candidate with OASIS INR-BSCP and D-BSCP switched from cps4 to cps2 to match MR-D-BSCP final cps2; comparison artifacts are in comparison/v001_vs_v002_candidate_panelAB_final_cps2."
+    }
+  ],
+  "final_control_spacing_policy": {
+    "fitting_figure_panelAB": {
+      "OASIS rank-9": {
+        "single_stage_final_spacing": "cps2",
+        "multistage_schedule": "8-4-2",
+        "reason": "Match the final control spacing of single-stage INR-BSCP and D-BSCP to the final stage of MR-D-BSCP."
+      },
+      "LungCT case01": {
+        "single_stage_final_spacing": "cps4",
+        "multistage_schedule": "32-16-8-4",
+        "reason": "LungCT multistage DirectCP ends at cps4, so existing single-stage cps4 rows are final-spacing matched."
+      },
+      "LungCT case08": {
+        "single_stage_final_spacing": "cps4",
+        "multistage_schedule": "32-16-8-4",
+        "reason": "LungCT multistage DirectCP ends at cps4, so existing single-stage cps4 rows are final-spacing matched."
+      }
+    },
+    "pareto_and_table_oasis": {
+      "matched_main_spacing": "cps2",
+      "supplemental_spacing_rows": [
+        "cps4"
+      ],
+      "reason": "cps2 is the final-spacing matched comparison against MR-D-BSCP (8-4-2); cps4 rows remain useful spacing-ablation context."
+    }
+  }
+}

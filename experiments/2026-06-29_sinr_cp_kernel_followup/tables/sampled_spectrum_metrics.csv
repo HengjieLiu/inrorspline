@@ -1,0 +1,10 @@
+dataset,case_key,checkpoint,diagnostic,p05,p50,p95,p99,max,note
+oasis,oasis_rank009,init_step,sampled_update_norm_ratio_proxy,61.481347486026635,89.20014503593116,189.8035175545449,339.08794377598497,6897.811889289011,Proxy only; autograd CP-kernel spectrum was not formed.
+oasis,oasis_rank009,epoch50,sampled_update_norm_ratio_proxy,1.3103937042740434,3.273070517873374,9.205832096320076,16.34551651008646,182.02330298713852,Proxy only; autograd CP-kernel spectrum was not formed.
+oasis,oasis_rank009,epoch250,sampled_update_norm_ratio_proxy,0.9291656704948319,2.6968251662154543,7.748543114480046,13.33120734320342,191.3830673955793,Proxy only; autograd CP-kernel spectrum was not formed.
+lungct,lungct_case01,init_step,sampled_update_norm_ratio_proxy,59.23363341652869,80.36490780744687,170.67257864856268,308.4853157897234,8353.408991569073,Proxy only; autograd CP-kernel spectrum was not formed.
+lungct,lungct_case01,epoch50,sampled_update_norm_ratio_proxy,0.8948843720213705,2.7634035754449506,10.780529456654511,20.666523800125745,159.0117249927292,Proxy only; autograd CP-kernel spectrum was not formed.
+lungct,lungct_case01,epoch250,sampled_update_norm_ratio_proxy,0.6557380805553519,2.3964452624325387,9.778514893312412,18.981883347919243,151.64261055608262,Proxy only; autograd CP-kernel spectrum was not formed.
+lungct,lungct_case08,init_step,sampled_update_norm_ratio_proxy,61.41713082369589,97.49383964752732,228.92752340579395,412.2134448752012,4792.748745386329,Proxy only; autograd CP-kernel spectrum was not formed.
+lungct,lungct_case08,epoch50,sampled_update_norm_ratio_proxy,1.209460810602727,3.2550047794245813,10.565805747400072,19.303660461416804,214.45212525953048,Proxy only; autograd CP-kernel spectrum was not formed.
+lungct,lungct_case08,epoch250,sampled_update_norm_ratio_proxy,0.7173340190649222,2.635225371625399,8.579251121292534,16.086575267284566,192.76712047271383,Proxy only; autograd CP-kernel spectrum was not formed.

@@ -1,0 +1,108 @@
+{
+  "oasis20": {
+    "title": "OASIS seed-3 first20 automatic best-Dice summary",
+    "source": "experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_first10_first20_alpha5_saved_baselines_plus_directcp842_paper_v1/first20/population_summary_first20_with_saved_baselines.csv",
+    "expected_rows": 9,
+    "expected_cases": 20,
+    "cases_column": "n_cases",
+    "selection": {
+      "metric": "dice_mean_mean",
+      "mode": "max",
+      "tie_breakers": [
+        {"metric": "hd95_mean_mean", "mode": "min"},
+        {"metric": "asd_symmetric_mean_mean", "mode": "min"},
+        {"metric": "alpha", "mode": "min"}
+      ]
+    },
+    "methods": [
+      {"id": "idir_original_dense_siren_be_autograd", "label": "IDIR"},
+      {"id": "sinr_cps2_be_bspline_analytic", "label": "SINR cps2"},
+      {"id": "sinr_cps4_be_bspline_analytic", "label": "SINR cps4"},
+      {"id": "direct_cp_cps2_be_bspline_analytic", "label": "DirectCP cps2"},
+      {"id": "direct_cp_cps4_be_bspline_analytic", "label": "DirectCP cps4"},
+      {"id": "direct_cp_8_4_2_be_bspline_analytic_multistage", "label": "DirectCP 8-4-2"},
+      {"id": "greedy", "label": "Greedy"},
+      {"id": "bs1_vxm_v0_2", "label": "VoxelMorph"},
+      {"id": "bs4_sitreg_v0", "label": "SITReg"}
+    ],
+    "metrics": [
+      {"key": "dice", "label": "Dice", "mean": "dice_mean_mean", "std": "dice_mean_std", "format": "fixed", "digits": 3},
+      {"key": "hd95", "label": "HD95", "mean": "hd95_mean_mean", "std": "hd95_mean_std", "format": "fixed", "digits": 2},
+      {"key": "asd_sym", "label": "ASD sym", "mean": "asd_symmetric_mean_mean", "std": "asd_symmetric_mean_std", "format": "fixed", "digits": 2},
+      {"key": "fg_logj", "label": "FG stdLogJ", "mean": "log_jdet_std_fg_mean", "std": "log_jdet_std_fg_std", "format": "fixed", "digits": 2},
+      {
+        "key": "fg_bending",
+        "label": "FG bending",
+        "mean_candidates": ["be_native_analytic_fixed_fg_voxel_mean", "be_fd_forward_fixed_fg_voxel_mean"],
+        "std_candidates": ["be_native_analytic_fixed_fg_voxel_std", "be_fd_forward_fixed_fg_voxel_std"],
+        "format": "fixed",
+        "digits": 2,
+        "fallback_note": "Native analytic bending unavailable; used finite-difference foreground bending."
+      },
+      {"key": "fg_jdet_le0_pct", "label": "FG Jdet<0 %", "mean": "jdet_le0_pct_fg_mean", "std": "jdet_le0_pct_fg_std", "format": "adaptive_percent"}
+    ]
+  },
+  "lungct10": {
+    "title": "LungCT 4DCT all10 automatic best-TRE summary",
+    "expected_rows": 6,
+    "expected_cases": 10,
+    "cases_column": "cases",
+    "selection": {
+      "metric": "original_snap_tre_mean_mm_mean",
+      "mode": "min",
+      "tie_breakers": [
+        {"metric": "original_subvoxel_tre_mean_mm_mean", "mode": "min"},
+        {"metric": "fg_jdet_le0_pct_mean", "mode": "min"},
+        {"metric": "reg_value", "mode": "min"}
+      ]
+    },
+    "sources": [
+      {
+        "name": "latest_midratio_mean_rows",
+        "type": "mean_rows",
+        "path": "experiments/2026-06-26_lungct_directcp4stage_midratio_pareto_extension/pareto_visual_review_midratio_extension/combined_mean_rows_with_ptvreg.csv",
+        "methods": [
+          "idir_be_default_lungmask",
+          "direct_cp_32_16_8_4_ptv_lcc_isotv",
+          "direct_cp_32_16_8_4_global_ncc_fd_be",
+          "ptvreg_reference"
+        ]
+      },
+      {
+        "name": "no_sweep_single_stage_rows",
+        "type": "no_sweep_case_rows",
+        "path": "experiments/2026-06-25_lungct_ptvprep_no_sweep_repro/summary_runs.csv",
+        "methods": [
+          "sinr_cps4_ptv_lcc_isotv",
+          "direct_cp_cps4_ptv_lcc_isotv"
+        ]
+      }
+    ],
+    "methods": [
+      {"id": "idir_be_default_lungmask", "label": "IDIR"},
+      {"id": "direct_cp_32_16_8_4_ptv_lcc_isotv", "label": "DirectCP 4stage pTV-LCC+isoTV"},
+      {"id": "direct_cp_32_16_8_4_global_ncc_fd_be", "label": "DirectCP 4stage global-NCC+FD-BE"},
+      {"id": "sinr_cps4_ptv_lcc_isotv", "label": "SINR cps4"},
+      {"id": "direct_cp_cps4_ptv_lcc_isotv", "label": "DirectCP cps4"},
+      {"id": "ptvreg_reference", "label": "pTVReg"}
+    ],
+    "failure_analysis": {
+      "title": "LungCT single-stage failure cases",
+      "source": "experiments/2026-06-25_lungct_ptvprep_no_sweep_repro/summary_runs.csv",
+      "metric": "native_crop_snap_tre_mean_mm",
+      "metric_label": "Original snap TRE",
+      "threshold_mm": 2.0,
+      "methods": [
+        {"id": "sinr_cps4_ptv_lcc_isotv", "label": "SINR cps4"},
+        {"id": "direct_cp_cps4_ptv_lcc_isotv", "label": "DirectCP cps4"}
+      ]
+    },
+    "metrics": [
+      {"key": "original_snap_tre", "label": "Original snap TRE", "mean": "original_snap_tre_mean_mm_mean", "std": "original_snap_tre_mean_mm_std", "format": "fixed", "digits": 3},
+      {"key": "original_subvoxel_tre", "label": "Original sub TRE", "mean": "original_subvoxel_tre_mean_mm_mean", "std": "original_subvoxel_tre_mean_mm_std", "format": "fixed", "digits": 3},
+      {"key": "fg_logj", "label": "FG stdLogJ", "mean": "fg_logj_std_mean", "std": "fg_logj_std_std", "format": "fixed", "digits": 3},
+      {"key": "fg_bending", "label": "FG bending", "mean": "fg_bending_energy_mean", "std": "fg_bending_energy_std", "format": "adaptive_small"},
+      {"key": "fg_jdet_le0_pct", "label": "FG Jdet<0 %", "mean": "fg_jdet_le0_pct_mean", "std": "fg_jdet_le0_pct_std", "format": "adaptive_percent"}
+    ]
+  }
+}

@@ -455,6 +455,171 @@ def expand_bspline_controls(
     return field.squeeze(0).permute(1, 2, 3, 0).contiguous()
 
 
+CP_MARGIN = 4
+
+
+def parse_int_list(text: str) -> List[int]:
+    values = [int(token.strip()) for token in str(text).split(",") if token.strip()]
+    if not values:
+        raise ValueError(f"No integer values parsed from {text!r}")
+    return values
+
+
+def parse_stage_ints(text: str, expected_len: int) -> List[int]:
+    values = parse_int_list(text)
+    if len(values) == 1 and int(expected_len) > 1:
+        return values * int(expected_len)
+    if len(values) != int(expected_len):
+        raise ValueError(f"Expected {expected_len} stage values from {text!r}, got {values}")
+    return values
+
+
+def parse_float_list(text: str, expected_len: int, default: float) -> List[float]:
+    if str(text).strip():
+        values = [float(token.strip()) for token in str(text).split(",") if token.strip()]
+    else:
+        values = [float(default)]
+    if len(values) == 1 and int(expected_len) > 1:
+        return values * int(expected_len)
+    if len(values) != int(expected_len):
+        raise ValueError(f"Expected {expected_len} stage float values from {text!r}, got {values}")
+    return values
+
+
+def build_nested_cp_shapes(
+    image_shape: Sequence[int],
+    base_spacing: int,
+    spacings: Iterable[int],
+    cp_margin: int = CP_MARGIN,
+) -> Dict[int, Tuple[int, int, int]]:
+    q_base = [int(math.ceil(int(length) / float(base_spacing))) for length in image_shape]
+    shapes: Dict[int, Tuple[int, int, int]] = {}
+    for spacing in spacings:
+        if int(base_spacing) % int(spacing) != 0:
+            raise ValueError(f"spacing={spacing} must divide base_spacing={base_spacing}")
+        ratio = int(base_spacing) // int(spacing)
+        shapes[int(spacing)] = tuple(int(ratio * q + int(cp_margin)) for q in q_base)
+    return shapes
+
+
+def assert_nested_schedule(shapes: Dict[int, Tuple[int, int, int]], spacings: Sequence[int]) -> None:
+    for coarse, fine in zip(spacings, spacings[1:]):
+        if int(coarse) != 2 * int(fine):
+            raise ValueError(f"Only dyadic consecutive spacing is supported, got {coarse}->{fine}")
+        expected = tuple(int(2 * (int(n) - CP_MARGIN) + CP_MARGIN) for n in shapes[int(coarse)])
+        if tuple(shapes[int(fine)]) != expected:
+            raise ValueError(f"Non-nested CP grid: {coarse}->{fine}, observed={shapes[int(fine)]}, expected={expected}")
+
+
+def flat_to_grid(control_flat: torch.Tensor, control_shape: Sequence[int]) -> torch.Tensor:
+    return control_flat.reshape(*tuple(int(v) for v in control_shape), 3)
+
+
+def grid_to_flat(control_grid: torch.Tensor) -> torch.Tensor:
+    return control_grid.reshape(-1, int(control_grid.shape[-1]))
+
+
+def refine_axis_cubic_dyadic_crop_aligned(control_grid: torch.Tensor, axis: int) -> torch.Tensor:
+    moved = control_grid.movedim(axis, 0)
+    if moved.shape[0] < 3:
+        raise ValueError(f"Need at least 3 coefficients along axis {axis}, got {moved.shape[0]}")
+    even = 0.5 * (moved[:-2] + moved[1:-1])
+    odd = (moved[:-2] + 6.0 * moved[1:-1] + moved[2:]) / 8.0
+    out = moved.new_empty((2 * moved.shape[0] - CP_MARGIN, *moved.shape[1:]))
+    out[0::2] = even
+    out[1::2] = odd
+    return out.movedim(0, axis)
+
+
+def cubic_bspline_dyadic_knot_insert_3d(coarse_grid: torch.Tensor, target_shape: Sequence[int]) -> torch.Tensor:
+    target = tuple(int(v) for v in target_shape)
+    expected = tuple(int(2 * s - CP_MARGIN) for s in coarse_grid.shape[:3])
+    if target != expected:
+        raise ValueError(f"Target shape {target} is not nested from {tuple(coarse_grid.shape[:3])}; expected {expected}")
+    refined = coarse_grid
+    for axis in range(3):
+        refined = refine_axis_cubic_dyadic_crop_aligned(refined, axis=axis)
+    return refined
+
+
+def field_difference_metrics(diff: torch.Tensor, prefix: str = "") -> Dict[str, float]:
+    mag = torch.linalg.norm(diff, dim=-1)
+    flat = mag.reshape(-1)
+    return {
+        f"{prefix}mean_abs": float(diff.abs().mean().detach().cpu()),
+        f"{prefix}max_abs": float(diff.abs().max().detach().cpu()),
+        f"{prefix}mean_mag": float(mag.mean().detach().cpu()),
+        f"{prefix}p95_mag": float(torch.quantile(flat, 0.95).detach().cpu()),
+        f"{prefix}max_mag": float(mag.max().detach().cpu()),
+    }
+
+
+def domain_cps_from_full(full_cps: int, downsample: int) -> int:
+    if int(full_cps) % int(downsample) != 0:
+        raise ValueError(f"full_cps={full_cps} must be divisible by downsample={downsample}")
+    value = int(full_cps) // int(downsample)
+    if value < 1:
+        raise ValueError(f"Invalid domain cps {value} from full_cps={full_cps}, downsample={downsample}")
+    return value
+
+
+def expand_on_shape(
+    control_disp: torch.Tensor,
+    control_shape: Sequence[int],
+    full_cps: int,
+    eval_shape: Sequence[int],
+    downsample: int,
+) -> torch.Tensor:
+    domain_cps = domain_cps_from_full(int(full_cps), int(downsample))
+    return expand_bspline_controls(
+        control_disp,
+        tuple(int(v) for v in control_shape),
+        tuple(int(v) for v in eval_shape),
+        domain_cps,
+    )
+
+
+def gaussian_kernel1d(sigma: float, radius_sigma: float, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
+    radius = max(1, int(math.ceil(float(radius_sigma) * float(sigma))))
+    coords = torch.arange(-radius, radius + 1, device=device, dtype=dtype)
+    kernel = torch.exp(-0.5 * (coords / float(sigma)) ** 2)
+    return kernel / kernel.sum()
+
+
+def gaussian_blur3d(volume: torch.Tensor, sigma: float, radius_sigma: float) -> Tuple[torch.Tensor, int]:
+    if float(sigma) <= 0.0:
+        return volume, 1
+    kernel = gaussian_kernel1d(float(sigma), float(radius_sigma), volume.device, volume.dtype)
+    pad = int(kernel.numel() // 2)
+    vol = volume[None, None]
+    kx = kernel.view(1, 1, 1, 1, -1)
+    ky = kernel.view(1, 1, 1, -1, 1)
+    kz = kernel.view(1, 1, -1, 1, 1)
+    vol = F.conv3d(F.pad(vol, (pad, pad, 0, 0, 0, 0), mode="replicate"), kx)
+    vol = F.conv3d(F.pad(vol, (0, 0, pad, pad, 0, 0), mode="replicate"), ky)
+    vol = F.conv3d(F.pad(vol, (0, 0, 0, 0, pad, pad), mode="replicate"), kz)
+    return vol.squeeze(0).squeeze(0), int(kernel.numel())
+
+
+def downsample_shape(image_shape: Sequence[int], factor: int) -> Tuple[int, int, int]:
+    return tuple(max(2, int(math.ceil(int(s) / float(factor)))) for s in image_shape)
+
+
+def make_loss_volume(
+    volume: torch.Tensor,
+    factor: int,
+    sigma_scale: float,
+    radius_sigma: float,
+) -> Tuple[torch.Tensor, float, int]:
+    if int(factor) <= 1:
+        return volume, 0.0, 1
+    sigma = float(sigma_scale) * float(factor)
+    blurred, kernel_size = gaussian_blur3d(volume, sigma=sigma, radius_sigma=float(radius_sigma))
+    target_shape = downsample_shape(tuple(int(v) for v in volume.shape), int(factor))
+    down = F.interpolate(blurred[None, None], size=target_shape, mode="trilinear", align_corners=True)
+    return down.squeeze(0).squeeze(0), sigma, kernel_size
+
+
 def as_tensor(x: torch.Tensor | np.ndarray, *, device: Optional[torch.device] = None) -> torch.Tensor:
     if isinstance(x, torch.Tensor):
         return x.to(device=device) if device is not None else x
@@ -1236,13 +1401,21 @@ def regularity_metrics(
     return reg, be_rows, diffusion_rows
 
 
-def dice_per_label(warped_seg: torch.Tensor, fixed_seg: torch.Tensor) -> List[float]:
+def dice_per_label(
+    warped_seg: torch.Tensor,
+    fixed_seg: torch.Tensor,
+    moving_seg: torch.Tensor | None = None,
+) -> List[float]:
     warped_np = warped_seg.detach().cpu().numpy()
     fixed_np = fixed_seg.detach().cpu().numpy()
+    moving_np = None if moving_seg is None else moving_seg.detach().cpu().numpy()
     out: List[float] = []
     for label in OASIS_LABELS:
         pred = warped_np == label
         true = fixed_np == label
+        if moving_np is not None and not ((moving_np == label).any() and pred.any() and true.any()):
+            out.append(float("nan"))
+            continue
         denom = int(pred.sum()) + int(true.sum())
         out.append(float((2.0 * np.logical_and(pred, true).sum()) / (denom + 1e-5)))
     return out
@@ -1333,7 +1506,7 @@ def evaluate_from_dense_coords(
     assert isinstance(fixed_seg, torch.Tensor)
     warped = warp_full(moving, dense_coords, mode="bilinear")
     warped_seg = warp_full(moving_seg, dense_coords, mode="nearest")
-    dice = dice_per_label(warped_seg, fixed_seg)
+    dice = dice_per_label(warped_seg, fixed_seg, moving_seg)
     surface = surface_metrics_per_label(warped_seg, fixed_seg, moving_seg)
     metrics: Dict[str, object] = {
         "image_loss": float(ncc_loss(fixed[None, None], warped[None, None]).detach().cpu()),

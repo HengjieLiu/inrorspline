@@ -1,0 +1,498 @@
+{
+  "artifact": "pareto_figure",
+  "display_name_mapping": [
+    {
+      "dataset": "lungct10",
+      "display_name": "D-BSCP (pTVReg loss)",
+      "method_family": "directcp",
+      "method_id": "direct_cp_cps4_ptv_lcc_isotv",
+      "original_name": "DirectCP cps4 pTV-LCC+isoTV"
+    },
+    {
+      "dataset": "lungct10",
+      "display_name": "MR-D-BSCP (IDIR loss)",
+      "method_family": "directcp_multistage",
+      "method_id": "direct_cp_32_16_8_4_global_ncc_fd_be",
+      "original_name": "DirectCP 4stage global-NCC+FD-BE"
+    },
+    {
+      "dataset": "lungct10",
+      "display_name": "MR-D-BSCP (pTVReg loss)",
+      "method_family": "directcp_multistage",
+      "method_id": "direct_cp_32_16_8_4_ptv_lcc_isotv",
+      "original_name": "DirectCP 4stage pTV-LCC+isoTV"
+    },
+    {
+      "dataset": "lungct10",
+      "display_name": "INR-Dense (IDIR loss)",
+      "method_family": "idir",
+      "method_id": "idir_be_default_lungmask",
+      "original_name": "IDIR BE"
+    },
+    {
+      "dataset": "lungct10",
+      "display_name": "pTVReg (pTVReg loss)",
+      "method_family": "reference",
+      "method_id": "ptvreg_reference",
+      "original_name": "pTVReg"
+    },
+    {
+      "dataset": "lungct10",
+      "display_name": "INR-BSCP (pTVReg loss)",
+      "method_family": "sinr",
+      "method_id": "sinr_cps4_ptv_lcc_isotv",
+      "original_name": "SINR cps4 pTV-LCC+isoTV"
+    },
+    {
+      "dataset": "oasis20",
+      "display_name": "D-BSCP (cps2)",
+      "method_family": "directcp",
+      "method_id": "direct_cp_cps2_be_bspline_analytic",
+      "original_name": "DirectCP cps2"
+    },
+    {
+      "dataset": "oasis20",
+      "display_name": "D-BSCP (cps4)",
+      "method_family": "directcp",
+      "method_id": "direct_cp_cps4_be_bspline_analytic",
+      "original_name": "DirectCP cps4"
+    },
+    {
+      "dataset": "oasis20",
+      "display_name": "MR-D-BSCP (8-4-2)",
+      "method_family": "directcp_multistage",
+      "method_id": "direct_cp_8_4_2_be_bspline_analytic_multistage",
+      "original_name": "DirectCP 8-4-2"
+    },
+    {
+      "dataset": "oasis20",
+      "display_name": "INR-Dense",
+      "method_family": "idir",
+      "method_id": "idir_original_dense_siren_be_autograd",
+      "original_name": "IDIR"
+    },
+    {
+      "dataset": "oasis20",
+      "display_name": "VoxelMorph",
+      "method_family": "reference",
+      "method_id": "bs1_vxm_v0_2",
+      "original_name": "BS1 VoxelMorph"
+    },
+    {
+      "dataset": "oasis20",
+      "display_name": "TransMorph",
+      "method_family": "reference",
+      "method_id": "bs2_tm_v0",
+      "original_name": "BS2 TransMorph"
+    },
+    {
+      "dataset": "oasis20",
+      "display_name": "VFA",
+      "method_family": "reference",
+      "method_id": "bs3_vfa_v0",
+      "original_name": "BS3 VFA"
+    },
+    {
+      "dataset": "oasis20",
+      "display_name": "SITReg",
+      "method_family": "reference",
+      "method_id": "bs4_sitreg_v0",
+      "original_name": "BS4 SITReg"
+    },
+    {
+      "dataset": "oasis20",
+      "display_name": "Greedy",
+      "method_family": "reference",
+      "method_id": "greedy",
+      "original_name": "Greedy"
+    },
+    {
+      "dataset": "oasis20",
+      "display_name": "INR-BSCP (cps2)",
+      "method_family": "sinr",
+      "method_id": "sinr_cps2_be_bspline_analytic",
+      "original_name": "SINR cps2"
+    },
+    {
+      "dataset": "oasis20",
+      "display_name": "INR-BSCP (cps4)",
+      "method_family": "sinr",
+      "method_id": "sinr_cps4_be_bspline_analytic",
+      "original_name": "SINR cps4"
+    }
+  ],
+  "font_sizes": {
+    "lungct10": {
+      "axis_labels": 16,
+      "legend": 12,
+      "tick_labels": 12
+    },
+    "oasis20": {
+      "axis_labels": 16,
+      "legend": 12,
+      "tick_labels": 12
+    }
+  },
+  "generated_utc": "2026-07-01T14:29:49+00:00",
+  "method_styles": {
+    "lungct10_colors": {
+      "direct_cp_32_16_8_4_global_ncc_fd_be": "#009E73",
+      "direct_cp_32_16_8_4_ptv_lcc_isotv": "#D55E00",
+      "direct_cp_cps4_ptv_lcc_isotv": "#B23A48",
+      "idir_be_default_lungmask": "#0072B2",
+      "ptvreg_reference": "#111111",
+      "sinr_cps4_ptv_lcc_isotv": "#CC79A7"
+    },
+    "lungct10_markers": {
+      "direct_cp_32_16_8_4_global_ncc_fd_be": "^",
+      "direct_cp_32_16_8_4_ptv_lcc_isotv": "s",
+      "direct_cp_cps4_ptv_lcc_isotv": "P",
+      "idir_be_default_lungmask": "o",
+      "ptvreg_reference": "*",
+      "sinr_cps4_ptv_lcc_isotv": "D"
+    },
+    "lungct10_plot_method_order": [
+      "idir_be_default_lungmask",
+      "direct_cp_32_16_8_4_global_ncc_fd_be",
+      "direct_cp_32_16_8_4_ptv_lcc_isotv",
+      "ptvreg_reference"
+    ]
+  },
+  "metric_pair_coverage": {
+    "lungct10": {
+      "accuracy_metrics": [
+        "original_snap_tre_mean_mm"
+      ],
+      "annotated_dir": "lungct10",
+      "exclude_by_ratio": {
+        "direct_cp_32_16_8_4_global_ncc_fd_be": [
+          0.0,
+          0.001,
+          0.01
+        ],
+        "direct_cp_32_16_8_4_ptv_lcc_isotv": [
+          0.01,
+          10.0,
+          100.0
+        ],
+        "idir_be_default_lungmask": []
+      },
+      "exclude_by_weight": {
+        "direct_cp_32_16_8_4_global_ncc_fd_be": [],
+        "direct_cp_32_16_8_4_ptv_lcc_isotv": [],
+        "idir_be_default_lungmask": []
+      },
+      "paper_no_annotations_dir": "lungct10_paper_no_annotations",
+      "regularity_metrics": [
+        "fg_logj_std",
+        "fg_jdet_le0_pct",
+        "fg_bending_energy",
+        "fg_diffusion_l2"
+      ],
+      "subset": "default_exclusions"
+    },
+    "oasis20": {
+      "accuracy_metrics": [
+        "dice_mean",
+        "hd95_mean",
+        "asd_warped_to_fixed_mean",
+        "asd_symmetric_mean"
+      ],
+      "annotated_dir": "oasis20",
+      "include_directcp842": true,
+      "paper_no_annotations_dir": "oasis20_paper_no_annotations",
+      "regularity_metrics": [
+        "be_fd_forward_fixed_fg_voxel",
+        "diffusion_fd_forward_fixed_fg_voxel",
+        "diffusion_l2_fg",
+        "jdet_le0_pct_fg",
+        "log_jdet_std_fg",
+        "ndv_frac_fg"
+      ],
+      "spotlight_panels": [
+        [
+          "dice_mean",
+          "log_jdet_std_fg"
+        ],
+        [
+          "hd95_mean",
+          "log_jdet_std_fg"
+        ]
+      ],
+      "styles": [
+        "line_segments",
+        "line_segments_errorbars",
+        "ellipses"
+      ]
+    }
+  },
+  "nickname_path": "experiments/paper_artifacts/method_nicknames.csv",
+  "output_formats": [
+    "png"
+  ],
+  "outputs": {
+    "lungct10_annotated": [
+      "lungct10/default_exclusions/original_snap_tre_mean_mm_vs_fg_bending_energy.png",
+      "lungct10/default_exclusions/original_snap_tre_mean_mm_vs_fg_diffusion_l2.png",
+      "lungct10/default_exclusions/original_snap_tre_mean_mm_vs_fg_jdet_le0_pct.png",
+      "lungct10/default_exclusions/original_snap_tre_mean_mm_vs_fg_logj_std.png"
+    ],
+    "lungct10_paper_no_annotations": [
+      "lungct10_paper_no_annotations/default_exclusions/original_snap_tre_mean_mm_vs_fg_bending_energy.png",
+      "lungct10_paper_no_annotations/default_exclusions/original_snap_tre_mean_mm_vs_fg_diffusion_l2.png",
+      "lungct10_paper_no_annotations/default_exclusions/original_snap_tre_mean_mm_vs_fg_jdet_le0_pct.png",
+      "lungct10_paper_no_annotations/default_exclusions/original_snap_tre_mean_mm_vs_fg_logj_std.png"
+    ],
+    "oasis20_annotated": [
+      "oasis20/big_plots/contact_sheet_ellipses.png",
+      "oasis20/big_plots/contact_sheet_line_segments.png",
+      "oasis20/big_plots/contact_sheet_line_segments_errorbars.png",
+      "oasis20/big_plots/spotlight_ellipses__dice_mean_vs_log_jdet_std_fg.png",
+      "oasis20/big_plots/spotlight_ellipses__hd95_mean_vs_log_jdet_std_fg.png",
+      "oasis20/big_plots/spotlight_line_segments__dice_mean_vs_log_jdet_std_fg.png",
+      "oasis20/big_plots/spotlight_line_segments__hd95_mean_vs_log_jdet_std_fg.png",
+      "oasis20/big_plots/spotlight_line_segments_errorbars__dice_mean_vs_log_jdet_std_fg.png",
+      "oasis20/big_plots/spotlight_line_segments_errorbars__hd95_mean_vs_log_jdet_std_fg.png",
+      "oasis20/small_plots/ellipses__asd_symmetric_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/ellipses__asd_symmetric_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/ellipses__asd_symmetric_mean_vs_diffusion_l2_fg.png",
+      "oasis20/small_plots/ellipses__asd_symmetric_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20/small_plots/ellipses__asd_symmetric_mean_vs_log_jdet_std_fg.png",
+      "oasis20/small_plots/ellipses__asd_symmetric_mean_vs_ndv_frac_fg.png",
+      "oasis20/small_plots/ellipses__asd_warped_to_fixed_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/ellipses__asd_warped_to_fixed_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/ellipses__asd_warped_to_fixed_mean_vs_diffusion_l2_fg.png",
+      "oasis20/small_plots/ellipses__asd_warped_to_fixed_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20/small_plots/ellipses__asd_warped_to_fixed_mean_vs_log_jdet_std_fg.png",
+      "oasis20/small_plots/ellipses__asd_warped_to_fixed_mean_vs_ndv_frac_fg.png",
+      "oasis20/small_plots/ellipses__dice_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/ellipses__dice_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/ellipses__dice_mean_vs_diffusion_l2_fg.png",
+      "oasis20/small_plots/ellipses__dice_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20/small_plots/ellipses__dice_mean_vs_log_jdet_std_fg.png",
+      "oasis20/small_plots/ellipses__dice_mean_vs_ndv_frac_fg.png",
+      "oasis20/small_plots/ellipses__hd95_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/ellipses__hd95_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/ellipses__hd95_mean_vs_diffusion_l2_fg.png",
+      "oasis20/small_plots/ellipses__hd95_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20/small_plots/ellipses__hd95_mean_vs_log_jdet_std_fg.png",
+      "oasis20/small_plots/ellipses__hd95_mean_vs_ndv_frac_fg.png",
+      "oasis20/small_plots/line_segments__asd_symmetric_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/line_segments__asd_symmetric_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/line_segments__asd_symmetric_mean_vs_diffusion_l2_fg.png",
+      "oasis20/small_plots/line_segments__asd_symmetric_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20/small_plots/line_segments__asd_symmetric_mean_vs_log_jdet_std_fg.png",
+      "oasis20/small_plots/line_segments__asd_symmetric_mean_vs_ndv_frac_fg.png",
+      "oasis20/small_plots/line_segments__asd_warped_to_fixed_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/line_segments__asd_warped_to_fixed_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/line_segments__asd_warped_to_fixed_mean_vs_diffusion_l2_fg.png",
+      "oasis20/small_plots/line_segments__asd_warped_to_fixed_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20/small_plots/line_segments__asd_warped_to_fixed_mean_vs_log_jdet_std_fg.png",
+      "oasis20/small_plots/line_segments__asd_warped_to_fixed_mean_vs_ndv_frac_fg.png",
+      "oasis20/small_plots/line_segments__dice_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/line_segments__dice_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/line_segments__dice_mean_vs_diffusion_l2_fg.png",
+      "oasis20/small_plots/line_segments__dice_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20/small_plots/line_segments__dice_mean_vs_log_jdet_std_fg.png",
+      "oasis20/small_plots/line_segments__dice_mean_vs_ndv_frac_fg.png",
+      "oasis20/small_plots/line_segments__hd95_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/line_segments__hd95_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/line_segments__hd95_mean_vs_diffusion_l2_fg.png",
+      "oasis20/small_plots/line_segments__hd95_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20/small_plots/line_segments__hd95_mean_vs_log_jdet_std_fg.png",
+      "oasis20/small_plots/line_segments__hd95_mean_vs_ndv_frac_fg.png",
+      "oasis20/small_plots/line_segments_errorbars__asd_symmetric_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/line_segments_errorbars__asd_symmetric_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/line_segments_errorbars__asd_symmetric_mean_vs_diffusion_l2_fg.png",
+      "oasis20/small_plots/line_segments_errorbars__asd_symmetric_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20/small_plots/line_segments_errorbars__asd_symmetric_mean_vs_log_jdet_std_fg.png",
+      "oasis20/small_plots/line_segments_errorbars__asd_symmetric_mean_vs_ndv_frac_fg.png",
+      "oasis20/small_plots/line_segments_errorbars__asd_warped_to_fixed_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/line_segments_errorbars__asd_warped_to_fixed_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/line_segments_errorbars__asd_warped_to_fixed_mean_vs_diffusion_l2_fg.png",
+      "oasis20/small_plots/line_segments_errorbars__asd_warped_to_fixed_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20/small_plots/line_segments_errorbars__asd_warped_to_fixed_mean_vs_log_jdet_std_fg.png",
+      "oasis20/small_plots/line_segments_errorbars__asd_warped_to_fixed_mean_vs_ndv_frac_fg.png",
+      "oasis20/small_plots/line_segments_errorbars__dice_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/line_segments_errorbars__dice_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/line_segments_errorbars__dice_mean_vs_diffusion_l2_fg.png",
+      "oasis20/small_plots/line_segments_errorbars__dice_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20/small_plots/line_segments_errorbars__dice_mean_vs_log_jdet_std_fg.png",
+      "oasis20/small_plots/line_segments_errorbars__dice_mean_vs_ndv_frac_fg.png",
+      "oasis20/small_plots/line_segments_errorbars__hd95_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/line_segments_errorbars__hd95_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20/small_plots/line_segments_errorbars__hd95_mean_vs_diffusion_l2_fg.png",
+      "oasis20/small_plots/line_segments_errorbars__hd95_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20/small_plots/line_segments_errorbars__hd95_mean_vs_log_jdet_std_fg.png",
+      "oasis20/small_plots/line_segments_errorbars__hd95_mean_vs_ndv_frac_fg.png"
+    ],
+    "oasis20_paper_no_annotations": [
+      "oasis20_paper_no_annotations/big_plots/contact_sheet_ellipses.png",
+      "oasis20_paper_no_annotations/big_plots/contact_sheet_line_segments.png",
+      "oasis20_paper_no_annotations/big_plots/contact_sheet_line_segments_errorbars.png",
+      "oasis20_paper_no_annotations/big_plots/spotlight_ellipses__dice_mean_vs_log_jdet_std_fg.png",
+      "oasis20_paper_no_annotations/big_plots/spotlight_ellipses__hd95_mean_vs_log_jdet_std_fg.png",
+      "oasis20_paper_no_annotations/big_plots/spotlight_line_segments__dice_mean_vs_log_jdet_std_fg.png",
+      "oasis20_paper_no_annotations/big_plots/spotlight_line_segments__hd95_mean_vs_log_jdet_std_fg.png",
+      "oasis20_paper_no_annotations/big_plots/spotlight_line_segments_errorbars__dice_mean_vs_log_jdet_std_fg.png",
+      "oasis20_paper_no_annotations/big_plots/spotlight_line_segments_errorbars__hd95_mean_vs_log_jdet_std_fg.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__asd_symmetric_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__asd_symmetric_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__asd_symmetric_mean_vs_diffusion_l2_fg.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__asd_symmetric_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__asd_symmetric_mean_vs_log_jdet_std_fg.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__asd_symmetric_mean_vs_ndv_frac_fg.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__asd_warped_to_fixed_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__asd_warped_to_fixed_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__asd_warped_to_fixed_mean_vs_diffusion_l2_fg.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__asd_warped_to_fixed_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__asd_warped_to_fixed_mean_vs_log_jdet_std_fg.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__asd_warped_to_fixed_mean_vs_ndv_frac_fg.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__dice_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__dice_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__dice_mean_vs_diffusion_l2_fg.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__dice_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__dice_mean_vs_log_jdet_std_fg.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__dice_mean_vs_ndv_frac_fg.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__hd95_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__hd95_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__hd95_mean_vs_diffusion_l2_fg.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__hd95_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__hd95_mean_vs_log_jdet_std_fg.png",
+      "oasis20_paper_no_annotations/small_plots/ellipses__hd95_mean_vs_ndv_frac_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__asd_symmetric_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__asd_symmetric_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__asd_symmetric_mean_vs_diffusion_l2_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__asd_symmetric_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__asd_symmetric_mean_vs_log_jdet_std_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__asd_symmetric_mean_vs_ndv_frac_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__asd_warped_to_fixed_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__asd_warped_to_fixed_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__asd_warped_to_fixed_mean_vs_diffusion_l2_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__asd_warped_to_fixed_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__asd_warped_to_fixed_mean_vs_log_jdet_std_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__asd_warped_to_fixed_mean_vs_ndv_frac_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__dice_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__dice_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__dice_mean_vs_diffusion_l2_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__dice_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__dice_mean_vs_log_jdet_std_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__dice_mean_vs_ndv_frac_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__hd95_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__hd95_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__hd95_mean_vs_diffusion_l2_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__hd95_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__hd95_mean_vs_log_jdet_std_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments__hd95_mean_vs_ndv_frac_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__asd_symmetric_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__asd_symmetric_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__asd_symmetric_mean_vs_diffusion_l2_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__asd_symmetric_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__asd_symmetric_mean_vs_log_jdet_std_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__asd_symmetric_mean_vs_ndv_frac_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__asd_warped_to_fixed_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__asd_warped_to_fixed_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__asd_warped_to_fixed_mean_vs_diffusion_l2_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__asd_warped_to_fixed_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__asd_warped_to_fixed_mean_vs_log_jdet_std_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__asd_warped_to_fixed_mean_vs_ndv_frac_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__dice_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__dice_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__dice_mean_vs_diffusion_l2_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__dice_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__dice_mean_vs_log_jdet_std_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__dice_mean_vs_ndv_frac_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__hd95_mean_vs_be_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__hd95_mean_vs_diffusion_fd_forward_fixed_fg_voxel.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__hd95_mean_vs_diffusion_l2_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__hd95_mean_vs_jdet_le0_pct_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__hd95_mean_vs_log_jdet_std_fg.png",
+      "oasis20_paper_no_annotations/small_plots/line_segments_errorbars__hd95_mean_vs_ndv_frac_fg.png"
+    ]
+  },
+  "plot_counts": {
+    "lungct10_annotated_png": 4,
+    "lungct10_paper_no_annotations_png": 4,
+    "oasis20_annotated_png": 81,
+    "oasis20_paper_no_annotations_png": 81,
+    "total_png": 170
+  },
+  "selected_hypervariants": [
+    {
+      "dataset": "oasis20",
+      "lr": 0.0001,
+      "method_id": "idir_original_dense_siren_be_autograd",
+      "variant": "BE alpha sweep"
+    },
+    {
+      "dataset": "oasis20",
+      "lr": 0.0001,
+      "method_id": "sinr_cps2_be_bspline_analytic",
+      "variant": "BE alpha sweep"
+    },
+    {
+      "dataset": "oasis20",
+      "lr": 0.0001,
+      "method_id": "sinr_cps4_be_bspline_analytic",
+      "variant": "BE alpha sweep"
+    },
+    {
+      "dataset": "oasis20",
+      "lr": 0.001,
+      "method_id": "direct_cp_cps2_be_bspline_analytic",
+      "variant": "BE alpha sweep"
+    },
+    {
+      "dataset": "oasis20",
+      "lr": 0.001,
+      "method_id": "direct_cp_cps4_be_bspline_analytic",
+      "variant": "BE alpha sweep"
+    },
+    {
+      "dataset": "oasis20",
+      "lr": 0.001,
+      "method_id": "direct_cp_8_4_2_be_bspline_analytic_multistage",
+      "variant": "canonical lr=1e-3 multistage BE alpha sweep"
+    },
+    {
+      "dataset": "lungct10",
+      "lr": 0.0001,
+      "method_id": "idir_be_default_lungmask",
+      "variant": "pTV-prep/native IDIR alpha sweep rows"
+    },
+    {
+      "dataset": "lungct10",
+      "lr": 0.0001,
+      "method_id": "sinr_cps4_ptv_lcc_isotv",
+      "variant": "single-stage pTV LCC+isoTV"
+    },
+    {
+      "dataset": "lungct10",
+      "lr": 0.001,
+      "method_id": "direct_cp_cps4_ptv_lcc_isotv",
+      "variant": "single-stage pTV LCC+isoTV"
+    },
+    {
+      "dataset": "lungct10",
+      "lr": 0.001,
+      "method_id": "direct_cp_32_16_8_4_ptv_lcc_isotv",
+      "variant": "32-16-8-4 pTV LCC+isoTV sweep"
+    },
+    {
+      "dataset": "lungct10",
+      "lr": 0.001,
+      "method_id": "direct_cp_32_16_8_4_global_ncc_fd_be",
+      "variant": "32-16-8-4 global NCC+FD-BE sweep"
+    }
+  ],
+  "source_files": {
+    "lungct10_mean_rows": "experiments/2026-06-26_lungct_directcp4stage_midratio_pareto_extension/pareto_visual_review_midratio_extension/combined_mean_rows_with_ptvreg.csv",
+    "lungct10_single_stage_rows": "experiments/2026-06-25_lungct_ptvprep_no_sweep_repro/summary_runs.csv",
+    "oasis20": "experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_first10_first20_alpha5_saved_baselines_plus_directcp842_lr1e3_paper_v1/first20/population_summary_first20_with_saved_baselines.csv"
+  },
+  "standard_path": "experiments/paper_artifacts/artifact_standard_v002_candidate.json",
+  "validation_status_counts": {
+    "matches_standard": 11
+  },
+  "version": "v002_candidate"
+}
