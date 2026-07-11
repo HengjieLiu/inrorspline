@@ -1,0 +1,262 @@
+{
+  "artifact": "motion_pattern_figure",
+  "version": "v001",
+  "generated_by": "experiments/paper_artifacts/motion_pattern_figure/build_motion_pattern_figure.py",
+  "output_dir": "${REPO_ROOT}/experiments/paper_artifacts/motion_pattern_figure/v001",
+  "device": "cuda",
+  "cases": [
+    {
+      "case_key": "oasis_rank009",
+      "dataset": "oasis",
+      "display_label": "OASIS rank 9",
+      "fixed_id": "0173",
+      "moving_id": "0136",
+      "case_rank": 9,
+      "original_case_index": 88,
+      "pair_file": "${REPO_ROOT}/configs/splits/oasis/pair_test_200_shuffled_seed000003.txt",
+      "source_field_path": "${WAVEREG_DATA_ROOT}/wipmidl_0407/OASIS_v1/round1_MIDL/gpu8_OASIS_v1_bs4_sitreg_v0_run1_20250407165940/inference/inference_bestdice/disp_0173_0136.nii.gz",
+      "source_field": "bs4_sitreg_v0",
+      "source_field_storage_layout": "channel_first_zyx_repo_ras",
+      "source_field_component_order": "zyx_voxel",
+      "source_field_reorientation": "none",
+      "source_field_units": "voxel",
+      "source_field_direction": "fixed_to_moving_pull_field_for_warping_moving_to_fixed",
+      "source_field_raw_shape": [
+        3,
+        160,
+        224,
+        192
+      ],
+      "field_shape_zyx": [
+        160,
+        224,
+        192
+      ],
+      "registration_spacing_zyx_mm": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "slice_view": "coronal",
+      "slice_axis_zyx": 1,
+      "slice_index": 107,
+      "slice_selection": "fixed raw image-positive foreground bounding-box center",
+      "display_orientation": "OASIS LIA-to-RAS loader output, then legacy np.fliplr(slice.T) display transform",
+      "display_aspect": 1.0,
+      "grid_step_voxels": 4,
+      "backward_grid_mode": "image_warped_pull_grid",
+      "backward_grid_direction": "synthetic raster grid sampled through fixed-to-moving pull field",
+      "forward_grid_mode": "coordinate_lattice_identity_plus_displacement",
+      "forward_grid_direction": "sampled fixed-coordinate lattice plus stored pull displacement",
+      "forward_grid_component_mapping": "display_x=(D-1)-(z+disp_z), display_y=x+disp_x after np.fliplr(slice.T)",
+      "forward_grid_sample_count": 2009,
+      "forward_grid_color_quantity": "full 3D displacement magnitude",
+      "forward_grid_color_units": "mm",
+      "forward_grid_color_max_mm": 6.689738883972168,
+      "vector_step_voxels": 12,
+      "vector_arrow_components": "in-plane coronal displayed components",
+      "vector_color_quantity": "full 3D displacement magnitude",
+      "vector_color_units": "mm",
+      "vector_component_mapping": "display_u=-disp_z_voxel, display_v=disp_x_voxel after np.fliplr(slice.T); color=3D magnitude_mm",
+      "vector_arrow_scale": 1.0,
+      "vector_color_max": 6.825840425491333,
+      "vector_sample_count": 112,
+      "summary_color_max_mm": 6.825840425491333,
+      "summary_color_scale_scope": "per_case_shared_by_forward_grid_and_quiver"
+    },
+    {
+      "case_key": "lungct_case01",
+      "dataset": "lungct_4dct",
+      "display_label": "LungCT case 01",
+      "fixed_phase": "T00 end-inhale",
+      "moving_phase": "T50 end-exhale",
+      "registration_direction": "T50 moving to T00 fixed",
+      "source_field_path": "${DATA_ROOT}/ptvreg/4DCT/case01_T50_to_T00_deformation.mat",
+      "source_field": "pTVReg",
+      "source_field_h5py_layout": "component,z,y,x",
+      "source_field_matlab_layout": "Tptv_rsz(x,y,z,component)",
+      "source_field_component_order": "x,y,z",
+      "source_field_units": "physical_mm",
+      "source_field_direction": "fixed_T00_to_moving_T50",
+      "source_saved_tre_phys_mean_mm": 0.7671410824122017,
+      "source_recomputed_snap_tre_mean_mm": 0.7671410824122021,
+      "source_tre_validation_abs_err": 4.440892098500626e-16,
+      "case_dir": "${LUNGCT_DATA_ROOT}/processed/preprocessing/ptvprep/ptvreg_landmark_crop_1mm_trilinear_v1/4dct/case01",
+      "field_shape_zyx": [
+        210,
+        150,
+        232
+      ],
+      "native_spacing_zyx_mm": [
+        2.5,
+        0.97,
+        0.97
+      ],
+      "registration_spacing_zyx_mm": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "crop_bounds_zyx_0based_inclusive": [
+        [
+          3,
+          86
+        ],
+        [
+          45,
+          199
+        ],
+        [
+          16,
+          254
+        ]
+      ],
+      "slice_view": "coronal",
+      "slice_axis_zyx": 1,
+      "slice_index": 74,
+      "slice_selection": "fixed T00 lung-mask bounding-box center",
+      "display_orientation": "pTV-prep zyx array, coronal arr[:, y, :], flipped along z for superior-at-top display",
+      "display_aspect": 1.0,
+      "grid_step_voxels": 4,
+      "backward_grid_mode": "image_warped_pull_grid",
+      "backward_grid_direction": "synthetic raster grid sampled through fixed_T00_to_moving_T50 pull field",
+      "forward_grid_mode": "coordinate_lattice_identity_plus_displacement",
+      "forward_grid_direction": "sampled fixed T00 crop-coordinate lattice plus pTVReg pull displacement",
+      "forward_grid_component_mapping": "display_x=x+disp_x, display_y=(D-1)-(z+disp_z) after arr[:, y, :] z-flip",
+      "forward_grid_sample_count": 3186,
+      "forward_grid_color_quantity": "full 3D displacement magnitude",
+      "forward_grid_color_units": "mm",
+      "forward_grid_color_max_mm": 8.57904930114746,
+      "vector_step_voxels": 12,
+      "vector_arrow_components": "in-plane coronal displayed components",
+      "vector_color_quantity": "full 3D displacement magnitude",
+      "vector_color_units": "mm",
+      "vector_component_mapping": "display_u=disp_x, display_v=-disp_z after arr[:, y, :] z-flip",
+      "vector_arrow_scale": 1.0,
+      "vector_color_max": 9.200683288574222,
+      "vector_sample_count": 150,
+      "summary_color_max_mm": 9.200683288574222,
+      "summary_color_scale_scope": "per_case_shared_by_forward_grid_and_quiver"
+    },
+    {
+      "case_key": "lungct_case08",
+      "dataset": "lungct_4dct",
+      "display_label": "LungCT case 08",
+      "fixed_phase": "T00 end-inhale",
+      "moving_phase": "T50 end-exhale",
+      "registration_direction": "T50 moving to T00 fixed",
+      "source_field_path": "${DATA_ROOT}/ptvreg/4DCT/case08_T50_to_T00_deformation.mat",
+      "source_field": "pTVReg",
+      "source_field_h5py_layout": "component,z,y,x",
+      "source_field_matlab_layout": "Tptv_rsz(x,y,z,component)",
+      "source_field_component_order": "x,y,z",
+      "source_field_units": "physical_mm",
+      "source_field_direction": "fixed_T00_to_moving_T50",
+      "source_saved_tre_phys_mean_mm": 1.014219831733267,
+      "source_recomputed_snap_tre_mean_mm": 1.0142198317332671,
+      "source_tre_validation_abs_err": 2.220446049250313e-16,
+      "case_dir": "${LUNGCT_DATA_ROOT}/processed/preprocessing/ptvprep/ptvreg_landmark_crop_1mm_trilinear_v1/4dct/case08",
+      "field_shape_zyx": [
+        228,
+        207,
+        254
+      ],
+      "native_spacing_zyx_mm": [
+        2.5,
+        0.97,
+        0.97
+      ],
+      "registration_spacing_zyx_mm": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "crop_bounds_zyx_0based_inclusive": [
+        [
+          20,
+          110
+        ],
+        [
+          89,
+          301
+        ],
+        [
+          121,
+          382
+        ]
+      ],
+      "slice_view": "coronal",
+      "slice_axis_zyx": 1,
+      "slice_index": 102,
+      "slice_selection": "fixed T00 lung-mask bounding-box center",
+      "display_orientation": "pTV-prep zyx array, coronal arr[:, y, :], flipped along z for superior-at-top display",
+      "display_aspect": 1.0,
+      "grid_step_voxels": 4,
+      "backward_grid_mode": "image_warped_pull_grid",
+      "backward_grid_direction": "synthetic raster grid sampled through fixed_T00_to_moving_T50 pull field",
+      "forward_grid_mode": "coordinate_lattice_identity_plus_displacement",
+      "forward_grid_direction": "sampled fixed T00 crop-coordinate lattice plus pTVReg pull displacement",
+      "forward_grid_component_mapping": "display_x=x+disp_x, display_y=(D-1)-(z+disp_z) after arr[:, y, :] z-flip",
+      "forward_grid_sample_count": 3770,
+      "forward_grid_color_quantity": "full 3D displacement magnitude",
+      "forward_grid_color_units": "mm",
+      "forward_grid_color_max_mm": 24.60362339019775,
+      "vector_step_voxels": 12,
+      "vector_arrow_components": "in-plane coronal displayed components",
+      "vector_color_quantity": "full 3D displacement magnitude",
+      "vector_color_units": "mm",
+      "vector_component_mapping": "display_u=disp_x, display_v=-disp_z after arr[:, y, :] z-flip",
+      "vector_arrow_scale": 2.5747026867336698,
+      "vector_color_max": 25.06020965576172,
+      "vector_sample_count": 231,
+      "summary_color_max_mm": 25.06020965576172,
+      "summary_color_scale_scope": "per_case_shared_by_forward_grid_and_quiver"
+    }
+  ],
+  "outputs": {
+    "composite_png": "motion_pattern_coronal_reference.png",
+    "composite_pdf": "motion_pattern_coronal_reference.pdf",
+    "summary_png": "motion_pattern_coronal_summary.png",
+    "summary_pdf": "motion_pattern_coronal_summary.pdf",
+    "vector_composite_png": "motion_pattern_coronal_vector_reference.png",
+    "vector_composite_pdf": "motion_pattern_coronal_vector_reference.pdf",
+    "case_csv": "motion_pattern_cases.csv",
+    "review_notebook": "motion_pattern_reference_review.ipynb"
+  },
+  "per_case_pngs": [
+    {
+      "case_key": "oasis_rank009",
+      "path": "oasis_rank009_coronal_reference.png"
+    },
+    {
+      "case_key": "lungct_case01",
+      "path": "lungct_case01_coronal_reference.png"
+    },
+    {
+      "case_key": "lungct_case08",
+      "path": "lungct_case08_coronal_reference.png"
+    }
+  ],
+  "per_case_vector_pngs": [
+    {
+      "case_key": "oasis_rank009",
+      "path": "oasis_rank009_coronal_vector_reference.png"
+    },
+    {
+      "case_key": "lungct_case01",
+      "path": "lungct_case01_coronal_vector_reference.png"
+    },
+    {
+      "case_key": "lungct_case08",
+      "path": "lungct_case08_coronal_vector_reference.png"
+    }
+  ],
+  "notes": [
+    "Reference-only visualization: no registration runs are launched.",
+    "Backward grid panels warp a synthetic 3D binary grid using the same pull-field convention as image warping.",
+    "Forward grid panels draw a sparse coordinate lattice after adding the sampled displacement at grid vertices.",
+    "Summary panels overlay forward grid and quiver on moving images using a shared per-case mm color scale.",
+    "Vector panels show displayed in-plane coronal pull-field components; colors show full 3D displacement magnitude.",
+    "OASIS and LungCT use different source orientations; per-case display transforms are recorded above."
+  ]
+}

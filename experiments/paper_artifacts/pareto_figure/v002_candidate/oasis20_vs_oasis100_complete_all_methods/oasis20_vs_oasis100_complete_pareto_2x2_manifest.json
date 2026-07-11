@@ -1,0 +1,186 @@
+{
+  "artifact": "oasis20_vs_oasis100_complete_all_methods",
+  "source_version": "v002_candidate",
+  "generated_utc": "2026-07-06T14:11:51+00:00",
+  "source_files": {
+    "oasis20_population": "experiments/paper_artifacts/pareto_figure/v002_candidate/oasis20_pareto_source_rows.csv",
+    "oasis100_first10_main_sweeps": "${DATA_ROOT}/runs/oasis_seed3_first10_alpha_sweep_be_2500e_v1",
+    "oasis100_first10_cps2_prelim_sweeps": "${DATA_ROOT}/runs/oasis_seed3_first10_direct_cp_cps2_prelim_a100_1000_10000_v1",
+    "oasis100_first10_cps2_completion_sweeps": "${DATA_ROOT}/runs/oasis_seed3_first10_direct_cp_cps2_completion_a0_10_100000_v1",
+    "oasis100_next10_sweeps": "${DATA_ROOT}/runs/oasis_seed3_next10_alpha_sweep_be_2500e_5models_v1",
+    "oasis100_single_stage_extension": "${DATA_ROOT}/runs/oasis_seed3_ranks020_099_alpha_sweep_be_2500e_5models_v1",
+    "oasis100_baseline_first20": "${DATA_ROOT}/runs/oasis_seed3_first10_saved_baselines_v1",
+    "oasis100_baseline_extension": "${DATA_ROOT}/runs/oasis_seed3_ranks020_099_saved_baselines_v1",
+    "oasis100_directcp842_first20": "${DATA_ROOT}/runs/oasis_seed3_first20_directcp842_lr1e3_alpha_sweep_v1",
+    "oasis100_directcp842_extension": "${DATA_ROOT}/runs/oasis_seed3_ranks020_099_directcp842_lr1e3_alpha_sweep_v1",
+    "method_nicknames": "experiments/paper_artifacts/method_nicknames.csv"
+  },
+  "outputs": [
+    "experiments/paper_artifacts/pareto_figure/v002_candidate/oasis20_vs_oasis100_complete_all_methods/oasis20_vs_oasis100_complete_pareto_2x2_ellipses_no_annotations.png",
+    "experiments/paper_artifacts/pareto_figure/v002_candidate/oasis20_vs_oasis100_complete_all_methods/oasis20_vs_oasis100_complete_pareto_2x2_ellipses_annotated_review.png"
+  ],
+  "source_rows": "experiments/paper_artifacts/pareto_figure/v002_candidate/oasis20_vs_oasis100_complete_all_methods/oasis20_vs_oasis100_complete_source_rows.csv",
+  "output_formats": [
+    "png"
+  ],
+  "annotation_modes": {
+    "no_annotations": {
+      "annotate": false,
+      "filename": "oasis20_vs_oasis100_complete_pareto_2x2_ellipses_no_annotations.png"
+    },
+    "annotated_review": {
+      "annotate": true,
+      "filename": "oasis20_vs_oasis100_complete_pareto_2x2_ellipses_annotated_review.png"
+    }
+  },
+  "panels": [
+    {
+      "cohort": "OASIS20",
+      "title": "Dice vs SDlogJ (OASIS N=20)",
+      "acc_key": "dice_mean"
+    },
+    {
+      "cohort": "OASIS20",
+      "title": "HD95 vs SDlogJ (OASIS N=20)",
+      "acc_key": "hd95_mean"
+    },
+    {
+      "cohort": "OASIS100",
+      "title": "Dice vs SDlogJ (OASIS N=100)",
+      "acc_key": "dice_mean"
+    },
+    {
+      "cohort": "OASIS100",
+      "title": "HD95 vs SDlogJ (OASIS N=100)",
+      "acc_key": "hd95_mean"
+    }
+  ],
+  "style": {
+    "figsize": [
+      14.0,
+      10.0
+    ],
+    "dpi": 300,
+    "title_fontsize": 18,
+    "axis_label_fontsize": 14,
+    "tick_label_fontsize": 12,
+    "legend_fontsize": 8.5,
+    "legend_frame": true,
+    "ellipse_alpha": 0.14,
+    "grid_alpha": 0.25,
+    "wspace": 0.18,
+    "hspace": 0.3
+  },
+  "included_methods": {
+    "sweeps": [
+      "idir_original_dense_siren_be_autograd",
+      "sinr_cps4_be_bspline_analytic",
+      "direct_cp_cps4_be_bspline_analytic",
+      "sinr_cps2_be_bspline_analytic",
+      "direct_cp_cps2_be_bspline_analytic",
+      "direct_cp_8_4_2_be_bspline_analytic_multistage"
+    ],
+    "baselines": [
+      "bs1_vxm_v0_2",
+      "bs2_tm_v0",
+      "bs3_vfa_v0",
+      "bs4_sitreg_v0",
+      "greedy"
+    ]
+  },
+  "excluded_methods": [],
+  "row_counts": {
+    "expected_population_rows_per_cohort": 41,
+    "oasis20_population_rows": 41,
+    "oasis100_population_rows": 41,
+    "oasis100_case_sweep_rows": 3600,
+    "oasis100_case_baseline_rows": 500
+  },
+  "axis_limits": {
+    "xlim": [
+      0.0015122668966025266,
+      1.6708009980861163
+    ],
+    "dice_ylim": [
+      0.6291884799612637,
+      0.8637340467450314
+    ],
+    "hd95_ylim": [
+      1.1154114170304827,
+      4.907982937024786
+    ]
+  },
+  "oasis100_coverage": {
+    "sweep_counts": {
+      "idir_original_dense_siren_be_autograd": {
+        "0": 100,
+        "0.01": 100,
+        "0.1": 100,
+        "1": 100,
+        "10": 100,
+        "100": 100
+      },
+      "sinr_cps4_be_bspline_analytic": {
+        "0": 100,
+        "10": 100,
+        "100": 100,
+        "1000": 100,
+        "10000": 100,
+        "100000": 100
+      },
+      "direct_cp_cps4_be_bspline_analytic": {
+        "0": 100,
+        "10": 100,
+        "100": 100,
+        "1000": 100,
+        "10000": 100,
+        "100000": 100
+      },
+      "sinr_cps2_be_bspline_analytic": {
+        "0": 100,
+        "10": 100,
+        "100": 100,
+        "1000": 100,
+        "10000": 100,
+        "100000": 100
+      },
+      "direct_cp_cps2_be_bspline_analytic": {
+        "0": 100,
+        "10": 100,
+        "100": 100,
+        "1000": 100,
+        "10000": 100,
+        "100000": 100
+      },
+      "direct_cp_8_4_2_be_bspline_analytic_multistage": {
+        "0": 100,
+        "10": 100,
+        "100": 100,
+        "1000": 100,
+        "10000": 100,
+        "100000": 100
+      }
+    },
+    "baseline_counts": {
+      "bs1_vxm_v0_2": 100,
+      "bs2_tm_v0": 100,
+      "bs3_vfa_v0": 100,
+      "bs4_sitreg_v0": 100,
+      "greedy": 100
+    },
+    "direct_cp_cps4_counts": {
+      "0": 100,
+      "10": 100,
+      "100": 100,
+      "1000": 100,
+      "10000": 100,
+      "100000": 100
+    }
+  },
+  "preflight": {
+    "all_included_first100_groups_complete": true,
+    "direct_cp_cps4_complete": true,
+    "inr_bscp_cps4_included": true,
+    "inr_bscp_cps4_excluded": false
+  }
+}

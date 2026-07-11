@@ -1,0 +1,21 @@
+{
+  "updated_at": "2026-07-04 06:24:29 +0000",
+  "started_epoch": 1783140827.6181364,
+  "elapsed_sec": 5441.441624403,
+  "job_count": 400,
+  "done_count": 400,
+  "completed_in_launcher": 400,
+  "skipped_existing": 0,
+  "pending_count": 0,
+  "running_count": 0,
+  "failure_count": 0,
+  "gpus": [
+    "0",
+    "1",
+    "2",
+    "3"
+  ],
+  "max_concurrent": 4,
+  "running": [],
+  "failures": []
+}

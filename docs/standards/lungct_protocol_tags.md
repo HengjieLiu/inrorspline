@@ -12,6 +12,140 @@ row, read:
 - `docs/reports/protocol_warnings/ptvreg_technique_audit_directcp_multistage.md`
 - `docs/standards/lungct_tre_metric_conventions.md`
 
+## Fixed/Moving Image Convention
+
+This repository follows the pTVReg/DIR-Lab convention for LungCT registration.
+
+### Registration Direction
+
+For DIR-Lab 4DCT experiments, registration is performed from the end-exhale
+phase to the end-inhale phase:
+
+```text
+moving image: T50 / end-exhale / maximum exhale
+fixed image:  T00 / end-inhale / maximum inhale
+direction:    T50 -> T00, i.e., exhale-to-inhale
+```
+
+In standard image registration terminology:
+
+- The fixed image is the reference or target image space.
+- The moving image is the image that is spatially transformed.
+- The registration output is the moving image warped into the fixed image
+  space.
+
+Therefore, in the LungCT setup:
+
+```text
+moving image = exhale CT = smaller/contracted lung state
+fixed image  = inhale CT = larger/expanded lung state
+```
+
+The registration task is to deform the smaller-lung exhale image toward the
+larger-lung inhale image.
+
+### DIR-Lab 4DCT Phase Naming
+
+For the DIR-Lab 4DCT dataset:
+
+```text
+T00 = maximum inhale phase
+T50 = maximum exhale phase
+```
+
+Accordingly:
+
+```text
+T00 has the larger lung volume.
+T50 has the smaller lung volume.
+```
+
+When using the pTVReg-style setup, the images are assigned as:
+
+```text
+volmov = T50  # moving image, maximum exhale
+volfix = T00  # fixed image, maximum inhale
+```
+
+Thus, the image registration direction is:
+
+```text
+T50 -> T00
+exhale -> inhale
+moving -> fixed
+smaller lung -> larger lung
+```
+
+### COPD Breath-Hold CT Convention
+
+For COPD experiments, the same fixed/moving interpretation is used:
+
+```text
+moving image: eBHCT / end-exhale breath-hold CT
+fixed image:  iBHCT / end-inhale breath-hold CT
+direction:    eBHCT -> iBHCT, i.e., exhale-to-inhale
+```
+
+Therefore:
+
+```text
+eBHCT = moving image = smaller/contracted lung
+iBHCT = fixed image  = larger/expanded lung
+```
+
+### Displacement Field Direction
+
+The image registration direction and the displacement-field sampling convention
+should not be confused.
+
+At the image level, the repository convention is:
+
+```text
+moving image is warped to fixed image
+T50 / exhale -> T00 / inhale
+```
+
+However, depending on the implementation, the stored displacement field may be
+represented as a backward/pull field rather than a forward physical trajectory
+field. In a pull-based warping convention, each voxel in the fixed image grid
+samples an intensity from a corresponding location in the moving image.
+Therefore, the displacement array may numerically map fixed-grid coordinates
+back into the moving image, even though the registration task is described as
+moving-to-fixed.
+
+For clarity in this repository:
+
+```text
+"registration direction" refers to the image-level task:
+moving image -> fixed image
+
+"field direction" refers to how the displacement field is stored or sampled
+internally.
+```
+
+Unless otherwise stated, exhale-to-inhale LungCT registration means:
+
+```text
+moving image: exhale CT / T50 / eBHCT
+fixed image:  inhale CT / T00 / iBHCT
+warped image: moving exhale CT resampled into fixed inhale CT space
+```
+
+### Recommended Wording
+
+A concise description for manuscripts or experiment summaries is:
+
+> For LungCT registration, we follow the pTVReg/DIR-Lab convention and register
+> the end-exhale image to the end-inhale image. Specifically, T50/end-exhale is
+> used as the moving image and T00/end-inhale is used as the fixed image. Thus,
+> the moving image corresponds to the smaller, contracted lung state, while the
+> fixed image corresponds to the larger, expanded lung state.
+
+A shorter version is:
+
+> LungCT registration is performed in the exhale-to-inhale direction, with
+> T50/end-exhale as the moving image and T00/end-inhale as the fixed image.
+
 ## Required Tag Fields
 
 Every LungCT run or result row should make these fields explicit:

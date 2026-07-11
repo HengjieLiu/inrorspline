@@ -16,6 +16,7 @@ status: active
 - `docs/01_project_brief.md`: scientific framing.
 - `docs/02_literature_review.md`: literature synthesis map.
 - `docs/03_methods.md`: method and protocol plan.
+- `docs/implementation/`: code-derived implementation notes for method architecture, training losses, deformation math, and paper claims.
 - `docs/04_experiment_registry.md`: experiment ledger.
 - `docs/05_results_summary.md`: current evidence map.
 - `docs/literature/`: paper reading notes and external-code links.

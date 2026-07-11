@@ -1,0 +1,5 @@
+artifact,matches_standard,reference,temporary_exception,version
+best_result_table,10,4,1,v001
+best_result_table,11,4,,v002_candidate
+pareto_figure,10,,1,v001
+pareto_figure,11,,,v002_candidate

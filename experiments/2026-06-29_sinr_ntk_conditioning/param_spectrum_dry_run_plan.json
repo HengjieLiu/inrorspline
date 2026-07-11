@@ -1,0 +1,10 @@
+{
+  "status": "dry_run",
+  "states": [
+    "init",
+    "final"
+  ],
+  "ritz_dim": 64,
+  "review_root": "/homebase/code_sync/inrorspline/experiments/2026-06-29_sinr_ntk_conditioning",
+  "out_root": "/database/inrorspline/runs/sinr_ntk_conditioning_20260629_v1"
+}

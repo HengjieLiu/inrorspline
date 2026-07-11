@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "artifact_standard_version": "v002_candidate",
+  "description": "Candidate final-paper artifact standard using canonical OASIS DirectCP 8-4-2 lr=1e-3 data.",
+  "canonical_lr_by_family": {
+    "idir": 0.0001,
+    "sinr": 0.0001,
+    "directcp": 0.001,
+    "directcp_multistage": 0.001
+  },
+  "method_family_by_id": {
+    "IDIR": "idir",
+    "SINR cps2": "sinr",
+    "SINR cps4": "sinr",
+    "DirectCP cps2": "directcp",
+    "DirectCP cps4": "directcp",
+    "DirectCP 4stage cps4": "directcp_multistage",
+    "DirectCP 8-4-2": "directcp_multistage",
+    "panelA_idir": "idir",
+    "panelA_sinr_cps4": "sinr",
+    "panelA_direct_cp_cps4": "directcp",
+    "panelA_direct_cp_multistage": "directcp_multistage",
+    "idir_original_dense_siren_be_autograd": "idir",
+    "sinr_cps2_be_bspline_analytic": "sinr",
+    "sinr_cps4_be_bspline_analytic": "sinr",
+    "direct_cp_cps2_be_bspline_analytic": "directcp",
+    "direct_cp_cps4_be_bspline_analytic": "directcp",
+    "direct_cp_8_4_2_be_bspline_analytic_multistage": "directcp_multistage",
+    "idir_be_default_lungmask": "idir",
+    "sinr_cps4_ptv_lcc_isotv": "sinr",
+    "sinr_cps4_global_ncc_fd_be": "sinr",
+    "direct_cp_cps4_ptv_lcc_isotv": "directcp",
+    "direct_cp_cps4_global_ncc_fd_be": "directcp",
+    "direct_cp_32_16_8_4_ptv_lcc_isotv": "directcp_multistage",
+    "direct_cp_32_16_8_4_global_ncc_fd_be": "directcp_multistage"
+  },
+  "reference_method_ids": [
+    "greedy",
+    "bs1_vxm_v0_2",
+    "bs2_tm_v0",
+    "bs3_vfa_v0",
+    "bs4_sitreg_v0",
+    "ptvreg_reference",
+    "Greedy",
+    "VoxelMorph",
+    "TransMorph",
+    "VFA",
+    "SITReg",
+    "pTVReg"
+  ],
+  "artifact_versions": {
+    "best_result_table": {
+      "current": "v002_candidate",
+      "output_dir": "experiments/paper_artifacts/best_result_table/v002_candidate"
+    },
+    "pareto_figure": {
+      "current": "v002_candidate",
+      "output_dir": "experiments/paper_artifacts/pareto_figure/v002_candidate"
+    },
+    "fitting_figure": {
+      "current": "v001",
+      "output_dir": "experiments/paper_artifacts/fitting_figure/v001"
+    }
+  },
+  "artifact_source_overrides": {
+    "oasis20_population_summary": "experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_first10_first20_alpha5_saved_baselines_plus_directcp842_lr1e3_paper_v1/first20/population_summary_first20_with_saved_baselines.csv"
+  },
+  "artifact_selected_hypervariants": {
+    "best_result_table": [
+      {"dataset": "oasis20", "method_id": "idir_original_dense_siren_be_autograd", "lr": 0.0001, "selected_setting": "alpha=1"},
+      {"dataset": "oasis20", "method_id": "sinr_cps2_be_bspline_analytic", "lr": 0.0001, "selected_setting": "alpha=1000"},
+      {"dataset": "oasis20", "method_id": "sinr_cps4_be_bspline_analytic", "lr": 0.0001, "selected_setting": "alpha=1000"},
+      {"dataset": "oasis20", "method_id": "direct_cp_cps2_be_bspline_analytic", "lr": 0.001, "selected_setting": "alpha=1000"},
+      {"dataset": "oasis20", "method_id": "direct_cp_cps4_be_bspline_analytic", "lr": 0.001, "selected_setting": "alpha=1000"},
+      {"dataset": "oasis20", "method_id": "direct_cp_8_4_2_be_bspline_analytic_multistage", "lr": 0.001, "selected_setting": "automatic best-Dice alpha from canonical lr=1e-3 sweep"},
+      {"dataset": "lungct10", "method_id": "idir_be_default_lungmask", "lr": 0.0001, "selected_setting": "a=3"},
+      {"dataset": "lungct10", "method_id": "sinr_cps4_ptv_lcc_isotv", "lr": 0.0001, "selected_setting": "default"},
+      {"dataset": "lungct10", "method_id": "direct_cp_cps4_ptv_lcc_isotv", "lr": 0.001, "selected_setting": "default"},
+      {"dataset": "lungct10", "method_id": "direct_cp_32_16_8_4_ptv_lcc_isotv", "lr": 0.001, "selected_setting": "w=0.11"},
+      {"dataset": "lungct10", "method_id": "direct_cp_32_16_8_4_global_ncc_fd_be", "lr": 0.001, "selected_setting": "a=10000"}
+    ],
+    "pareto_figure": [
+      {"dataset": "oasis20", "method_id": "idir_original_dense_siren_be_autograd", "lr": 0.0001, "variant": "BE alpha sweep"},
+      {"dataset": "oasis20", "method_id": "sinr_cps2_be_bspline_analytic", "lr": 0.0001, "variant": "BE alpha sweep"},
+      {"dataset": "oasis20", "method_id": "sinr_cps4_be_bspline_analytic", "lr": 0.0001, "variant": "BE alpha sweep"},
+      {"dataset": "oasis20", "method_id": "direct_cp_cps2_be_bspline_analytic", "lr": 0.001, "variant": "BE alpha sweep"},
+      {"dataset": "oasis20", "method_id": "direct_cp_cps4_be_bspline_analytic", "lr": 0.001, "variant": "BE alpha sweep"},
+      {"dataset": "oasis20", "method_id": "direct_cp_8_4_2_be_bspline_analytic_multistage", "lr": 0.001, "variant": "canonical lr=1e-3 multistage BE alpha sweep"},
+      {"dataset": "lungct10", "method_id": "idir_be_default_lungmask", "lr": 0.0001, "variant": "pTV-prep/native IDIR alpha sweep rows"},
+      {"dataset": "lungct10", "method_id": "sinr_cps4_ptv_lcc_isotv", "lr": 0.0001, "variant": "single-stage pTV LCC+isoTV"},
+      {"dataset": "lungct10", "method_id": "direct_cp_cps4_ptv_lcc_isotv", "lr": 0.001, "variant": "single-stage pTV LCC+isoTV"},
+      {"dataset": "lungct10", "method_id": "direct_cp_32_16_8_4_ptv_lcc_isotv", "lr": 0.001, "variant": "32-16-8-4 pTV LCC+isoTV sweep"},
+      {"dataset": "lungct10", "method_id": "direct_cp_32_16_8_4_global_ncc_fd_be", "lr": 0.001, "variant": "32-16-8-4 global NCC+FD-BE sweep"}
+    ]
+  },
+  "temporary_exceptions": [],
+  "todos": [
+    {
+      "id": "rerun_oasis_directcp842_lr1e-3",
+      "status": "candidate_generated_after_full_run",
+      "reason": "Candidate standard expects the OASIS DirectCP 8-4-2 lr=1e-3 sweep source package."
+    }
+  ]
+}

@@ -1,0 +1,524 @@
+{
+  "datasets": {
+    "lungct10": {
+      "candidate_rows_total": 25,
+      "dataset": "lungct10",
+      "errors": [],
+      "expected_cases": 10,
+      "expected_rows": 6,
+      "failure_analysis": {
+        "headers": [
+          "Method",
+          "Failed cases",
+          "Fail count",
+          "Worst case"
+        ],
+        "metric": "native_crop_snap_tre_mean_mm",
+        "metric_label": "Original snap TRE",
+        "rows": [
+          {
+            "Fail count": "5/10",
+            "Failed cases": "05: 2.576, 06: 3.393, 07: 3.969, 08: 11.950, 10: 2.448",
+            "Method": "INR-BSCP (pTVReg loss)",
+            "Worst case": "08: 11.950"
+          },
+          {
+            "Fail count": "9/10",
+            "Failed cases": "02: 2.981, 03: 4.186, 04: 6.640, 05: 5.814, 06: 8.497, 07: 9.037, 08: 13.815, 09: 6.097, 10: 5.459",
+            "Method": "D-BSCP (pTVReg loss)",
+            "Worst case": "08: 13.815"
+          }
+        ],
+        "source": "experiments/2026-06-25_lungct_ptvprep_no_sweep_repro/summary_runs.csv",
+        "threshold_mm": 2.0,
+        "title": "LungCT single-stage failure cases",
+        "warnings": []
+      },
+      "output_rows": 6,
+      "pool_summaries": [
+        {
+          "candidate_rows": 7,
+          "method": "idir_be_default_lungmask"
+        },
+        {
+          "candidate_rows": 7,
+          "method": "direct_cp_32_16_8_4_ptv_lcc_isotv"
+        },
+        {
+          "candidate_rows": 8,
+          "method": "direct_cp_32_16_8_4_global_ncc_fd_be"
+        },
+        {
+          "candidate_rows": 1,
+          "method": "sinr_cps4_ptv_lcc_isotv"
+        },
+        {
+          "candidate_rows": 1,
+          "method": "direct_cp_cps4_ptv_lcc_isotv"
+        },
+        {
+          "candidate_rows": 1,
+          "method": "ptvreg_reference"
+        }
+      ],
+      "selection": {
+        "metric": "original_snap_tre_mean_mm_mean",
+        "mode": "min",
+        "tie_breakers": [
+          {
+            "metric": "original_subvoxel_tre_mean_mm_mean",
+            "mode": "min"
+          },
+          {
+            "metric": "fg_jdet_le0_pct_mean",
+            "mode": "min"
+          },
+          {
+            "metric": "reg_value",
+            "mode": "min"
+          }
+        ]
+      },
+      "sources": [
+        {
+          "methods": [
+            "idir_be_default_lungmask",
+            "direct_cp_32_16_8_4_ptv_lcc_isotv",
+            "direct_cp_32_16_8_4_global_ncc_fd_be",
+            "ptvreg_reference"
+          ],
+          "name": "latest_midratio_mean_rows",
+          "path": "experiments/2026-06-26_lungct_directcp4stage_midratio_pareto_extension/pareto_visual_review_midratio_extension/combined_mean_rows_with_ptvreg.csv",
+          "rows": 23,
+          "type": "mean_rows"
+        },
+        {
+          "methods": [
+            "sinr_cps4_ptv_lcc_isotv",
+            "direct_cp_cps4_ptv_lcc_isotv"
+          ],
+          "name": "no_sweep_single_stage_rows",
+          "path": "experiments/2026-06-25_lungct_ptvprep_no_sweep_repro/summary_runs.csv",
+          "rows": 40,
+          "type": "no_sweep_case_rows"
+        }
+      ],
+      "table_headers": [
+        "Method",
+        "Selected",
+        "Cases",
+        "Original snap TRE",
+        "Original sub TRE",
+        "FG stdLogJ",
+        "FG bending",
+        "FG Jdet<0 %"
+      ],
+      "title": "LungCT 4DCT all10 automatic best-TRE summary",
+      "validation_rows": [
+        {
+          "artifact": "best_result_table",
+          "canonical_lr": 0.0001,
+          "canonical_lr_label": "1e-4",
+          "dataset": "lungct10",
+          "method_family": "idir",
+          "method_id": "idir_be_default_lungmask",
+          "note": "",
+          "observed_lr": 0.0001,
+          "observed_lr_label": "1e-4",
+          "selected_setting": "a=3",
+          "source": "experiments/2026-06-26_lungct_directcp4stage_midratio_pareto_extension/pareto_visual_review_midratio_extension/combined_mean_rows_with_ptvreg.csv",
+          "status": "matches_standard"
+        },
+        {
+          "artifact": "best_result_table",
+          "canonical_lr": 0.001,
+          "canonical_lr_label": "1e-3",
+          "dataset": "lungct10",
+          "method_family": "directcp_multistage",
+          "method_id": "direct_cp_32_16_8_4_ptv_lcc_isotv",
+          "note": "",
+          "observed_lr": 0.001,
+          "observed_lr_label": "1e-3",
+          "selected_setting": "w=0.11",
+          "source": "experiments/2026-06-26_lungct_directcp4stage_midratio_pareto_extension/pareto_visual_review_midratio_extension/combined_mean_rows_with_ptvreg.csv",
+          "status": "matches_standard"
+        },
+        {
+          "artifact": "best_result_table",
+          "canonical_lr": 0.001,
+          "canonical_lr_label": "1e-3",
+          "dataset": "lungct10",
+          "method_family": "directcp_multistage",
+          "method_id": "direct_cp_32_16_8_4_global_ncc_fd_be",
+          "note": "",
+          "observed_lr": 0.001,
+          "observed_lr_label": "1e-3",
+          "selected_setting": "a=10000",
+          "source": "experiments/2026-06-26_lungct_directcp4stage_midratio_pareto_extension/pareto_visual_review_midratio_extension/combined_mean_rows_with_ptvreg.csv",
+          "status": "matches_standard"
+        },
+        {
+          "artifact": "best_result_table",
+          "canonical_lr": 0.0001,
+          "canonical_lr_label": "1e-4",
+          "dataset": "lungct10",
+          "method_family": "sinr",
+          "method_id": "sinr_cps4_ptv_lcc_isotv",
+          "note": "",
+          "observed_lr": 0.0001,
+          "observed_lr_label": "1e-4",
+          "selected_setting": "default",
+          "source": "experiments/2026-06-25_lungct_ptvprep_no_sweep_repro/summary_runs.csv",
+          "status": "matches_standard"
+        },
+        {
+          "artifact": "best_result_table",
+          "canonical_lr": 0.001,
+          "canonical_lr_label": "1e-3",
+          "dataset": "lungct10",
+          "method_family": "directcp",
+          "method_id": "direct_cp_cps4_ptv_lcc_isotv",
+          "note": "",
+          "observed_lr": 0.001,
+          "observed_lr_label": "1e-3",
+          "selected_setting": "default",
+          "source": "experiments/2026-06-25_lungct_ptvprep_no_sweep_repro/summary_runs.csv",
+          "status": "matches_standard"
+        },
+        {
+          "artifact": "best_result_table",
+          "canonical_lr": null,
+          "canonical_lr_label": "",
+          "dataset": "lungct10",
+          "method_family": "reference",
+          "method_id": "ptvreg_reference",
+          "note": "",
+          "observed_lr": null,
+          "observed_lr_label": "",
+          "selected_setting": "pTVReg",
+          "source": "experiments/2026-06-26_lungct_directcp4stage_midratio_pareto_extension/pareto_visual_review_midratio_extension/combined_mean_rows_with_ptvreg.csv",
+          "status": "reference"
+        }
+      ],
+      "warnings": []
+    },
+    "oasis20": {
+      "candidate_rows_total": 41,
+      "dataset": "oasis20",
+      "errors": [],
+      "expected_cases": 20,
+      "expected_rows": 9,
+      "output_rows": 9,
+      "pool_summaries": [
+        {
+          "candidate_rows": 6,
+          "method": "idir_original_dense_siren_be_autograd"
+        },
+        {
+          "candidate_rows": 6,
+          "method": "sinr_cps2_be_bspline_analytic"
+        },
+        {
+          "candidate_rows": 6,
+          "method": "sinr_cps4_be_bspline_analytic"
+        },
+        {
+          "candidate_rows": 6,
+          "method": "direct_cp_cps2_be_bspline_analytic"
+        },
+        {
+          "candidate_rows": 6,
+          "method": "direct_cp_cps4_be_bspline_analytic"
+        },
+        {
+          "candidate_rows": 6,
+          "method": "direct_cp_8_4_2_be_bspline_analytic_multistage"
+        },
+        {
+          "candidate_rows": 1,
+          "method": "greedy"
+        },
+        {
+          "candidate_rows": 1,
+          "method": "bs1_vxm_v0_2"
+        },
+        {
+          "candidate_rows": 1,
+          "method": "bs4_sitreg_v0"
+        }
+      ],
+      "selection": {
+        "metric": "dice_mean_mean",
+        "mode": "max",
+        "tie_breakers": [
+          {
+            "metric": "hd95_mean_mean",
+            "mode": "min"
+          },
+          {
+            "metric": "asd_symmetric_mean_mean",
+            "mode": "min"
+          },
+          {
+            "metric": "alpha",
+            "mode": "min"
+          }
+        ]
+      },
+      "sources": [
+        {
+          "name": "oasis20_population",
+          "path": "experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_first10_first20_alpha5_saved_baselines_plus_directcp842_paper_v1/first20/population_summary_first20_with_saved_baselines.csv",
+          "rows": 41
+        }
+      ],
+      "table_headers": [
+        "Method",
+        "Selected",
+        "Cases",
+        "Dice",
+        "HD95",
+        "ASD sym",
+        "FG stdLogJ",
+        "FG bending",
+        "FG Jdet<0 %"
+      ],
+      "title": "OASIS seed-3 first20 automatic best-Dice summary",
+      "validation_rows": [
+        {
+          "artifact": "best_result_table",
+          "canonical_lr": 0.0001,
+          "canonical_lr_label": "1e-4",
+          "dataset": "oasis20",
+          "method_family": "idir",
+          "method_id": "idir_original_dense_siren_be_autograd",
+          "note": "",
+          "observed_lr": 0.0001,
+          "observed_lr_label": "1e-4",
+          "selected_setting": "alpha=1",
+          "source": "experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_first10_first20_alpha5_saved_baselines_plus_directcp842_paper_v1/first20/population_summary_first20_with_saved_baselines.csv",
+          "status": "matches_standard"
+        },
+        {
+          "artifact": "best_result_table",
+          "canonical_lr": 0.0001,
+          "canonical_lr_label": "1e-4",
+          "dataset": "oasis20",
+          "method_family": "sinr",
+          "method_id": "sinr_cps2_be_bspline_analytic",
+          "note": "",
+          "observed_lr": 0.0001,
+          "observed_lr_label": "1e-4",
+          "selected_setting": "alpha=1000",
+          "source": "experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_first10_first20_alpha5_saved_baselines_plus_directcp842_paper_v1/first20/population_summary_first20_with_saved_baselines.csv",
+          "status": "matches_standard"
+        },
+        {
+          "artifact": "best_result_table",
+          "canonical_lr": 0.0001,
+          "canonical_lr_label": "1e-4",
+          "dataset": "oasis20",
+          "method_family": "sinr",
+          "method_id": "sinr_cps4_be_bspline_analytic",
+          "note": "",
+          "observed_lr": 0.0001,
+          "observed_lr_label": "1e-4",
+          "selected_setting": "alpha=1000",
+          "source": "experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_first10_first20_alpha5_saved_baselines_plus_directcp842_paper_v1/first20/population_summary_first20_with_saved_baselines.csv",
+          "status": "matches_standard"
+        },
+        {
+          "artifact": "best_result_table",
+          "canonical_lr": 0.001,
+          "canonical_lr_label": "1e-3",
+          "dataset": "oasis20",
+          "method_family": "directcp",
+          "method_id": "direct_cp_cps2_be_bspline_analytic",
+          "note": "",
+          "observed_lr": 0.001,
+          "observed_lr_label": "1e-3",
+          "selected_setting": "alpha=1000",
+          "source": "experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_first10_first20_alpha5_saved_baselines_plus_directcp842_paper_v1/first20/population_summary_first20_with_saved_baselines.csv",
+          "status": "matches_standard"
+        },
+        {
+          "artifact": "best_result_table",
+          "canonical_lr": 0.001,
+          "canonical_lr_label": "1e-3",
+          "dataset": "oasis20",
+          "method_family": "directcp",
+          "method_id": "direct_cp_cps4_be_bspline_analytic",
+          "note": "",
+          "observed_lr": 0.001,
+          "observed_lr_label": "1e-3",
+          "selected_setting": "alpha=1000",
+          "source": "experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_first10_first20_alpha5_saved_baselines_plus_directcp842_paper_v1/first20/population_summary_first20_with_saved_baselines.csv",
+          "status": "matches_standard"
+        },
+        {
+          "artifact": "best_result_table",
+          "canonical_lr": 0.001,
+          "canonical_lr_label": "1e-3",
+          "dataset": "oasis20",
+          "method_family": "directcp_multistage",
+          "method_id": "direct_cp_8_4_2_be_bspline_analytic_multistage",
+          "note": "OASIS DirectCP 8-4-2 currently exists only at lr=1e-2 in current paper-facing artifacts.",
+          "observed_lr": 0.01,
+          "observed_lr_label": "1e-2",
+          "selected_setting": "alpha=1000",
+          "source": "experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_first10_first20_alpha5_saved_baselines_plus_directcp842_paper_v1/first20/population_summary_first20_with_saved_baselines.csv",
+          "status": "temporary_exception"
+        },
+        {
+          "artifact": "best_result_table",
+          "canonical_lr": null,
+          "canonical_lr_label": "",
+          "dataset": "oasis20",
+          "method_family": "reference",
+          "method_id": "greedy",
+          "note": "",
+          "observed_lr": null,
+          "observed_lr_label": "",
+          "selected_setting": "reference",
+          "source": "experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_first10_first20_alpha5_saved_baselines_plus_directcp842_paper_v1/first20/population_summary_first20_with_saved_baselines.csv",
+          "status": "reference"
+        },
+        {
+          "artifact": "best_result_table",
+          "canonical_lr": null,
+          "canonical_lr_label": "",
+          "dataset": "oasis20",
+          "method_family": "reference",
+          "method_id": "bs1_vxm_v0_2",
+          "note": "",
+          "observed_lr": null,
+          "observed_lr_label": "",
+          "selected_setting": "reference",
+          "source": "experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_first10_first20_alpha5_saved_baselines_plus_directcp842_paper_v1/first20/population_summary_first20_with_saved_baselines.csv",
+          "status": "reference"
+        },
+        {
+          "artifact": "best_result_table",
+          "canonical_lr": null,
+          "canonical_lr_label": "",
+          "dataset": "oasis20",
+          "method_family": "reference",
+          "method_id": "bs4_sitreg_v0",
+          "note": "",
+          "observed_lr": null,
+          "observed_lr_label": "",
+          "selected_setting": "reference",
+          "source": "experiments/2026-06-25_oasis_seed3_first10_alpha_sweep/pareto_first10_first20_alpha5_saved_baselines_plus_directcp842_paper_v1/first20/population_summary_first20_with_saved_baselines.csv",
+          "status": "reference"
+        }
+      ],
+      "warnings": []
+    }
+  },
+  "display_name_mapping": {
+    "lungct10": [
+      {
+        "display_name": "INR-Dense (IDIR loss)",
+        "method_family": "idir",
+        "method_id": "idir_be_default_lungmask",
+        "original_name": "IDIR"
+      },
+      {
+        "display_name": "MR-D-BSCP (pTVReg loss)",
+        "method_family": "directcp_multistage",
+        "method_id": "direct_cp_32_16_8_4_ptv_lcc_isotv",
+        "original_name": "DirectCP 4stage pTV-LCC+isoTV"
+      },
+      {
+        "display_name": "MR-D-BSCP (IDIR loss)",
+        "method_family": "directcp_multistage",
+        "method_id": "direct_cp_32_16_8_4_global_ncc_fd_be",
+        "original_name": "DirectCP 4stage global-NCC+FD-BE"
+      },
+      {
+        "display_name": "INR-BSCP (pTVReg loss)",
+        "method_family": "sinr",
+        "method_id": "sinr_cps4_ptv_lcc_isotv",
+        "original_name": "SINR cps4"
+      },
+      {
+        "display_name": "D-BSCP (pTVReg loss)",
+        "method_family": "directcp",
+        "method_id": "direct_cp_cps4_ptv_lcc_isotv",
+        "original_name": "DirectCP cps4"
+      },
+      {
+        "display_name": "pTVReg (pTVReg loss)",
+        "method_family": "reference",
+        "method_id": "ptvreg_reference",
+        "original_name": "pTVReg"
+      }
+    ],
+    "oasis20": [
+      {
+        "display_name": "INR-Dense",
+        "method_family": "idir",
+        "method_id": "idir_original_dense_siren_be_autograd",
+        "original_name": "IDIR"
+      },
+      {
+        "display_name": "INR-BSCP (cps2)",
+        "method_family": "sinr",
+        "method_id": "sinr_cps2_be_bspline_analytic",
+        "original_name": "SINR cps2"
+      },
+      {
+        "display_name": "INR-BSCP (cps4)",
+        "method_family": "sinr",
+        "method_id": "sinr_cps4_be_bspline_analytic",
+        "original_name": "SINR cps4"
+      },
+      {
+        "display_name": "D-BSCP (cps2)",
+        "method_family": "directcp",
+        "method_id": "direct_cp_cps2_be_bspline_analytic",
+        "original_name": "DirectCP cps2"
+      },
+      {
+        "display_name": "D-BSCP (cps4)",
+        "method_family": "directcp",
+        "method_id": "direct_cp_cps4_be_bspline_analytic",
+        "original_name": "DirectCP cps4"
+      },
+      {
+        "display_name": "MR-D-BSCP (8-4-2)",
+        "method_family": "directcp_multistage",
+        "method_id": "direct_cp_8_4_2_be_bspline_analytic_multistage",
+        "original_name": "DirectCP 8-4-2"
+      },
+      {
+        "display_name": "Greedy",
+        "method_family": "reference",
+        "method_id": "greedy",
+        "original_name": "Greedy"
+      },
+      {
+        "display_name": "VoxelMorph",
+        "method_family": "reference",
+        "method_id": "bs1_vxm_v0_2",
+        "original_name": "VoxelMorph"
+      },
+      {
+        "display_name": "SITReg",
+        "method_family": "reference",
+        "method_id": "bs4_sitreg_v0",
+        "original_name": "SITReg"
+      }
+    ]
+  },
+  "formatting": {
+    "adaptive_percent": "2 decimals for ordinary percentages, 4 decimals near zero, scientific for tiny nonzero values",
+    "adaptive_small": "preserves small regularity values instead of rounding them to zero",
+    "mean_std_separator": "+/-"
+  },
+  "generated_utc": "2026-07-01T11:54:53+00:00",
+  "nickname_path": "experiments/paper_artifacts/method_nicknames.csv",
+  "output_dir": "experiments/paper_artifacts/best_result_table/v001",
+  "spec_path": "experiments/2026-06-26_auto_result_selection_tables/table_specs.json",
+  "standard_path": "experiments/paper_artifacts/artifact_standard.json"
+}

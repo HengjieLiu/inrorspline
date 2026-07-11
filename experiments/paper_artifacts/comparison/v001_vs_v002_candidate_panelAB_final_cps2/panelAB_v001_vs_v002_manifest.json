@@ -1,0 +1,15 @@
+{
+  "generated_at_utc": "2026-07-01T23:28:03.231618+00:00",
+  "old_version": "v001",
+  "new_version": "v002_candidate",
+  "old_dir": "experiments/paper_artifacts/fitting_figure/v001",
+  "new_dir": "experiments/paper_artifacts/fitting_figure/v002_candidate",
+  "outputs": [
+    "panelAB_v001_vs_v002_delta_summary.csv",
+    "panelAB_v001_vs_v002_delta_summary.md",
+    "panelAB_selected_run_diff.csv",
+    "panelAB_curve_endpoint_diff.csv",
+    "panelAB_comparison_guide.md",
+    "panelAB_v001_vs_v002_side_by_side.png"
+  ]
+}

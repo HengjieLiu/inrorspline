@@ -1,0 +1,2 @@
+job_index,case_rank,original_case_index,fixed_id,moving_id,method,method_key,alpha,lr
+0,0,158,0333,0115,direct_cp_8_4_2_be_bspline_analytic_multistage,direct_cp_8_4_2_be_bspline_analytic_multistage,0.0,0.001

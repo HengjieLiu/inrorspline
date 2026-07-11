@@ -1,0 +1,131 @@
+{
+  "artifact": "dirlab_label_updates",
+  "font": {
+    "family": "DejaVu Sans",
+    "fitting_size_px": 36,
+    "pareto_size_px": 76,
+    "source": "DejaVu Sans resolved from the local system font installation"
+  },
+  "generated_at_utc": "2026-07-08T11:33:05.557975+00:00",
+  "method": "Pillow raster patch; original PNGs, notebooks, and generator scripts are unchanged.",
+  "outputs": [
+    {
+      "dimensions_px": [
+        3561,
+        2602
+      ],
+      "output": "experiments/paper_artifacts/dirlab_label_updates/v001/pareto_four_panel_composite_no_annotations_dirlab.png",
+      "replacements": [
+        {
+          "clear_rect_px": [
+            430,
+            1320,
+            1615,
+            1412
+          ],
+          "new_text": "TRE vs SDlogJ (DIR-LAB N=10)",
+          "old_bbox_px": [
+            502,
+            1336,
+            1536,
+            1409
+          ],
+          "old_text": "TRE vs SDlogJ (4DCT N=10)"
+        },
+        {
+          "clear_rect_px": [
+            2010,
+            1320,
+            3548,
+            1412
+          ],
+          "new_text": "TRE vs bending energy (DIR-LAB N=10)",
+          "old_bbox_px": [
+            2090,
+            1336,
+            3472,
+            1409
+          ],
+          "old_text": "TRE vs bending energy (4DCT N=10)"
+        }
+      ],
+      "source": "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/four_panel_composite/pareto_four_panel_composite_no_annotations.png"
+    },
+    {
+      "dimensions_px": [
+        2385,
+        1379
+      ],
+      "output": "experiments/paper_artifacts/dirlab_label_updates/v001/fit_modes_panelAB_composite_sitreg_dirlab.png",
+      "replacements": [
+        {
+          "clear_rect_px": [
+            1080,
+            100,
+            1430,
+            150
+          ],
+          "new_text": "DIR-LAB case01",
+          "old_bbox_px": [
+            1130,
+            112,
+            1372,
+            139
+          ],
+          "old_text": "4DCT case01"
+        },
+        {
+          "clear_rect_px": [
+            1855,
+            100,
+            2215,
+            150
+          ],
+          "new_text": "DIR-LAB case 08",
+          "old_bbox_px": [
+            1907,
+            112,
+            2162,
+            139
+          ],
+          "old_text": "4DCT case 08"
+        },
+        {
+          "clear_rect_px": [
+            1080,
+            727,
+            1430,
+            777
+          ],
+          "new_text": "DIR-LAB case01",
+          "old_bbox_px": [
+            1130,
+            739,
+            1372,
+            766
+          ],
+          "old_text": "4DCT case01"
+        },
+        {
+          "clear_rect_px": [
+            1855,
+            727,
+            2215,
+            777
+          ],
+          "new_text": "DIR-LAB case 08",
+          "old_bbox_px": [
+            1907,
+            739,
+            2162,
+            766
+          ],
+          "old_text": "4DCT case 08"
+        }
+      ],
+      "source": "experiments/paper_artifacts/fitting_figure/v002_candidate/panelAB_composite/fit_modes_panelAB_composite_sitreg.png"
+    }
+  ],
+  "purpose": "Derived paper figure copies with visible 4DCT title labels changed to DIR-LAB.",
+  "version": "v001"
+}

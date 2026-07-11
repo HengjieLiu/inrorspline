@@ -5,6 +5,14 @@ status: active_draft
 
 # Methods
 
+## Implementation Reference
+
+For code-level architecture, training-loss definitions, cubic B-spline
+formulas, DirectCP optimization details, and paper-claim crosswalks, see
+`docs/implementation/`. This file remains the protocol/method plan; the
+implementation folder records how the current repo-local code realizes those
+methods.
+
 ## Method Families
 
 - `IDIR`: coordinate-network deformation model. Use original-style loss/regularization where possible, and keep alpha scales separate from spline methods.
@@ -40,6 +48,9 @@ Known required consistency items:
 Main target:
 
 - 10 4DCT pairs.
+- Fixed/moving convention follows `docs/standards/lungct_protocol_tags.md`:
+  DIR-Lab 4DCT uses `T50`/end-exhale as moving and `T00`/end-inhale as fixed
+  (`T50 -> T00`); COPD uses `eBHCT` as moving and `iBHCT` as fixed.
 - Benchmark references: pTVReg official/reproduced, clearly labeled by preprocessing protocol.
 - Method variants: IDIR, SINR, single-stage DirectCP cps4 negative control, and multistage DirectCP such as `32-16-8-4`.
 
