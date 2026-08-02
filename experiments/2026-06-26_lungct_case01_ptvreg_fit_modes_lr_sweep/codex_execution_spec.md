@@ -1,5 +1,8 @@
 # LungCT Case01 pTVReg Fit-Modes LR Sweep Execution Spec
 
+> Historical paths are preserved as executed. Current equivalent:
+> `/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm`.
+
 ## Objective
 
 Run a single-case diagnostic comparing IDIR, SINR cps4, DirectCP cps4, and

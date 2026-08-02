@@ -7,6 +7,9 @@ date_completed: 2026-07-07
 
 # COPD DirectCP32 pTV-LCC + isoTV Sanity Run
 
+> Historical paths are preserved as executed. Current equivalent:
+> `/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm`.
+
 ## Goal
 
 Run a COPD cases `01-10` sanity pass for

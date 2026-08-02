@@ -6,6 +6,9 @@ date_planned: 2026-06-25
 
 # LungCT DirectCP32 Global NCC + Analytic BE Alpha Sweep
 
+> Historical paths are preserved as executed. Current equivalent:
+> `/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm`.
+
 ## Goal
 
 Run a selected-case diagnostic for DirectCP multistage `32,16,8,4` on canonical

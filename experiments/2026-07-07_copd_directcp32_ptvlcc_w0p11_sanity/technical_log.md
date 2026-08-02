@@ -7,6 +7,9 @@ date_completed: 2026-07-07
 
 # Technical Log
 
+> Historical paths are preserved as executed. Current equivalents are
+> `/database/datasets/lungCT/DIR-Lab/processed/{lungmask_R231_native,pTVReg_iso1mm}`.
+
 ## Known Limitations
 
 - This is a COPD sanity run for one method only, not a full COPD Pareto panel.

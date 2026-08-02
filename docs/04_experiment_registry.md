@@ -5,6 +5,11 @@ status: active
 
 # Experiment Registry
 
+> Historical LungCT dataset paths below record the locations used when each run
+> executed. Since 2026-07-11, their current pTVReg-equivalent root is
+> `/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm`; see
+> `docs/migrations/lungct_dirlab_2026-07-11.md`.
+
 Every real run should get an entry before launch. Large artifacts belong under `SCRATCH_ROOT`, not Git.
 
 ## Required Fields

@@ -41,7 +41,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def mask_paths(root: Path, case_id: int, phase: str, modelname: str) -> Dict[str, Path]:
-    case_dir = root / "4dct" / f"case{case_id:02d}"
+    dataset_dir = "4DCT" if (root / "4DCT").is_dir() or not (root / "4dct").is_dir() else "4dct"
+    case_dir = root / dataset_dir / f"case{case_id:02d}"
     prefix = f"case{case_id:02d}_T{phase}_{modelname}"
     return {
         "binary": case_dir / f"{prefix}_binary_zyx.npy",
@@ -108,18 +109,30 @@ def verify_case(case_id: int, args: argparse.Namespace) -> Dict[str, object]:
 
 
 def promote_tree(stage_root: Path, target_root: Path, timestamp: str) -> Dict[str, str]:
-    source = stage_root / "4dct"
-    target = target_root / "4dct"
-    backup = target_root / f"4dct_backup_{timestamp}"
+    source = stage_root / "4DCT"
+    target = target_root / "4DCT"
+    backup = target_root / f"4DCT_backup_{timestamp}"
     if not source.is_dir():
         raise FileNotFoundError(source)
+    if source.resolve() == target.resolve():
+        return {
+            "source": str(source),
+            "target": str(target),
+            "backup": "",
+            "status": "already_current",
+        }
     target_root.mkdir(parents=True, exist_ok=True)
     if target.exists():
         if backup.exists():
             raise FileExistsError(backup)
         shutil.move(str(target), str(backup))
     shutil.copytree(source, target)
-    return {"source": str(source), "target": str(target), "backup": str(backup)}
+    return {
+        "source": str(source),
+        "target": str(target),
+        "backup": str(backup),
+        "status": "promoted",
+    }
 
 
 def main() -> None:
@@ -149,7 +162,7 @@ def main() -> None:
     else:
         report["promotion_status"] = "verified_only"
 
-    report_path = args.report or (args.stage_root / "4dct_promotion_verification_report.json")
+    report_path = args.report or (args.stage_root / "4DCT" / "promotion_verification_report.json")
     write_json(report_path, report)
     print(f"Fixed masks exact match: {all_match}")
     print(f"Promotion status: {report['promotion_status']}")

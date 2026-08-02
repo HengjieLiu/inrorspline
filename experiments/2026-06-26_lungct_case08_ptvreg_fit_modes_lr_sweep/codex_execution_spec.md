@@ -1,5 +1,8 @@
 # LungCT Case08 pTVReg Fit-Modes LR Sweep Execution Spec
 
+> Historical paths are preserved as executed. Current equivalent:
+> `/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm`.
+
 ## Objective
 
 Repeat the Case01 fit-modes LR sweep on DIR-Lab 4DCT case `08`, using the same

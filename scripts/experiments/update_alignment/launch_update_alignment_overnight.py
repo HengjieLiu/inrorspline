@@ -42,7 +42,7 @@ DEFAULT_REVIEW_ROOT = REPO_ROOT / "experiments/2026-06-29_update_alignment_overn
 DEFAULT_OASIS_ROOT = Path("/database/wavereg/datasets/OASIS/OASIS_official/oasis_organized/split_v1")
 DEFAULT_PAIR_FILE = REPO_ROOT / "configs/splits/oasis/pair_test_200_shuffled_seed000003.txt"
 DEFAULT_PTVPREP_ROOT = Path(
-    "/database/datasets/lungCT/processed/preprocessing/ptvprep/ptvreg_landmark_crop_1mm_trilinear_v1"
+    "/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm"
 )
 DEFAULT_PTVREG_ROOT = Path("/database/inrorspline/ptvreg/4DCT")
 

@@ -68,8 +68,11 @@ DEFAULT_OUTPUT_ROOT = REVIEW_ROOT / "pareto_visual_review"
 DEFAULT_PTVREG_ROOT = Path(os.environ.get("PTVREG_4DCT_ROOT", "/database/inrorspline/ptvreg/4DCT"))
 DEFAULT_PTVPREP_ROOT = Path(
     os.environ.get(
-        "LUNGCT_PTVPREP_ROOT",
-        "/database/datasets/lungCT/processed/preprocessing/ptvprep/ptvreg_landmark_crop_1mm_trilinear_v1",
+        "INRORSPLINE_DIRLAB_PTVREG_ISO1MM_ROOT",
+        os.environ.get(
+            "INRORSPLINE_LUNGCT_PTVPREP_ROOT",
+            "/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm",
+        ),
     )
 )
 EXPECTED_CASES = list(range(1, 11))

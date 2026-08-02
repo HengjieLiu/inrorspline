@@ -107,7 +107,7 @@ def process_case(case_id: int, args: argparse.Namespace, device: torch.device) -
     fixed_reg_zyx = transform_landmarks_crop_to_registration(fixed_crop_zyx, crop_shape, reg_shape)
     moving_reg_zyx = transform_landmarks_crop_to_registration(moving_crop_zyx, crop_shape, reg_shape)
 
-    case_dir = args.out_root / "copd" / f"case{case_id:02d}"
+    case_dir = args.out_root / "COPD" / f"case{case_id:02d}"
     paths = save_case_arrays(
         case_dir,
         {
@@ -273,8 +273,8 @@ def main() -> None:
         "all_verification_pass": bool(all(row["verification"]["pass"] for row in rows)),  # type: ignore[index]
         "rows": rows,
     }
-    write_json(args.out_root / "copd_ptvprep_summary.json", summary)
-    write_summary_csv(args.out_root / "copd_ptvprep_summary.csv", rows)
+    write_json(args.out_root / "COPD" / "summary.json", summary)
+    write_summary_csv(args.out_root / "COPD" / "summary.csv", rows)
     print(f"Wrote {len(rows)} COPD pTVprep cases to {args.out_root}")
     print(f"All verification pass: {summary['all_verification_pass']}")
 

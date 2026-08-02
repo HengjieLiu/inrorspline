@@ -6,6 +6,9 @@ date_planned: 2026-06-26
 
 # LungCT Case08 DirectCP 4-Stage BE Implementation Comparison
 
+> Historical paths are preserved as executed. Current equivalent:
+> `/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm`.
+
 ## Goal
 
 Compare two training regularizers for the same DirectCP 4-stage LungCT case `08`

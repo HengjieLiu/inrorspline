@@ -6,6 +6,9 @@ date_planned: 2026-06-25
 
 # LungCT pTV-Prep No-Sweep Reproduction
 
+> Historical paths are preserved as executed. Current equivalent:
+> `/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm`.
+
 ## Goal
 
 Run a fixed-parameter 4DCT LungCT reproduction pass on the canonical cropped

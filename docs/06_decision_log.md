@@ -39,9 +39,27 @@ Rationale:
 - Cross-method comparisons should rely on `alpha * training_reg_loss` and common
   posthoc regularity metrics rather than raw alpha labels alone.
 
+## 2026-07-11: Consolidate LungCT Under DIR-Lab
+
+Decision:
+
+- Use `/data/$USER/datasets/lungCT/DIR-Lab` as the sole LungCT dataset root.
+- Keep raw `4DCT` and `COPD` data under `raw/`.
+- Keep native R231 masks and pTVReg-style 1 mm data as separately named
+  preprocessing protocols: `lungmask_R231_native` and `pTVReg_iso1mm`.
+- Store migration/checksum records outside the dataset tree under
+  `/data/$USER/datasets/manifests/` and do not maintain compatibility symlinks.
+
+Rationale:
+
+- The former top-level raw trees were byte-identical duplicates.
+- Named protocol directories make preprocessing assumptions explicit and keep
+  raw data separate from derived artifacts.
+- External integrity records allow the dataset root to remain clean without
+  discarding provenance.
+
 ## Pending Decisions
 
-- Real server map and where to store it.
-- Final public dataset handles and path conventions.
+- Final public dataset handles that avoid private host paths.
 - Whether to add a Python package scaffold, and which tooling to use.
 - Which OASIS alpha/LR grid to lock for the first seed-3 run.

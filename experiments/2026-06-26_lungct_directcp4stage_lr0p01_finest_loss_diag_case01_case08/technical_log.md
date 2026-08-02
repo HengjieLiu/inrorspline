@@ -1,5 +1,8 @@
 # LungCT DirectCP 4-Stage Finest-Domain Loss Diagnostic Technical Log
 
+> Historical paths are preserved as executed. Current equivalent:
+> `/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm`.
+
 ## Known Limitations
 
 - This diagnostic reruns only cases `01` and `08` and only DirectCP 4-stage at

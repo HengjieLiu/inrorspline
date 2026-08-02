@@ -193,7 +193,7 @@ optimization.
 ## 4DCT Input Size Comparison
 
 Shapes below are `[z, y, x]`. The pTV crop shapes are computed from the real landmark
-files under `/data/hengjie/datasets/lungCT` using the same crop formula as our runners.
+files under the canonical `LUNGCT_DATA` root using the same crop formula as our runners.
 The pTV 1 mm registration shape is `round(crop_shape_zyx * native_spacing_zyx)`.
 
 | Case | IDIR/native full shape z,y,x | Native spacing z,y,x mm | pTV landmark crop shape z,y,x | pTV 1mm reg shape z,y,x | Crop volume / native volume |

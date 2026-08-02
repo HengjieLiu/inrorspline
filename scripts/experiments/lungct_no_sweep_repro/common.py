@@ -21,22 +21,37 @@ import torch.nn.functional as F
 THIS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = THIS_DIR.parents[2]
 
-HOST_PTVPREP_ROOT = Path(
-    "/data/hengjie/datasets/lungCT/processed/preprocessing/ptvprep/ptvreg_landmark_crop_1mm_trilinear_v1"
+HOST_DIRLAB_ROOT = Path(
+    os.environ.get(
+        "INRORSPLINE_DIRLAB_HOST_ROOT",
+        f"/data/{os.environ.get('USER', '$USER')}/datasets/lungCT/DIR-Lab",
+    )
 )
-DOCKER_PTVPREP_ROOT = Path(
-    "/database/datasets/lungCT/processed/preprocessing/ptvprep/ptvreg_landmark_crop_1mm_trilinear_v1"
-)
+HOST_PTVPREP_ROOT = HOST_DIRLAB_ROOT / "processed" / "pTVReg_iso1mm"
+DOCKER_PTVPREP_ROOT = Path("/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm")
 HOST_RUN_ROOT = Path("/data/hengjie/inrorspline/runs/lungct_ptvprep_no_sweep_repro_v1")
 DOCKER_RUN_ROOT = Path("/database/inrorspline/runs/lungct_ptvprep_no_sweep_repro_v1")
 DEFAULT_REVIEW_ROOT = REPO_ROOT / "experiments/2026-06-25_lungct_ptvprep_no_sweep_repro"
 
-DEFAULT_PTVPREP_ROOT = Path(
-    os.environ.get(
-        "INRORSPLINE_LUNGCT_PTVPREP_ROOT",
-        str(DOCKER_PTVPREP_ROOT if DOCKER_PTVPREP_ROOT.exists() else HOST_PTVPREP_ROOT),
-    )
-)
+def resolve_default_ptvprep_root(
+    environ: Optional[Dict[str, str]] = None,
+    *,
+    docker_available: Optional[bool] = None,
+) -> Path:
+    """Resolve the canonical pTVReg preprocessing root with legacy fallback."""
+    env = os.environ if environ is None else environ
+    override = env.get("INRORSPLINE_DIRLAB_PTVREG_ISO1MM_ROOT")
+    if override:
+        return Path(override)
+    legacy_override = env.get("INRORSPLINE_LUNGCT_PTVPREP_ROOT")
+    if legacy_override:
+        return Path(legacy_override)
+    if docker_available is None:
+        docker_available = Path("/database").exists()
+    return DOCKER_PTVPREP_ROOT if docker_available else HOST_PTVPREP_ROOT
+
+
+DEFAULT_PTVPREP_ROOT = resolve_default_ptvprep_root()
 DEFAULT_RUN_ROOT = Path(
     os.environ.get(
         "INRORSPLINE_LUNGCT_RUN_ROOT",
@@ -145,7 +160,11 @@ def parse_stage_ints(value: str, n: int) -> List[int]:
 
 
 def case_dir(root: Path, case_id: int, dataset: str = "4dct") -> Path:
-    return Path(root) / str(dataset).lower() / f"case{int(case_id):02d}"
+    dataset_norm = str(dataset).lower()
+    dataset_dir = {"4dct": "4DCT", "copd": "COPD"}.get(dataset_norm)
+    if dataset_dir is None:
+        raise ValueError(f"Unsupported LungCT dataset: {dataset!r}")
+    return Path(root) / dataset_dir / f"case{int(case_id):02d}"
 
 
 def _case_paths(cdir: Path, dataset: str) -> Tuple[Dict[str, Path], str, str]:

@@ -6,6 +6,9 @@ date_planned: 2026-07-07
 
 # COPD DirectCP64-32-16-8-4 pTV-LCC + isoTV Sanity Run
 
+> Historical paths are preserved as executed. Current equivalent:
+> `/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm`.
+
 ## Goal
 
 Run COPD cases `01-10` for the same `MR-D-BSCP (pTVReg loss)` settings as the

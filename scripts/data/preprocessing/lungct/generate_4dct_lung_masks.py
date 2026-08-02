@@ -59,7 +59,7 @@ def write_mask_outputs(
     spacing_zyx,
     overwrite: bool,
 ) -> Dict[str, str]:
-    out_dir = stage_root / "4dct" / f"case{case_id:02d}"
+    out_dir = stage_root / "4DCT" / f"case{case_id:02d}"
     out_dir.mkdir(parents=True, exist_ok=True)
     label_npy = out_dir / f"case{case_id:02d}_T{phase}_{modelname}_labels_zyx.npy"
     binary_npy = out_dir / f"case{case_id:02d}_T{phase}_{modelname}_binary_zyx.npy"
@@ -142,7 +142,7 @@ def main() -> None:
                 f"fraction={summary['foreground_fraction']:.6f}"
             )
 
-    write_json(args.stage_root / "4dct_generation_summary.json", {"rows": summaries})
+    write_json(args.stage_root / "4DCT" / "generation_summary.json", {"rows": summaries})
     print(f"Wrote {len(summaries)} masks to {args.stage_root}")
 
 

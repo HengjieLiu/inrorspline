@@ -194,13 +194,16 @@ Legacy task4 pTV-prep and pTV-domain outputs are audit inputs, not canonical
 processed data. Do not launch new claims from copied legacy pTV-prep,
 DirectCP/SINR pTV-domain, or `isoptv_torch` outputs.
 
-The current regenerated 4DCT pTV-prep handle is
-`ptvreg_landmark_crop_1mm_trilinear_v1`, stored under the processed LungCT data
-tree at `processed/preprocessing/ptvprep/`. It uses pTVReg fixed/moving,
+The current regenerated 4DCT/COPD pTV-prep handle is `pTVReg_iso1mm`, stored at
+`DIR-Lab/processed/pTVReg_iso1mm/{4DCT,COPD}`. It uses pTVReg fixed/moving,
 intensity, crop-index, and target-shape conventions, with intentional PyTorch
 trilinear image resampling. The transformed T00/T50 lung masks in this artifact
 are QA/preprocessed-data companions, not evidence that official pTVReg used lung
 masks for optimization.
+
+Native R231 mask intermediates are retained separately at
+`DIR-Lab/processed/lungmask_R231_native/{4DCT,COPD}`. Raw images and landmarks
+live only under `DIR-Lab/raw/{4DCT,COPD}`.
 
 ## Interpretation Rule
 

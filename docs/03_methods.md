@@ -48,6 +48,8 @@ Known required consistency items:
 Main target:
 
 - 10 4DCT pairs.
+- Canonical local data handle: `DIR-Lab`, with raw `4DCT`/`COPD` data separated
+  from the named `pTVReg_iso1mm` preprocessing protocol.
 - Fixed/moving convention follows `docs/standards/lungct_protocol_tags.md`:
   DIR-Lab 4DCT uses `T50`/end-exhale as moving and `T00`/end-inhale as fixed
   (`T50 -> T00`); COPD uses `eBHCT` as moving and `iBHCT` as fixed.

@@ -7,6 +7,9 @@ date_completed: 2026-07-07
 
 # COPD DirectCP64-32-16-8-4 pTV-LCC + isoTV E400x4+900 Sanity
 
+> Historical paths are preserved as executed. Current equivalent:
+> `/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm`.
+
 ## Purpose
 
 Rerun the COPD `64,32,16,8,4` pTVReg-loss DirectCP sanity experiment with the

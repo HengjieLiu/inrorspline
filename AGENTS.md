@@ -212,7 +212,8 @@ export REPO_ROOT="$HOME/code_sync/$PROJECT_SLUG"
 export DATA_ROOT="/data/$USER/$PROJECT_SLUG"
 export SCRATCH_ROOT="/scratch/$USER/$PROJECT_SLUG"
 export BRAIN_DATA="$DATA_ROOT/brain"
-export LUNGCT_DATA="$DATA_ROOT/lungct"
+export LUNGCT_DATA="/data/$USER/datasets/lungCT/DIR-Lab"
+export LUNGCT_PTVREG_ISO1MM="$LUNGCT_DATA/processed/pTVReg_iso1mm"
 ```
 
 Expected host layout:
@@ -220,8 +221,8 @@ Expected host layout:
 ```text
 $REPO_ROOT/                 # Git-managed code/docs/configs/tests
 $DATA_ROOT/brain/           # OASIS and related brain data, outside Git
-$DATA_ROOT/lungct/          # LungCT/4DCT/COPD data, outside Git
-$DATA_ROOT/manifests/       # manifests/checksums for data integrity
+/data/$USER/datasets/lungCT/DIR-Lab/  # canonical LungCT/4DCT/COPD data
+/data/$USER/datasets/manifests/       # dataset migration/integrity records
 $SCRATCH_ROOT/runs/         # large experiment outputs, outside Git
 ```
 

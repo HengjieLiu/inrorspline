@@ -99,10 +99,11 @@ fractional 1mm registration landmark grid.
 ## pTV-Prep Crop-Origin Warning
 
 Legacy task4 pTV-prep outputs used a task4-compatible Python crop convention.
-The canonical regenerated handle `ptvreg_landmark_crop_1mm_trilinear_v1` uses
-the corrected pTVReg/MATLAB-origin crop convention. In the current 4DCT audit,
-the legacy crop was shifted by `+1` voxel in z/y/x for all ten cases while
-keeping the same crop shape.
+The canonical regenerated handle `pTVReg_iso1mm`, stored under
+`DIR-Lab/processed/pTVReg_iso1mm/{4DCT,COPD}`, uses the corrected
+pTVReg/MATLAB-origin crop convention. In the current 4DCT audit, the legacy
+crop was shifted by `+1` voxel in z/y/x for all ten cases while keeping the
+same crop shape.
 
 This crop-origin difference does not by itself corrupt TRE if images,
 landmarks, masks, uncropping, and TRE evaluation all use the same convention.

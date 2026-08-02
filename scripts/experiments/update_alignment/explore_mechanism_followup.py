@@ -35,7 +35,7 @@ DEFAULT_OUT_ROOT = Path("/database/inrorspline/runs/sinr_cp_mechanism_explore_20
 DEFAULT_REVIEW_ROOT = REPO_ROOT / "experiments/2026-06-29_sinr_cp_kernel_followup"
 DEFAULT_UPDATE_ROOT = Path("/database/inrorspline/runs/update_alignment_overnight_20260629_v1")
 DEFAULT_PTVPREP_ROOT = Path(
-    "/database/datasets/lungCT/processed/preprocessing/ptvprep/ptvreg_landmark_crop_1mm_trilinear_v1"
+    "/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm"
 )
 
 

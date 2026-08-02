@@ -152,7 +152,7 @@ def _select_phase_landmarks(landmark_dir: Optional[Path], case_id: int, phase: s
 
 def _candidate_copd_roots(data_root: Path, case_id: int) -> List[Path]:
     roots: List[Path] = []
-    for base in (data_root / "COPD", data_root / "raw" / "COPD"):
+    for base in (data_root / "raw" / "COPD",):
         roots.extend(
             [
                 base / f"copd{case_id}" / f"copd{case_id}",
@@ -196,7 +196,7 @@ def _select_copd_landmarks(root: Path, case_id: int, phase: str) -> Optional[Pat
 
 
 def resolve_4dct_case(case_id: int, data_root: Path) -> FourDCTCaseFiles:
-    root = data_root / "4DCT"
+    root = data_root / "raw" / "4DCT"
     notes: List[str] = []
     selected_root: Optional[Path] = None
     image_t00 = image_t50 = landmarks_t00 = landmarks_t50 = None
@@ -379,8 +379,10 @@ def landmark_mask_fraction(mask: np.ndarray, landmarks_zyx: np.ndarray) -> float
 
 def mask_root_case_dir(mask_root: Path, case_id: int, dataset: str = "4dct") -> Path:
     dataset_norm = str(dataset).lower()
-    if (mask_root / dataset_norm).is_dir():
-        return mask_root / dataset_norm / f"case{case_id:02d}"
-    if dataset_norm == "4dct" and (mask_root / "4dct").is_dir():
-        return mask_root / "4dct" / f"case{case_id:02d}"
-    return mask_root / f"case{case_id:02d}"
+    dataset_dir = {"4dct": "4DCT", "copd": "COPD"}.get(dataset_norm)
+    if dataset_dir is None:
+        raise ValueError(f"Unsupported LungCT dataset: {dataset!r}")
+    canonical_root = mask_root / dataset_dir
+    legacy_root = mask_root / dataset_norm
+    selected_root = canonical_root if canonical_root.is_dir() or not legacy_root.is_dir() else legacy_root
+    return selected_root / f"case{case_id:02d}"

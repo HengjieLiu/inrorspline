@@ -62,7 +62,7 @@ def write_mask_outputs(
     spacing_zyx,
     overwrite: bool,
 ) -> Dict[str, str]:
-    out_dir = stage_root / "copd" / f"case{case_id:02d}"
+    out_dir = stage_root / "COPD" / f"case{case_id:02d}"
     out_dir.mkdir(parents=True, exist_ok=True)
     label_npy = out_dir / f"case{case_id:02d}_{phase}_{modelname}_labels_zyx.npy"
     binary_npy = out_dir / f"case{case_id:02d}_{phase}_{modelname}_binary_zyx.npy"
@@ -146,7 +146,7 @@ def main() -> None:
                 flush=True,
             )
 
-    write_json(args.stage_root / "copd_generation_summary.json", {"rows": summaries})
+    write_json(args.stage_root / "COPD" / "generation_summary.json", {"rows": summaries})
     print(f"Wrote {len(summaries)} COPD masks to {args.stage_root}")
 
 

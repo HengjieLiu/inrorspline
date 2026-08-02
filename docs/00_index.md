@@ -33,7 +33,8 @@ export REPO_ROOT="$HOME/code_sync/$PROJECT_SLUG"
 export DATA_ROOT="/data/$USER/$PROJECT_SLUG"
 export SCRATCH_ROOT="/scratch/$USER/$PROJECT_SLUG"
 export BRAIN_DATA="$DATA_ROOT/brain"
-export LUNGCT_DATA="$DATA_ROOT/lungct"
+export LUNGCT_DATA="/data/$USER/datasets/lungCT/DIR-Lab"
+export LUNGCT_PTVREG_ISO1MM="$LUNGCT_DATA/processed/pTVReg_iso1mm"
 ```
 
 Do not place raw datasets under this repo. Use `DATA_ROOT` for data and `SCRATCH_ROOT` for large outputs.
@@ -41,6 +42,6 @@ Do not place raw datasets under this repo. Use `DATA_ROOT` for data and `SCRATCH
 ## Immediate Next Decisions
 
 - Confirm actual server map and whether it can be stored in public docs or only in ignored `private/`.
-- Confirm canonical dataset folder names under `DATA_ROOT`.
+- Keep DIR-Lab raw data and named preprocessing protocols under `LUNGCT_DATA`.
 - Decide when to add a Python package/test scaffold.
 - Convert the carried-forward absolute source paths in `docs/reports/` into repo-relative or private manifests where appropriate.
