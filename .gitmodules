@@ -10,3 +10,6 @@
 [submodule "external/pTVreg"]
 	path = external/pTVreg
 	url = https://github.com/visva89/pTVreg
+[submodule "external/DUAL-INR-DIR"]
+	path = external/DUAL-INR-DIR
+	url = https://github.com/IPMI-ICNS-UKE/DUAL-INR-DIR
