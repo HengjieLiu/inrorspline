@@ -1,0 +1,28 @@
+{
+  "generated": "2026-08-04 06:47:33 +0000",
+  "artifact": "oasis100_dice_sdlogj_covariance_diagnostics",
+  "metrics": {
+    "x": "log_jdet_std_fg",
+    "y": "dice_mean"
+  },
+  "row_counts": {
+    "sweep_case_rows": 3600,
+    "baseline_case_rows": 500,
+    "case_pair_rows": 4100,
+    "diagnostic_groups": 41,
+    "population_groups": 41,
+    "finite_correlation_groups": 41
+  },
+  "interpretation": "Pearson and Spearman correlations are emphasized because raw covariance is unit-dependent.",
+  "outputs": {
+    "expected_files": [
+      "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_dice_sdlogj/covariance_diagnostics/case_pairs.csv",
+      "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_dice_sdlogj/covariance_diagnostics/covariance_summary.csv",
+      "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_dice_sdlogj/covariance_diagnostics/covariance_rotated_ellipses__dice_mean_vs_log_jdet_std_fg.png",
+      "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_dice_sdlogj/covariance_diagnostics/correlation_heatmap_by_method_alpha.png",
+      "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_dice_sdlogj/covariance_diagnostics/README.md",
+      "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_dice_sdlogj/covariance_diagnostics/manifest.json"
+    ],
+    "missing_or_empty": []
+  }
+}
