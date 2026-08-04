@@ -327,6 +327,21 @@ def field_mse_metrics(pred_disp: torch.Tensor, target_disp: torch.Tensor, mask: 
     }
 
 
+def field_target_power_metrics(target: torch.Tensor, mask: torch.Tensor) -> Dict[str, float | str]:
+    """Return the masked pTVReg target power used by the paper rRMSE metric."""
+    mask_flat = mask.detach().reshape(-1).bool()
+    target_masked = target.detach().reshape(-1, 3)[mask_flat]
+    if target_masked.numel() == 0:
+        raise RuntimeError("Cannot compute target power on an empty fixed-T00 mask.")
+    power = float(target_masked.square().mean().detach().cpu())
+    return {
+        "field_target_power_masked_normalized_grid": power,
+        "field_target_rms_masked_normalized_grid": math.sqrt(power),
+        "field_target_power_units": "normalized_grid_displacement_squared",
+        "field_target_power_reduction": "component_and_masked_voxel_mean",
+    }
+
+
 def train_idir_field(args: argparse.Namespace, target: torch.Tensor, mask: torch.Tensor, device: torch.device) -> Dict[str, object]:
     image_shape = tuple(int(v) for v in target.shape[:3])
     model = c.build_siren(args.hidden_dim, args.hidden_layers, args.idir_omega).to(device)
@@ -687,6 +702,7 @@ def write_outputs(
     assert isinstance(dense, torch.Tensor)
     metrics = c.final_metrics_from_dense(dense, case, run_dir, bool(args.save_dense_dvf), args.log_base)
     field_metrics = field_mse_metrics(dense, target, mask)
+    target_power_metrics = field_target_power_metrics(target, mask)
     history = result["history"]
     assert isinstance(history, list)
     c.write_csv(run_dir / ("stage_history.csv" if args.method == "direct_cp_4stage" else "history.csv"), history)
@@ -792,6 +808,11 @@ def write_outputs(
     }
     summary.update(target_audit)
     summary.update(field_metrics)
+    summary.update(target_power_metrics)
+    target_power = float(target_power_metrics["field_target_power_masked_normalized_grid"])
+    summary["field_rrmse_objective_percent"] = 100.0 * math.sqrt(
+        float(field_metrics["field_mse_objective_normalized_grid"]) / (target_power + 1e-12)
+    )
     summary.update(metrics)
     summary.update(
         {

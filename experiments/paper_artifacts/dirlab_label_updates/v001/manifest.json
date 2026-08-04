@@ -1,5 +1,7 @@
 {
   "artifact": "dirlab_label_updates",
+  "status": "partially_superseded_historical_output",
+  "supersession_note": "The fitting-figure raster patch is superseded by the source-backed notebook regeneration; the separate Pareto patch remains a historical derived output until its own source is repaired.",
   "font": {
     "family": "DejaVu Sans",
     "fitting_size_px": 36,
@@ -57,6 +59,8 @@
         1379
       ],
       "output": "experiments/paper_artifacts/dirlab_label_updates/v001/fit_modes_panelAB_composite_sitreg_dirlab.png",
+      "status": "superseded_historical_output",
+      "superseded_by": "experiments/paper_artifacts/fitting_figure/v002_candidate/panelAB_composite/fit_modes_panelAB_composite_sitreg.png",
       "replacements": [
         {
           "clear_rect_px": [

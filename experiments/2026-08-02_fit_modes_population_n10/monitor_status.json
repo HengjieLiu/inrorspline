@@ -1,0 +1,38 @@
+{
+  "updated_at": "2026-08-02 22:43:57 +0000",
+  "elapsed_sec": 8426.109344482422,
+  "counts": {
+    "completed": 136,
+    "reused": 24
+  },
+  "total": 160,
+  "active_gpus": {},
+  "gpus": [
+    "0",
+    "1",
+    "2",
+    "3"
+  ],
+  "eta_provisional": false,
+  "eta_seconds": 0.0,
+  "estimated_completion_utc": "2026-08-02 22:43:57 +0000",
+  "observed_runtime_groups": {
+    "oasis|A|idir": 301.3521614074707,
+    "oasis|A|inr_bscp": 407.3745331764221,
+    "oasis|A|d_bscp": 210.93224382400513,
+    "oasis|A|mr_d_bscp": 256.13289618492126,
+    "oasis|B|idir": 60.22459292411804,
+    "oasis|B|inr_bscp": 331.550173997879,
+    "oasis|B|d_bscp": 135.58737921714783,
+    "oasis|B|mr_d_bscp": 195.864599943161,
+    "dirlab|A|idir": 301.4282647371292,
+    "dirlab|A|inr_bscp": 376.7134385108948,
+    "dirlab|A|d_bscp": 323.97893512248993,
+    "dirlab|A|mr_d_bscp": 354.1094329357147,
+    "dirlab|B|idir": 60.2253977060318,
+    "dirlab|B|inr_bscp": 180.84467446804047,
+    "dirlab|B|d_bscp": 150.64773643016815,
+    "dirlab|B|mr_d_bscp": 286.2499500513077
+  },
+  "recent_failures": []
+}

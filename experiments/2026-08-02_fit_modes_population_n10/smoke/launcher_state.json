@@ -1,0 +1,170 @@
+{
+  "updated_at": "2026-08-02 20:23:00 +0000",
+  "mode": "smoke",
+  "out_root": "${RUN_ROOT}",
+  "status_counts": {
+    "completed_existing": 16
+  },
+  "jobs": [
+    {
+      "job_id": "oasis_rank000_panelA_idir",
+      "status": "completed_existing",
+      "gpu": "",
+      "attempts": 0,
+      "elapsed_sec": null,
+      "returncode": null,
+      "log_path": "",
+      "source_kind": "population_run_resume"
+    },
+    {
+      "job_id": "oasis_rank000_panelA_inr_bscp",
+      "status": "completed_existing",
+      "gpu": "",
+      "attempts": 0,
+      "elapsed_sec": null,
+      "returncode": null,
+      "log_path": "",
+      "source_kind": "population_run_resume"
+    },
+    {
+      "job_id": "oasis_rank000_panelA_d_bscp",
+      "status": "completed_existing",
+      "gpu": "",
+      "attempts": 0,
+      "elapsed_sec": null,
+      "returncode": null,
+      "log_path": "",
+      "source_kind": "population_run_resume"
+    },
+    {
+      "job_id": "oasis_rank000_panelA_mr_d_bscp",
+      "status": "completed_existing",
+      "gpu": "",
+      "attempts": 0,
+      "elapsed_sec": null,
+      "returncode": null,
+      "log_path": "",
+      "source_kind": "population_run_resume"
+    },
+    {
+      "job_id": "oasis_rank000_panelB_idir",
+      "status": "completed_existing",
+      "gpu": "",
+      "attempts": 0,
+      "elapsed_sec": null,
+      "returncode": null,
+      "log_path": "",
+      "source_kind": "population_run_resume"
+    },
+    {
+      "job_id": "oasis_rank000_panelB_inr_bscp",
+      "status": "completed_existing",
+      "gpu": "",
+      "attempts": 0,
+      "elapsed_sec": null,
+      "returncode": null,
+      "log_path": "",
+      "source_kind": "population_run_resume"
+    },
+    {
+      "job_id": "oasis_rank000_panelB_d_bscp",
+      "status": "completed_existing",
+      "gpu": "",
+      "attempts": 0,
+      "elapsed_sec": null,
+      "returncode": null,
+      "log_path": "",
+      "source_kind": "population_run_resume"
+    },
+    {
+      "job_id": "oasis_rank000_panelB_mr_d_bscp",
+      "status": "completed_existing",
+      "gpu": "",
+      "attempts": 0,
+      "elapsed_sec": null,
+      "returncode": null,
+      "log_path": "",
+      "source_kind": "population_run_resume"
+    },
+    {
+      "job_id": "dirlab_case02_panelA_idir",
+      "status": "completed_existing",
+      "gpu": "",
+      "attempts": 0,
+      "elapsed_sec": null,
+      "returncode": null,
+      "log_path": "",
+      "source_kind": "population_run_resume"
+    },
+    {
+      "job_id": "dirlab_case02_panelA_inr_bscp",
+      "status": "completed_existing",
+      "gpu": "",
+      "attempts": 0,
+      "elapsed_sec": null,
+      "returncode": null,
+      "log_path": "",
+      "source_kind": "population_run_resume"
+    },
+    {
+      "job_id": "dirlab_case02_panelA_d_bscp",
+      "status": "completed_existing",
+      "gpu": "",
+      "attempts": 0,
+      "elapsed_sec": null,
+      "returncode": null,
+      "log_path": "",
+      "source_kind": "population_run_resume"
+    },
+    {
+      "job_id": "dirlab_case02_panelA_mr_d_bscp",
+      "status": "completed_existing",
+      "gpu": "",
+      "attempts": 0,
+      "elapsed_sec": null,
+      "returncode": null,
+      "log_path": "",
+      "source_kind": "population_run_resume"
+    },
+    {
+      "job_id": "dirlab_case02_panelB_idir",
+      "status": "completed_existing",
+      "gpu": "",
+      "attempts": 0,
+      "elapsed_sec": null,
+      "returncode": null,
+      "log_path": "",
+      "source_kind": "population_run_resume"
+    },
+    {
+      "job_id": "dirlab_case02_panelB_inr_bscp",
+      "status": "completed_existing",
+      "gpu": "",
+      "attempts": 0,
+      "elapsed_sec": null,
+      "returncode": null,
+      "log_path": "",
+      "source_kind": "population_run_resume"
+    },
+    {
+      "job_id": "dirlab_case02_panelB_d_bscp",
+      "status": "completed_existing",
+      "gpu": "",
+      "attempts": 0,
+      "elapsed_sec": null,
+      "returncode": null,
+      "log_path": "",
+      "source_kind": "population_run_resume"
+    },
+    {
+      "job_id": "dirlab_case02_panelB_mr_d_bscp",
+      "status": "completed_existing",
+      "gpu": "",
+      "attempts": 0,
+      "elapsed_sec": null,
+      "returncode": null,
+      "log_path": "",
+      "source_kind": "population_run_resume"
+    }
+  ]
+}

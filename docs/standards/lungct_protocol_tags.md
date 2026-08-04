@@ -153,16 +153,16 @@ Every LungCT run or result row should make these fields explicit:
 ```text
 dataset: 4dct | copd
 case_set: case01...case10 | selected cases
-image_domain: native_full_volume | landmark_crop
+image_domain: native_full_volume | landmark_crop | lung_union_bbox
 spacing: native | isotropic_1mm | other
-crop_rule: none | landmark_bbox_margin_xyz_10_10_5 | other
+crop_rule: none | landmark_bbox_margin_xyz_10_10_5 | fixed_moving_lobe_union_padding2 | other
 intensity_rule: native | ct_clip_80_900_scale_0_1 | other
-mask_rule: none | fixed_t00_lung_mask | other
+mask_rule: none | fixed_t00_lung_mask | fixed_lobe_union_sampling | fixed_lobe_union_sampling_plus_paired_lobe_loss | other
 loss_domain: full_image | crop | mask_sampled | border_masked
 metric_domain: native_landmarks | crop_landmarks | other
 metric_resolution: native_full_or_crop | cropped_1mm_reg | other
 tre_mode: snap_to_voxel | subvoxel | both
-method_family: idir | sinr | directcp | ptvreg | other
+method_family: idir | sinr | directcp | ptvreg | dual_inr | other
 variant: method-specific short name
 ```
 
@@ -187,6 +187,15 @@ Use these handles unless a run needs a more specific one:
   multistage control-spacing schedule.
 - `ptv_sinr_cps4`: SINR cps4 run using pTV-style preprocessing.
 - `isoptv_torch_ptv_domain`: isoTV Torch run on the pTV-style domain.
+- `dual_author_native_lungbbox_totalseg`: DUAL-INR-DIR author-code protocol
+  using author-format NIfTI images at native spacing, per-image min-max
+  intensity normalization, and a two-voxel-padded bounding box around the
+  union of fixed/T00 and moving/T50 TotalSegmentator lung-lobe masks. Training
+  coordinates are sampled from the fixed/T00 five-lobe union. A full-loss
+  variant may additionally compare the five fixed and warped-moving lobe
+  channels; a no-semantic-loss variant still uses the same masks for cropping
+  and fixed-domain sampling. Therefore this handle is neither
+  `native_full_lungmask_idir` nor a no-mask protocol.
 
 ## Current pTV-Prep Status
 
@@ -207,10 +216,10 @@ live only under `DIR-Lab/raw/{4DCT,COPD}`.
 
 ## Interpretation Rule
 
-Do not treat native IDIR, pTVReg, pTV-preprocessed SINR, and pTV-preprocessed
-DirectCP rows as clean method-only comparisons unless preprocessing, crop, mask,
-metric, interpolation, regularization scale, and evaluation convention are
-matched or explicitly tagged.
+Do not treat native IDIR, pTVReg, pTV-preprocessed SINR, pTV-preprocessed
+DirectCP, and DUAL author-protocol rows as clean method-only comparisons unless
+preprocessing, crop, mask, metric, interpolation, regularization scale, and
+evaluation convention are matched or explicitly tagged.
 
 For LungCT pTVReg-style comparisons, use `native_full_or_crop` +
 `snap_to_voxel` as the headline TRE convention. If a method reports

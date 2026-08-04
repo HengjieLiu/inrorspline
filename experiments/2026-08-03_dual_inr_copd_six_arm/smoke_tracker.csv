@@ -1,0 +1,5 @@
+variant,case_id,run_mode,gpu,attempt,status,returncode,elapsed_seconds,output_dir,log_path,started_utc,finished_utc
+P0,1,smoke,3,1,complete,0,67.42061727121472,${RUN_ROOT}/p0/case_01,${RUN_ROOT}/launcher_logs/p0_case01_smoke_attempt01_gpu3.log,2026-08-03T08:20:55.131135+00:00,2026-08-03T08:22:02.551976+00:00
+N0,1,smoke,1,1,complete,0,67.49883511289954,${RUN_ROOT}/n0/case_01,${RUN_ROOT}/launcher_logs/n0_case01_smoke_attempt01_gpu1.log,2026-08-03T08:20:55.130141+00:00,2026-08-03T08:22:02.629182+00:00
+N1,1,smoke,2,1,complete,0,71.26384760811925,${RUN_ROOT}/n1/case_01,${RUN_ROOT}/launcher_logs/n1_case01_smoke_attempt01_gpu2.log,2026-08-03T08:20:55.130735+00:00,2026-08-03T08:22:06.394704+00:00
+P1,1,smoke,3,1,complete,0,73.76678641885519,${RUN_ROOT}/p1/case_01,${RUN_ROOT}/launcher_logs/p1_case01_smoke_attempt01_gpu3.log,2026-08-03T08:22:02.553389+00:00,2026-08-03T08:23:16.320384+00:00

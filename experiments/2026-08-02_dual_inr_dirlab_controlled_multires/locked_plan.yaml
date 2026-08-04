@@ -1,0 +1,267 @@
+schema_version: 1
+status: locked_plan
+experiment_id: dual_inr_dirlab_controlled_multires_v1
+date_planned: "2026-08-02"
+
+objective: >-
+  Run a controlled DUAL-INR DIR-LAB 4DCT baseline across native IDIR-style
+  and canonical pTVReg 1 mm preprocessing, and isolate a true image-pyramid
+  schedule within each preprocessing protocol. Preserve every scientifically
+  valid result; TRE is never an execution or early-stopping criterion.
+
+scope:
+  dataset: dirlab_4dct
+  fixed_phase: 0
+  fixed_phase_name: T00_end_inhale
+  moving_phase: 5
+  moving_phase_name: T50_end_exhale
+  registration_direction: T50_to_T00
+  cases: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  seeds: [42]
+  variants: [n0_native_fullres, n1_native_multires, p0_ptvreg_fullres, p1_ptvreg_multires]
+  production_record_count: 40
+  technical_pilot_cases: [1, 8]
+  no_hyperparameter_tuning: true
+
+source:
+  repository: external/DUAL-INR-DIR
+  git_commit: f7c8e833435ec9c6b7ebec6c9a8098b566709146
+  require_clean_submodule: true
+
+environment:
+  required_variables:
+    REPO_ROOT: repository root
+    DIRLAB_RAW_ROOT: canonical raw DIR-LAB 4DCT root
+    DIRLAB_NATIVE_FIXED_MASK_ROOT: fixed-T00 R231 native-mask root
+    DIRLAB_PTVREG_ISO1MM_ROOT: canonical pTVReg-style 1 mm root
+    DUAL_CONTROLLED_RUN_ROOT: external large-output root
+  review_root: experiments/2026-08-02_dual_inr_dirlab_controlled_multires
+  docker_container: py310sitreg_v1_test1
+  docker_image: "${DOCKER_IMAGE}"
+  data_mode: logically_read_only
+  outputs_forbidden_below_data_roots: true
+
+protocols:
+  native_idir:
+    variant_prefix: n
+    protocol_tag: native_idir_fixed_t00_mask
+    image_domain: native_full_volume
+    crop: none
+    resampling: none
+    spacing: native_anisotropic
+    intensity: native_as_loaded
+    optimization_sampling_domain: fixed_t00_r231_lung_mask
+    moving_mask_in_optimization: false
+    semantic_mask_loss: false
+    headline_tre: native_landmark_snap_mm
+    diagnostic_tre: native_landmark_subvoxel_mm
+  ptvreg_iso1mm:
+    variant_prefix: p
+    protocol_tag: ptvreg_iso1mm_landmark_crop_no_mask
+    spacing_mm: [1.0, 1.0, 1.0]
+    crop_rule: fixed_moving_landmark_union_bbox
+    crop_margin_xyz_voxels: [10, 10, 5]
+    intensity:
+      clip_hu: [80, 900]
+      scale_to: [0.0, 1.0]
+    optimization_sampling_domain: full_fixed_crop_excluding_border
+    excluded_border_voxels_at_full_resolution: 5
+    lung_mask_in_optimization: false
+    semantic_mask_loss: false
+    headline_tre: field_remapped_to_native_crop_native_landmark_snap_mm
+    diagnostic_tre:
+      - registration_grid_snap_mm
+      - registration_grid_subvoxel_mm
+      - native_remapped_snap_mm
+      - native_remapped_subvoxel_mm
+
+model:
+  family: dual_inr
+  architecture: dual_siren_additive_residual
+  layers: [3, 256, 256, 3]
+  coarse_omega0: 10
+  fine_omega0: 30
+  coarse_output_scale: 0.1
+  fine_output_scale_constructor_initial: 0.05
+  fine_branch:
+    inactive_global_steps: [0, 399]
+    activate_at_global_step: 400
+    active_global_steps: [400, 2499]
+    activation_rule: reset_fine_scale_to_0.1_times_current_coarse_scale
+  normalized_coordinate_domain: [-1.0, 1.0]
+  model_weights_persist_across_stages: true
+
+loss:
+  data_term: sampled_global_ncc
+  points_per_step: 30000
+  laplacian_weight: 0.01
+  negative_jacobian_weight: 0.01
+  fine_branch_regularization_scale: 0.1
+  semantic_mask_weight: 0.0
+  semantic_mask_term_evaluated: false
+
+schedule:
+  total_steps: 2500
+  stage_steps: [400, 400, 800, 900]
+  stage_starts: [0, 400, 800, 1600]
+  stage_ends_inclusive: [399, 799, 1599, 2499]
+  transition_mode: fixed
+  coordinate_sampling:
+    domain_lattice: original_full_resolution_fixed_image
+    resample_domain_per_stage: false
+    normalize_sampled_coordinates_once_against_full_resolution_lattice: true
+    points_per_step: 30000
+  pyramid_construction:
+    independent_from_full_resolution_image: true
+    recursive_downsampling: false
+    target_shape_per_axis: ceil_full_shape_divided_by_factor
+    antialiasing:
+      apply_when_factor_greater_than_one: true
+      factor_one_is_identity: true
+      gaussian_sigma_voxels: 0.5_times_factor
+      kernel_radius_voxels: ceil_3_times_sigma
+      padding: replicate
+    interpolation: trilinear
+    align_corners: true
+  optimizer_per_stage:
+    class: torch.optim.AdamW
+    fresh_instance_each_stage: true
+    carry_optimizer_state_between_stages: false
+    initial_lr: 0.001
+    end_lr: 0.00001
+    weight_decay: 0.01
+    betas: [0.9, 0.999]
+    eps: 1.0e-08
+  scheduler_per_stage:
+    class: warmup_cosine
+    fresh_instance_each_stage: true
+    warmup_steps: 20
+    configured_base_lr: 0.001
+    first_update_lr_under_current_step_order: 0.0
+    ends_at_lr: 0.00001
+
+variants:
+  n0_native_fullres:
+    display_name: N0 native fixed-mask full-resolution schedule control
+    protocol: native_idir
+    pyramid_factors: [1, 1, 1, 1]
+  n1_native_multires:
+    display_name: N1 native fixed-mask MR-D-BSCP-shaped image pyramid
+    protocol: native_idir
+    pyramid_factors: [8, 4, 2, 1]
+  p0_ptvreg_fullres:
+    display_name: P0 pTVReg 1 mm no-mask full-resolution schedule control
+    protocol: ptvreg_iso1mm
+    pyramid_factors: [1, 1, 1, 1]
+  p1_ptvreg_multires:
+    display_name: P1 pTVReg 1 mm no-mask MR-D-BSCP-shaped image pyramid
+    protocol: ptvreg_iso1mm
+    pyramid_factors: [8, 4, 2, 1]
+
+isolation_contract:
+  paired_causal_comparisons:
+    - [n0_native_fullres, n1_native_multires]
+    - [p0_ptvreg_fullres, p1_ptvreg_multires]
+  sole_within_pair_scientific_difference: schedule.pyramid_factors
+  n_vs_p_interpretation: preprocessing_protocol_comparison_only
+  all_variants_share:
+    - source_commit
+    - model
+    - loss
+    - seed
+    - stage_boundaries
+    - fine_activation_step
+    - optimizer_and_scheduler_reset_rule
+  forbidden_description: literal_MR_D_BSCP_control_point_schedule
+  required_description: MR_D_BSCP_shaped_or_MR_inspired_image_pyramid
+
+execution:
+  short_smoke:
+    case: 1
+    variants: [n0_native_fullres, n1_native_multires, p0_ptvreg_fullres, p1_ptvreg_multires]
+    purpose: technical_only
+    scientific_metric_gate: none
+  technical_pilot:
+    cases: [1, 8]
+    variants: [n0_native_fullres, n1_native_multires, p0_ptvreg_fullres, p1_ptvreg_multires]
+    steps: 2500
+    purpose: finite_values_coordinates_memory_and_output_contract_only
+    scientific_metric_gate: none
+    exact_compatible_records_may_be_reused: true
+  production:
+    cases: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    variants: [n0_native_fullres, n1_native_multires, p0_ptvreg_fullres, p1_ptvreg_multires]
+    seeds: [42]
+    expected_records: 40
+    attempt_all_records: true
+    gpu_policy:
+      visible_gpus: 4
+      active_optimizers_per_gpu: 1
+      dispatcher: dynamic_queue
+    poor_tre_stops_record: false
+    poor_tre_stops_queue: false
+    technical_failure:
+      retry_failed_record: true
+      preserve_attempt_logs: true
+      continue_unrelated_jobs: true
+      never_change_locked_scientific_config_to_rescue: true
+
+required_case_outputs:
+  - resolved_config.yaml
+  - summary.json
+  - history.csv
+  - stage_trace.csv
+  - tre_scores.json
+  - dense_dvf_xyz_voxel.npy
+  - fixed_metric_mask_xyz.npy
+  - model_state.pt
+  - stdout.log
+  - stderr.log
+
+acceptance_gates:
+  source:
+    exact_commit: f7c8e833435ec9c6b7ebec6c9a8098b566709146
+    clean_submodule: true
+  data:
+    cases: 10
+    landmarks_per_phase_per_case: 300
+    phases: [0, 5]
+    validate_geometry_direction_and_landmark_mapping: true
+    native_fixed_mask_required_and_nonempty: true
+    ptvreg_no_optimization_mask: true
+  execution:
+    finite_history_rows_per_record: 2500
+    exact_stage_starts: [0, 400, 800, 1600]
+    exact_stage_steps: [400, 400, 800, 900]
+    fine_activation_step: 400
+    full_resolution_sampling_domain_each_stage: true
+    dense_fields_and_metrics_finite: true
+    required_outputs_complete: true
+  cohort:
+    attempted_records: 40
+    target_accepted_records: 40
+    cases_per_variant: 10
+    missing_or_duplicate_keys_allowed: 0
+  scientific_performance:
+    tre_threshold: none
+    regularity_threshold: none
+    nonpromising_result_is_valid: true
+
+reporting:
+  headline_metric: native_landmark_snap_tre_mm
+  retain_tre_diagnostics: true
+  aggregate: [per_case, mean, sample_sd, median, iqr]
+  common_posthoc_regularity:
+    metrics: [diffusion, bending, sdlogj, nonpositive_jacobian_fraction]
+    native_domain: fixed_t00_r231_lung_foreground_metric_only
+    ptvreg_domain: fixed_t00_lung_foreground_on_ptvreg_1mm_crop_metric_only
+  runtime_and_peak_memory: true
+
+claim_limits:
+  - N0-to-N1 and P0-to-P1 are the only schedule-isolating comparisons.
+  - N-to-P is a protocol comparison, not a preprocessing-neutral method comparison.
+  - N1 and P1 imitate the MR-D-BSCP coarse-to-fine shape only; they do not implement its control-point spacings, knot insertion, objective, or regularization weights.
+  - Fixed normalized-coordinate regularization weights have different physical meaning in native anisotropic and pTVReg 1 mm domains.
+  - Voxel-coordinate diffusion and bending are contextual across preprocessing domains; metric domains must stay tagged.
+  - One seed over ten cases supports a manageable camera-ready baseline, not a robustness claim.
+  - No hyperparameter selection or tuning is permitted under this experiment ID.

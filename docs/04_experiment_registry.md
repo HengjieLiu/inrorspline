@@ -1675,3 +1675,263 @@ Next decision:
   failures are `0`, first100 aggregation has no missing or duplicate
   combinations, final figures use only complete first100 rows, and the tracker
   and progress log agree on counts.
+
+### P13: OASIS10/DIR-LAB10 Population Fit-Modes Figure
+
+- Status: completed and accepted 2026-08-02. Final aggregate: 160/160 terminal-
+  success records, including 136 new completions and 24 exact-compatible
+  reuses; 0 failures; all 16 dataset/panel/method groups have N=10.
+- Purpose: replace the illustrative one-OASIS/two-DIR-LAB representation-
+  capacity evidence with paired population curves for a locked OASIS N=10
+  subset and all DIR-LAB N=10 cases.
+- Dataset: OASIS seed-3 shuffled ranks `0-9`, original sorted indices
+  `158,62,14,69,47,137,110,6,116,88`; DIR-LAB 4DCT cases `01-10`, moving
+  `T50` to fixed `T00` on the canonical pTVReg-equivalent isotropic 1 mm crop.
+- Matrix: `20 cases × 2 objectives × 4 methods = 160` records. The current
+  source-backed figure's 24 exact-compatible selected-case records are eligible
+  for provenance-preserving reuse; 136 records are expected to run anew.
+- OASIS Panel A: IDIR `alpha=1, lr=1e-4`; INR-BSCP cps2
+  `alpha=1000, lr=1e-4`; D-BSCP cps2 `alpha=1000, lr=1e-3`; MR-D-BSCP
+  `8-4-2`, `lr=1e-3`, stage epochs `400,800,1300`; total 2500 epochs.
+- DIR-LAB Panel A: IDIR `alpha_BE=3, lr=1e-4`; INR-BSCP cps4
+  `alpha=10000, lr=1e-4`; D-BSCP cps4 `alpha=10000, lr=1e-3`;
+  MR-D-BSCP `32-16-8-4`, `lr=1e-3`, stage epochs `200,400,800,1000`.
+- Panel B: MSE-only normalized-grid target-field fitting. OASIS uses SITReg
+  targets and the fixed `image>0` mask; DIR-LAB uses reconstructed pTVReg
+  targets and the fixed-T00 lung mask. Multistage schedules are OASIS
+  `400,800,1300` and DIR-LAB `400,400,800,900`.
+- Seed: `1`; single-stage epochs: `2500`; Panel A global-NCC diagnostic interval:
+  `10`; OASIS multistage finest-MSE interval: `10`; DIR-LAB multistage
+  finest-MSE interval: `1`.
+- Launch environment: Docker container `py310sitreg_v1_test1`, image
+  `${DOCKER_IMAGE}`; GPUs `0,1,2,3`, one active optimizer
+  per GPU with dynamic work stealing.
+- Output root: `${RUN_ROOT}` (completed-run variant
+  `fit_modes_population_n10_v1`).
+- Smoke output root: `${SMOKE_RUN_ROOT}` (completed-run variant
+  `fit_modes_population_n10_smoke_v1`).
+- Review root:
+  `experiments/2026-08-02_fit_modes_population_n10/`.
+- Split config:
+  `configs/splits/oasis/pair_test_200_shuffled_seed000003.txt`.
+- Standards preflight: OASIS raw image-positive foreground and shuffled-subset
+  rules reviewed; LungCT protocol warnings and fixed-T00 mask rule reviewed.
+- Primary endpoints: Panel A `1-NCC`; Panel B target-normalized rRMSE (%).
+  Every index record also retains target power where applicable, diagnostic
+  NCC, runtime, peak memory, and source provenance.
+- Monitoring: scheduler poll no longer than 60 seconds; persistent
+  `monitor_status.md/json`; provisional ETA from compatible historical runs,
+  then observed median runtime by dataset/panel/method.
+- Acceptance: `10/10` SITReg and `10/10` pTVReg targets validate; dry-run
+  resolves 160 unique records; isolated 16-job smoke passes; all 160 full
+  records are complete or exact-compatible reuse with no unresolved failures;
+  all endpoint/mask/unit/schedule/schema checks pass before figure generation.
+- Accepted outputs: `acceptance_report.md/json`, `optimization_index.csv/json`,
+  and `population_statistics.csv` in the review root. Scheduler wall time was
+  2 h 20 min 26 s on four GPUs. After acceptance, 20 source-backed case
+  diagnostic figures were generated and arranged in `diagnostic_comparison.md`
+  as two five-by-two dataset grids. All 160 plotted endpoints agree with the
+  accepted index; axis limits are shared within each dataset and recorded in
+  `diagnostic_manifest.json`. A compact final population-statistics figure is
+  still a separate paper-design step.
+- Known limitation: OASIS N=10 resolves the single-case cherry-picking concern
+  but does not literally repeat the previous N=100 testing cohort.
+- Open camera-ready issue: DIR-LAB MR-D-BSCP Panel A uses
+  `200,400,800,1000` (2400 total), while Panel B uses `400,400,800,900` (2500
+  total) and the Panel A single-stage methods use 2500 epochs. Until a
+  schedule-matched replacement cohort is accepted, claim only final-spacing
+  matching. The preferred replacement is versioned Panel A N=10 at
+  `400,400,800,900`; tracked in `docs/todos/camera_ready_checklist.md`.
+- Implementation entry point:
+  `scripts/experiments/fit_modes_population/launch_population.py`.
+- Diagnostic entry point:
+  `scripts/experiments/fit_modes_population/plot_case_diagnostics.py`.
+
+### P14: DUAL-INR-DIR Author Reproduction and Semantic-Loss Ablation
+
+- Status: complete 2026-08-02; implementation/data, paired smoke, full-length
+  cases01/08 pilot, 20-record production, common-regularity, aggregation, and
+  visual-review gates all passed.
+  The author-format ten-case artifact is published and independently validated;
+  the focused preprocessing/runner/orchestration/reporting suite passes `28/28`.
+  A0 reproduced the published author mean (`0.9789 mm` observed versus
+  `0.98 mm` reported). Schedule-controlled A1 produced `0.9834 mm`, a paired
+  descriptive delta of `+0.0045 +/- 0.0139 mm` (sample SD).
+- Purpose: reproduce the released DUAL-INR-DIR author configuration on all ten
+  DIR-LAB 4DCT cases and isolate the semantic lobe-mask loss without changing
+  the author data, crop, sampling, architecture, optimizer, or realized
+  casewise schedule.
+- Source: clean `external/DUAL-INR-DIR` submodule at commit
+  `f7c8e833435ec9c6b7ebec6c9a8098b566709146`.
+- Dataset and direction: DIR-LAB 4DCT cases `01-10`; moving T50/end-exhale to
+  fixed T00/end-inhale (`T50 -> T00`); one locked seed, `42`, matching the
+  upstream runner default.
+- Protocol handle: `dual_author_native_lungbbox_totalseg`. This author-code
+  protocol uses native spacing, per-image min-max normalization, a two-voxel-
+  padded crop around the union of fixed and moving five-lobe TotalSegmentator
+  masks, and fixed/T00 lobe-union coordinate sampling. It is neither native
+  full-volume IDIR nor pTVReg landmark-crop/iso1mm preprocessing.
+- A0 `a0_author_full_loss`: released-code sampled NCC plus Laplacian/curvature
+  weight `0.01`, negative-determinant weight `0.01`, and five-lobe semantic
+  mask weight `0.1`.
+- A1 `a1_author_no_semantic_mask_loss`: the scientific factor changes only
+  `loss.mask_weight` from `0.1` to `0.0`. A1 retains mask-derived cropping and
+  fixed-mask sampling and must not be labeled no-mask. As a schedule-control
+  intervention, A1 replays the realized blur-transition steps from A0 for the
+  same case and seed instead of rerunning the adaptive trigger.
+- Common author settings: dual SIREN layers `3-256-256-3`, coarse/fine
+  frequencies `10/30`, `30,000` sampled points per step, blur stages `4,2,0`,
+  AdamW, cosine schedule, initial/end LR `1e-3/1e-5`, and `3000` total steps.
+  A0 uses the author adaptive relative-convergence transitions; A1 uses the
+  exact casewise A0 boundaries.
+- Matrix: `10 cases x 2 variants x 1 seed = 20` production records.
+- Pilot: run full-length A0 first on cases `01` and `08` using the available
+  GPU pool with at most one optimizer per GPU
+  after source/data/config/dry-run and short-smoke gates, lock the realized A0
+  boundaries, then run paired A1. For production, finish A0 across all cases
+  and freeze its transition manifest before launching A1. Use all visible GPUs,
+  at most one optimizer per GPU, only after all four full pilot records and
+  visual checks pass.
+- Required environment variables: `${REPO_ROOT}`, `${DUAL_AUTHOR_DATA_ROOT}`,
+  `${DUAL_AUTHOR_DATA_MANIFEST}`, `${DUAL_AUTHOR_PILOT_ROOT}`, and
+  `${DUAL_AUTHOR_RUN_ROOT}`. Treat the prepared data artifact as logically
+  read-only and forbid output roots beneath it; the existing default
+  container's `/database` mapping itself is read-write. Large artifacts remain
+  outside Git.
+- Headline metric: native/crop-domain snap-to-voxel TRE in physical mm. Keep
+  subvoxel TRE, decoded-dense versus direct-INR agreement, common posthoc
+  regularity metrics, runtime, and peak memory as required diagnostics.
+- Technical acceptance: exact clean source commit; all ten cases pass phase,
+  orientation, shape/spacing, 300-landmark, five-lobe, checksum, and
+  TotalSegmentator-provenance checks. Converter-derived identity TRE for
+  cases01-10 must match `[3.892406, 4.337842, 6.942993, 9.830147, 7.476853,
+  10.891024, 11.026220, 14.994681, 7.918264, 7.301382]` mm within `1e-5 mm`
+  per case; the rounded paper Table 1 no-registration row is a release
+  discrepancy, not the data gate. Dry-run resolves 20 unique records; pilots
+  complete `4/4`; production aggregates `20/20`, N=10 per variant, with 3000
+  finite history rows and no unresolved, missing, or duplicate record.
+- Accepted prepared-data artifact: version
+  `dual_author_native_lungbbox_totalseg_v001`, with 84 verified checksum
+  entries. Manifest SHA-256 is
+  `40e40c98219ac68e0b323f4a50d9b1687c447c03c42093cf180f2453fe402cb2`,
+  preprocessing-contract SHA-256 is
+  `12cc0b9cd667d2d4d133d828162759e5cec245687f7e899d773a924fa0ce4c24`,
+  and checksum-manifest SHA-256 is
+  `b8b8d751def598b8c70b34cdfc293baa3e0c197649d5a3e814ec7046cd3ab0c3`.
+  The exact executed converter is embedded read-only in the artifact at
+  SHA-256 `1f33439328f5d586d8086b5d01297b3067fe7d63f4fb8ee0cf99193e01179ba3`.
+- Isolation acceptance: the scientific config difference is only
+  `loss.mask_weight`; allowed execution differences are transition mode/source
+  metadata and output identity. Each A1 run must use exactly its paired A0
+  stage boundaries. Dense and direct-INR pilot snap TRE differ by at most
+  `0.05 mm`; every full run visits blur stages `4,2,0` and activates the fine
+  branch at stage index `1`.
+- Fidelity review: compare A0 with the published author mean `0.98 mm`; use the
+  preregistered `0.82-1.12 mm` consistency interval based on the published
+  `0.97 +/- 0.15 mm` multiseed summary. Outside the interval, preserve and
+  report the completed experiment but mark fidelity failed and do not tune or
+  reseed under this experiment ID.
+- Interpretation limits: seed `42` alone does not reproduce the ten-seed
+  robustness analysis; A1 isolates only the semantic loss term; neither row is
+  a clean method-only comparison with IDIR or pTVReg; analysis is descriptive
+  and does not support equivalence or superiority claims.
+- Completed result: A0/A1 dense snap TRE is `0.9789 +/- 0.1727` versus
+  `0.9834 +/- 0.1669 mm` across cases (mean +/- sample SD). Mean five-lobe
+  Dice is `0.96788` versus `0.96463`; the paired A1-minus-A0 Dice delta is
+  `-0.00325`, negative in all ten cases. Foreground SDlogJ is
+  `0.1401 +/- 0.0361` versus `0.1389 +/- 0.0353`; neither variant has a
+  nonpositive foreground Jacobian voxel under the shared posthoc convention.
+  All ten A1 stage traces exactly match their paired A0 traces.
+- Locked plan and execution specification:
+  `experiments/2026-08-02_dual_inr_dirlab_author_repro/`.
+
+### P15: Controlled DUAL Native/pTVReg Full-Resolution and Image-Pyramid Baselines
+
+- Status: complete 2026-08-03; 40/40 optimization records and 40/40 common
+  regularity records passed strict technical acceptance with zero failures or
+  retries.
+- Purpose: retain the completed author reproduction while adding a controlled,
+  camera-ready DUAL baseline under two explicitly tagged preprocessing
+  protocols and isolating an MR-D-BSCP-shaped image-pyramid schedule within
+  each protocol.
+- Dataset: DIR-LAB 4DCT cases `01-10`, moving T50/end-exhale to fixed
+  T00/end-inhale, seed `42`.
+- Matrix: `N0,N1,P0,P1 x 10 cases = 40` records. N uses native full volumes,
+  native intensities, no crop/resampling, and fixed-T00 R231 mask sampling. P
+  uses the canonical pTVReg-style landmark crop at approximately 1 mm,
+  `[80,900] -> [0,1]` CT scaling, no lung mask in optimization, and a
+  five-voxel border domain.
+- Common objective/model: pinned DUAL SIREN `3-256-256-3`, omega `10/30`,
+  30,000 samples per step, sampled global NCC plus released Laplacian and
+  negative-Jacobian weights `0.01/0.01`, fine regularization scale `0.1`, and
+  no semantic-mask loss.
+- Schedule: fixed stage lengths `400,400,800,900` (2500 total), fine branch at
+  step 400. N0/P0 use image factors `1,1,1,1`; N1/P1 use independently built,
+  antialiased levels `8,4,2,1`. Model weights persist; fresh AdamW and
+  stage-local warmup-cosine state are used identically in every arm.
+- Execution: all four visible RTX 6000 Ada GPUs, one optimizer per GPU,
+  dynamic work queue. All 40 records are attempted. Technical failures are
+  isolated and retried while unrelated records continue; TRE and regularity
+  values never stop a record or the queue.
+- Headline endpoint: native snap-to-voxel TRE in mm. P fields are converted
+  from the 1 mm registration crop to the native crop before the headline
+  metric. Registration-grid snap/subvoxel TRE, direct/dense diagnostics,
+  runtime, peak memory, and shared posthoc regularity are retained.
+- Interpretation: only `N0 <-> N1` and `P0 <-> P1` isolate the schedule. N/P
+  changes preprocessing and optimization domain. N1/P1 are MR-inspired image
+  pyramids, not the literal MR-D-BSCP control lattice, knot insertion,
+  objective, or tuned weights. Native anisotropy and fixed normalized-grid
+  regularization scale remain explicit caveats.
+- Completed headline/native snap TRE (mean +/- sample SD, mm): N0
+  `1.0738 +/- 0.2041`, N1 `1.0649 +/- 0.2091`, P0
+  `1.0410 +/- 0.2160`, and P1 `1.0461 +/- 0.2211`. The paired
+  multiresolution-minus-full-resolution deltas are `-0.0089 +/- 0.0134 mm`
+  for N and `+0.0051 +/- 0.0147 mm` for P, a small and
+  direction-inconsistent schedule effect under the frozen recipe.
+- Common foreground SDlogJ is `0.1282`, `0.1286`, `0.1135`, and `0.1138`
+  for N0, N1, P0, and P1, respectively; all four have zero nonpositive
+  foreground Jacobian percentage. Voxel-coordinate diffusion/bending values
+  remain protocol-tagged and are not directly compared across N/P.
+- Contextual iso-1-mm references are pTVReg `0.9191 +/- 0.1607 mm` and
+  MR-D-BSCP `0.9175 +/- 0.1561 mm`. MR-D-BSCP uses one fixed cohort-selected
+  `w=0.055` for all cases, never a per-case oracle; both references retain
+  distinct preprocessing tags and regularity tables.
+- Review root and locked specification:
+  `experiments/2026-08-02_dual_inr_dirlab_controlled_multires/`.
+
+### P16: COPD DUAL-INR Six-Arm Author/Controlled Baseline
+
+- Status: production launched 2026-08-03. The all-case controlled dry-run and
+  all four controlled case-01 technical smokes passed; the N/P 40-record
+  queue is active. Five-lobe author preparation is atomic and its validation,
+  A smoke, and A0-to-A1 production pipeline are queued to begin only after
+  publication of the complete all-case artifact.
+- Purpose: extend the audited DUAL author reproduction and controlled
+  native/pTV baselines to COPD without selecting hyperparameters on COPD
+  outcomes. The resulting camera-ready table separates author fidelity,
+  semantic-loss ablation, preprocessing, and the MR-shaped image schedule.
+- Dataset and direction: COPD cases 01-10; moving eBHCT to fixed iBHCT
+  (eBH -> iBH); seed 42.
+- Matrix: A0,A1,N0,N1,P0,P1 x 10 = 60 new records. A0 is the released
+  five-lobe objective; A1 removes only the semantic loss and replays its paired
+  A0 transition trace. N0/N1 use native fixed-iBH R231 sampling; P0/P1 use the
+  existing legacy-Python pTV-style 1 mm artifact and no lung mask in
+  optimization. N0/P0 use factors 1,1,1,1; N1/P1 use 8,4,2,1.
+- Frozen common settings: DUAL SIREN 3-256-256-3, frequencies 10/30,
+  scales .1/.05, 30,000 points/step, NCC, Laplacian and negative-Jacobian
+  weights .01/.01, fine scale .1, and no N/P semantic term. The author
+  arms retain the released adaptive blur schedule 4,2,0 and 3,000 steps;
+  controlled N/P arms use 400,400,800,900 steps with fresh optimizer and
+  warmup-cosine state per stage.
+- Prepared-data requirement: all ten fixed/moving TotalSegmentator masks must
+  contain labels 10..14; R231 is retained only as a fixed-iBH posthoc metric
+  mask for A, never as an A optimizer input.
+- References: import the official pTVReg COPD best casewise TRE only; regularity
+  is N/A because no official dense field exists. Use one completed cohort,
+  MR-D-BSCP P2e, as the lowest-population-TRE 1 mm reference, never per-case
+  selection.
+- Output and review roots are versioned external scratch artifacts and
+  experiments/2026-08-03_dual_inr_copd_six_arm/, respectively.
+- Known limitation: the P artifact is pTV-style but its legacy crop bounds do
+  not exactly equal official pTVReg MATLAB bounds. Consequently P/MR are
+  matched to each other, while pTVReg remains a contextual, tagged reference.

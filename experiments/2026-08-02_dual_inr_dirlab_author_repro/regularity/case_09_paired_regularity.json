@@ -1,0 +1,209 @@
+{
+  "a0": {
+    "conversion": {
+      "fixed_lobe_union_voxels": 795112,
+      "source_shape_and_convention": "(X,Y,Z,xyz) author crop voxel displacement",
+      "source_shape_xyz": [
+        248,
+        193,
+        78
+      ],
+      "spacing_xyz_mm": [
+        0.9700000286102295,
+        0.9700000286102295,
+        2.5
+      ],
+      "spacing_zyx_mm": [
+        2.5,
+        0.9700000286102295,
+        0.9700000286102295
+      ],
+      "spatial_permutation": [
+        2,
+        1,
+        0
+      ],
+      "target_shape_and_convention": "(Z,Y,X,zyx) common voxel displacement",
+      "target_shape_zyx": [
+        78,
+        193,
+        248
+      ],
+      "vector_component_permutation": [
+        2,
+        1,
+        0
+      ]
+    },
+    "metrics": {
+      "bending_energy_fg": 0.007814132065531311,
+      "bending_energy_full": 0.01291681427481459,
+      "diffusion_l2_fg": 0.01389178262501455,
+      "diffusion_l2_full": 0.013754332300595756,
+      "disp_mag_max_fg_mm": 16.68377435092496,
+      "disp_mag_max_fg_vox": 11.303995308724243,
+      "disp_mag_max_full_mm": 16.994959763562598,
+      "disp_mag_max_full_vox": 12.06092246023591,
+      "disp_mag_mean_fg_mm": 7.330767590384102,
+      "disp_mag_mean_fg_vox": 4.411502503395172,
+      "disp_mag_mean_full_mm": 6.629109710558398,
+      "disp_mag_mean_full_vox": 3.861922406815855,
+      "disp_mag_p95_fg_mm": 13.581999154060162,
+      "disp_mag_p95_fg_vox": 7.821640200942087,
+      "disp_mag_p95_full_mm": 13.096880903632771,
+      "disp_mag_p95_full_vox": 7.694831354095339,
+      "jdet_le0_pct_fg": 0.0,
+      "jdet_le0_pct_full": 0.0,
+      "jdet_mean_fg": 0.8679127484158164,
+      "jdet_mean_full": 0.9373527828783671,
+      "log_jdet_std_fg": 0.16258433783938434,
+      "log_jdet_std_full": 0.16210340934663592,
+      "ndv_frac_fg": 0.0,
+      "ndv_frac_full": 0.0
+    }
+  },
+  "a1": {
+    "conversion": {
+      "fixed_lobe_union_voxels": 795112,
+      "source_shape_and_convention": "(X,Y,Z,xyz) author crop voxel displacement",
+      "source_shape_xyz": [
+        248,
+        193,
+        78
+      ],
+      "spacing_xyz_mm": [
+        0.9700000286102295,
+        0.9700000286102295,
+        2.5
+      ],
+      "spacing_zyx_mm": [
+        2.5,
+        0.9700000286102295,
+        0.9700000286102295
+      ],
+      "spatial_permutation": [
+        2,
+        1,
+        0
+      ],
+      "target_shape_and_convention": "(Z,Y,X,zyx) common voxel displacement",
+      "target_shape_zyx": [
+        78,
+        193,
+        248
+      ],
+      "vector_component_permutation": [
+        2,
+        1,
+        0
+      ]
+    },
+    "metrics": {
+      "bending_energy_fg": 0.00770817604397103,
+      "bending_energy_full": 0.012802858852033111,
+      "diffusion_l2_fg": 0.01369775097197202,
+      "diffusion_l2_full": 0.013620817020377263,
+      "disp_mag_max_fg_mm": 16.93625010722065,
+      "disp_mag_max_fg_vox": 10.845006866628319,
+      "disp_mag_max_full_mm": 17.52482410386872,
+      "disp_mag_max_full_vox": 11.452499800462457,
+      "disp_mag_mean_fg_mm": 7.310061346767718,
+      "disp_mag_mean_fg_vox": 4.401486627722034,
+      "disp_mag_mean_full_mm": 6.628331959526304,
+      "disp_mag_mean_full_vox": 3.8731663854699354,
+      "disp_mag_p95_fg_mm": 13.58217505714211,
+      "disp_mag_p95_fg_vox": 7.80858835785914,
+      "disp_mag_p95_full_mm": 13.156420173148312,
+      "disp_mag_p95_full_vox": 7.707586441892906,
+      "jdet_le0_pct_fg": 0.0,
+      "jdet_le0_pct_full": 0.0,
+      "jdet_mean_fg": 0.8693613812281898,
+      "jdet_mean_full": 0.9400491849141749,
+      "log_jdet_std_fg": 0.16125810796233564,
+      "log_jdet_std_full": 0.1620821983420271,
+      "ndv_frac_fg": 0.0,
+      "ndv_frac_full": 0.0
+    }
+  },
+  "a1_minus_a0": {
+    "bending_energy_fg": -0.00010595602156028127,
+    "bending_energy_full": -0.00011395542278147888,
+    "diffusion_l2_fg": -0.00019403165304253053,
+    "diffusion_l2_full": -0.00013351528021849322,
+    "disp_mag_max_fg_mm": 0.2524757562956914,
+    "disp_mag_max_fg_vox": -0.45898844209592404,
+    "disp_mag_max_full_mm": 0.5298643403061227,
+    "disp_mag_max_full_vox": -0.6084226597734528,
+    "disp_mag_mean_fg_mm": -0.020706243616384512,
+    "disp_mag_mean_fg_vox": -0.010015875673138552,
+    "disp_mag_mean_full_mm": -0.0007777510320936543,
+    "disp_mag_mean_full_vox": 0.011243978654080333,
+    "disp_mag_p95_fg_mm": 0.0001759030819474816,
+    "disp_mag_p95_fg_vox": -0.013051843082947379,
+    "disp_mag_p95_full_mm": 0.05953926951554145,
+    "disp_mag_p95_full_vox": 0.012755087797567732,
+    "jdet_le0_pct_fg": 0.0,
+    "jdet_le0_pct_full": 0.0,
+    "jdet_mean_fg": 0.001448632812373396,
+    "jdet_mean_full": 0.002696402035807788,
+    "log_jdet_std_fg": -0.0013262298770486958,
+    "log_jdet_std_full": -2.121100460880654e-05,
+    "ndv_frac_fg": 0.0,
+    "ndv_frac_full": 0.0
+  },
+  "case": 9,
+  "inputs": {
+    "a0_dense_dvf": "${RUN_ROOT}/a0/case_09/dense_dvf_crop_voxel_xyz.npy",
+    "a1_dense_dvf": "${RUN_ROOT}/a1/case_09/dense_dvf_crop_voxel_xyz.npy",
+    "crop_bbox": [
+      {
+        "start": 136,
+        "step": null,
+        "stop": 384
+      },
+      {
+        "start": 132,
+        "step": null,
+        "stop": 325
+      },
+      {
+        "start": 48,
+        "step": null,
+        "stop": 126
+      }
+    ],
+    "fixed_segmentation": "${DATA_ROOT}/case_09/segmentations_00.nii",
+    "original_shape_xyz": [
+      512,
+      512,
+      128
+    ]
+  },
+  "interpretation": {
+    "diffusion_and_bending": "Finite-difference metrics in native crop voxel coordinates; they depend on voxel/component scaling and are not physical-coordinate energies.",
+    "displacement": "Shared voxel-coordinate magnitude plus an added anisotropic-spacing physical-mm magnitude diagnostic.",
+    "foreground": "Exact fixed/T00 five-lobe union in the author crop.",
+    "jacobian_determinant": "Dimensionless and invariant when converting voxel to physical coordinates because F_phys = S F_vox S^-1 is a similarity transform, so det(F_phys) = det(F_vox).",
+    "jdet_border": "The shared implementation excludes a two-voxel border on axes longer than four voxels.",
+    "sdlogj": "Natural-log SD over positive determinants only."
+  },
+  "metric_source": {
+    "functions": [
+      "displacement_regularities",
+      "diffusion_loss_vox",
+      "bending_energy_vox",
+      "jacobian_determinant_zyx"
+    ],
+    "path": "${REPO_ROOT}/scripts/experiments/lungct_no_sweep_repro/common.py",
+    "sha256": "b44325a46804d2bf8c0ad8af2b62d72b890f459a107aedd7b9f7ce9666ea56b5"
+  },
+  "posthoc_source": {
+    "path": "${REPO_ROOT}/scripts/experiments/lungct_dual_inr_author/posthoc_author_regularity.py",
+    "repository_relative_path": "scripts/experiments/lungct_dual_inr_author/posthoc_author_regularity.py",
+    "sha256": "69883f85f50f0e7dc163a4064f2fdc9ab2257fb6981deb39bc87a5c93031fa8d",
+    "size_bytes": 20097
+  },
+  "run_mode": "full_length",
+  "schema_version": 1,
+  "seed": 42
+}

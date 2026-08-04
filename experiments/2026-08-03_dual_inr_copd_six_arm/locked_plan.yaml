@@ -1,0 +1,50 @@
+experiment_id: dual_inr_copd_six_arm_v001
+status: authorized_for_execution
+dataset: copd
+cases: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+seed: 42
+registration_direction: eBH_to_iBH
+new_records: 60
+variants:
+  A0:
+    data: author_native_totalseg_five_lobe_union
+    loss: released_ncc_spatial_plus_semantic_weight_0p1
+    schedule: released_adaptive_blur_4_2_0_3000_steps
+  A1:
+    data: author_native_totalseg_five_lobe_union
+    loss: ncc_plus_spatial_semantic_weight_0
+    schedule: exact_paired_A0_transition_replay_3000_steps
+  N0:
+    data: native_full_fixed_iBH_R231_sampling
+    loss: ncc_plus_spatial
+    factors: [1, 1, 1, 1]
+  N1:
+    data: native_full_fixed_iBH_R231_sampling
+    loss: ncc_plus_spatial
+    factors: [8, 4, 2, 1]
+  P0:
+    data: legacy_python_bounds_ptv_style_crop_iso1mm_no_lungmask
+    loss: ncc_plus_spatial
+    factors: [1, 1, 1, 1]
+  P1:
+    data: legacy_python_bounds_ptv_style_crop_iso1mm_no_lungmask
+    loss: ncc_plus_spatial
+    factors: [8, 4, 2, 1]
+controlled_common:
+  architecture: [3, 256, 256, 3]
+  omega: [10, 30]
+  scales: [0.1, 0.05]
+  samples_per_step: 30000
+  laplace_weight: 0.01
+  jacobian_weight: 0.01
+  fine_regularization_scale: 0.1
+  stage_lengths: [400, 400, 800, 900]
+  optimizer: AdamW
+  lr: [0.001, 0.00001]
+  warmup_steps: 20
+references:
+  ptvreg: official_COPD_TRE_best_TRE_only
+  mr_d_bscp: P2e_lowest_population_native_snap_TRE_completed_1mm_cohort
+scientific_stopping_rule: none
+technical_retry_rule: retry_unchanged_record_while_independent_jobs_continue
+technical_max_attempts: 2

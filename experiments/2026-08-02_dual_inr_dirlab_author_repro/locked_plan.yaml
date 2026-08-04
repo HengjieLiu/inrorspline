@@ -1,0 +1,231 @@
+schema_version: 1
+status: locked_plan
+experiment_id: dual_inr_dirlab_author_repro_v1
+date_planned: "2026-08-02"
+
+objective: >-
+  Reproduce the released DUAL-INR-DIR author configuration on DIR-LAB 4DCT
+  and isolate the semantic lobe-mask loss by comparing A0 with an A1 schedule-
+  controlled ablation that replays each case's realized A0 blur boundaries.
+
+scope:
+  dataset: dirlab_4dct
+  cases: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  case_count: 10
+  seeds: [42]
+  variants: [a0_author_full_loss, a1_author_no_semantic_mask_loss]
+  production_record_count: 20
+  pilot_cases: [1, 8]
+  pilot_record_count: 4
+
+source:
+  repository: external/DUAL-INR-DIR
+  git_commit: f7c8e833435ec9c6b7ebec6c9a8098b566709146
+  require_clean_submodule: true
+  config_source: external/DUAL-INR-DIR/src/inrdir/configs.py
+  runner_source: external/DUAL-INR-DIR/scripts/run_dirlab.py
+  trainer_source: external/DUAL-INR-DIR/src/inrdir/trainer.py
+
+environment:
+  required_variables:
+    REPO_ROOT: repository root
+    DUAL_AUTHOR_DATA_ROOT: logically read-only author-format converted DIR-LAB 4DCT root
+    DUAL_AUTHOR_DATA_MANIFEST: checksum and segmentation-provenance manifest
+    DUAL_AUTHOR_PILOT_ROOT: external full-length pilot output root
+    DUAL_AUTHOR_RUN_ROOT: external production output root
+  review_root: experiments/2026-08-02_dual_inr_dirlab_author_repro
+  docker_container: py310sitreg_v1_test1
+  docker_image: "${DOCKER_IMAGE}"
+  current_container_data_mount_mode: read_write
+  prepared_data_artifact_policy: logical_read_only
+  outputs_forbidden_below_data_root: true
+
+protocol:
+  handle: dual_author_native_lungbbox_totalseg
+  fixed_phase: 0
+  fixed_phase_name: T00_end_inhale
+  moving_phase: 5
+  moving_phase_name: T50_end_exhale
+  registration_direction: T50_to_T00
+  spacing: native
+  resampling: none
+  intensity_rule: per_image_minmax_0_1
+  crop_rule: fixed_moving_lobe_union_padding2
+  crop_padding_voxels: 2
+  lobe_class_ids: [10, 11, 12, 13, 14]
+  coordinate_sampling: fixed_t00_lobe_union
+  points_per_step: 30000
+  metric_domain: native_full_or_crop
+  headline_tre_mode: snap_to_voxel
+  diagnostic_tre_mode: subvoxel
+
+common_model:
+  family: dual_inr
+  architecture: dual_siren_additive_residual
+  layers: [3, 256, 256, 3]
+  coarse_omega0: 10
+  fine_omega0: 30
+  coarse_scale_initial: 0.1
+  fine_scale_constructor_initial: 0.05
+  fine_scale_activation_rule: 0.1_times_current_coarse_scale
+  fine_start_stage: 1
+
+common_training:
+  total_steps: 3000
+  blur_sigmas: [4.0, 2.0, 0.0]
+  blur_transition:
+    mode: adaptive_relative_convergence
+    patience_steps: 50
+    relative_threshold: 0.005
+  optimizer:
+    class: torch.optim.AdamW
+    initial_lr: 0.001
+    end_lr: 0.00001
+    weight_decay: 0.01
+    betas: [0.9, 0.999]
+    eps: 1.0e-08
+  scheduler:
+    class: warmup_cosine
+    warmup_steps: 20
+    reset_on_blur_change: true
+  seed: 42
+
+variants:
+  a0_author_full_loss:
+    display_name: DUAL-INR author full loss
+    loss:
+      data_term: sampled_global_ncc
+      laplace_weight: 0.01
+      jacobian_weight: 0.01
+      mask_weight: 0.1
+      mask_term_implementation: per_lobe_mean_squared_error_sum
+      fine_reg_scale: 0.1
+  a1_author_no_semantic_mask_loss:
+    display_name: DUAL-INR author data, no semantic mask loss
+    inherits: a0_author_full_loss
+    overrides:
+      loss.mask_weight: 0.0
+      training.blur_transition.mode: fixed_casewise_replay_from_a0
+      training.blur_transition.source: realized_a0_transition_steps_for_same_case_seed
+    retained_mask_uses:
+      - fixed_moving_union_crop
+      - fixed_t00_coordinate_sampling
+      - data_validation
+    schedule_control:
+      source: realized_a0_transition_steps_for_same_case_seed
+      require_identical_stage_boundaries_to_a0: true
+      purpose: prevent_loss_change_from_altering_realized_multiscale_schedule
+
+isolation_contract:
+  allowed_resolved_config_differences:
+    - variant_id
+    - display_name
+    - loss.mask_weight
+    - training.blur_transition.mode
+    - training.blur_transition.source
+    - output_path
+  required_loss_weight_change:
+    from_a0: 0.1
+    to_a1: 0.0
+  all_other_data_model_training_and_seed_fields_equal: true
+  realized_stage_boundaries_must_match_casewise: true
+
+execution:
+  short_smoke:
+    cases: [1]
+    variants: [a0_author_full_loss, a1_author_no_semantic_mask_loss]
+    steps: 3
+    order: a0_then_a1_casewise_schedule_replay
+    output_root: "${DUAL_AUTHOR_PILOT_ROOT}/smoke"
+  full_length_pilot:
+    cases: [1, 8]
+    variants: [a0_author_full_loss, a1_author_no_semantic_mask_loss]
+    steps: 3000
+    order: a0_then_a1_casewise_schedule_replay
+    gpu_policy: available_visible_gpus_one_optimizer_per_gpu
+    output_root: "${DUAL_AUTHOR_PILOT_ROOT}"
+  production:
+    cases: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    variants: [a0_author_full_loss, a1_author_no_semantic_mask_loss]
+    steps: 3000
+    order:
+      - complete_all_a0_records
+      - validate_and_lock_casewise_a0_transition_manifest
+      - launch_a1_with_casewise_a0_transition_replay
+    gpu_policy: all_visible_gpus_one_optimizer_per_gpu
+    launch_only_after_all_pilot_gates_pass: true
+    output_root: "${DUAL_AUTHOR_RUN_ROOT}"
+    exact_compatible_pilot_reuse: allowed_with_recorded_provenance
+
+required_case_outputs:
+  - resolved_config.yaml
+  - summary.json
+  - history.csv
+  - stage_trace.csv
+  - tre_scores.txt
+  - dirinr_dvf.nii.gz
+  - inr_dvf.pth
+  - inr_dvf_config.yaml
+  - stdout.log
+  - stderr.log
+
+acceptance_gates:
+  source:
+    submodule_commit_must_match: f7c8e833435ec9c6b7ebec6c9a8098b566709146
+    submodule_must_be_clean: true
+  data:
+    cases_must_equal: 10
+    landmarks_per_phase_per_case: 300
+    required_phases: [0, 5]
+    required_segmentations: [0, 5]
+    require_five_nonempty_lobe_channels: true
+    require_manifest_checksums_and_totalsegmentator_provenance: true
+    identity_tre_reference_mm: [3.892406, 4.337842, 6.942993, 9.830147, 7.476853, 10.891024, 11.026220, 14.994681, 7.918264, 7.301382]
+    identity_tre_absolute_tolerance_mm: 0.00001
+    reference_source: canonical_raw_landmarks_after_upstream_converter
+    paper_table1_no_registration_row_is_not_the_data_gate: true
+  manifest:
+    unique_production_records: 20
+    unique_full_length_pilot_records: 4
+    duplicate_records_allowed: 0
+    config_diff_must_match_isolation_contract: true
+    require_all_outputs_outside_data_root: true
+  pilot:
+    completed_records: 4
+    finite_history_rows_per_record: 3000
+    required_stage_order: [4.0, 2.0, 0.0]
+    require_each_stage_visited: true
+    require_fine_branch_active_from_stage_index: 1
+    require_a1_stage_boundaries_equal_a0_casewise: true
+    max_dense_vs_inr_snap_tre_difference_mm: 0.05
+    require_finite_dense_field_and_metrics: true
+    unresolved_failures_allowed: 0
+  production:
+    accepted_records: 20
+    accepted_cases_per_variant: 10
+    unresolved_failures_allowed: 0
+    missing_or_duplicate_records_allowed: 0
+    require_exactly_3000_finite_history_rows: true
+    require_all_output_files: true
+    require_a1_stage_boundaries_equal_a0_casewise: true
+  fidelity_review:
+    author_reference_a0_mean_tre_mm: 0.98
+    published_multiseed_a0_mean_plus_minus_sd_mm: [0.97, 0.15]
+    preregistered_consistency_interval_mm: [0.82, 1.12]
+    action_outside_interval: >-
+      Mark author-result fidelity as failed, preserve and aggregate the runs,
+      and do not tune, reseed, or claim a faithful reproduction without a new plan.
+  reporting:
+    require_per_case_a0_a1_paired_table: true
+    require_mean_sd_median_iqr: true
+    require_runtime_and_peak_memory: true
+    require_common_posthoc_regularity_metrics: true
+    inferential_or_equivalence_claims: false
+
+claim_limits:
+  - A1 removes only the semantic lobe-mask loss; it is not a no-mask method.
+  - A1 intentionally changes the transition mechanism to replay A0 boundaries; paired realized schedules must be identical.
+  - Both variants retain mask-derived cropping and fixed-mask coordinate sampling.
+  - One seed across ten cases does not reproduce the paper's ten-seed robustness analysis.
+  - This author protocol is not a method-only comparison with native full-volume IDIR or pTVReg iso1mm.
+  - A fidelity failure must be reported and must not trigger post-hoc tuning within this experiment ID.

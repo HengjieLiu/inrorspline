@@ -1,0 +1,13 @@
+{
+  "generated_at": "2026-08-02 22:47:28 +0000",
+  "expected_records": 160,
+  "observed_records": 160,
+  "accepted": true,
+  "problems": [],
+  "status_counts": {
+    "completed": 136,
+    "reused": 24
+  },
+  "population_groups_with_n10": 16,
+  "population_groups_total": 16
+}
