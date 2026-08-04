@@ -72,6 +72,7 @@ Use these bracket commands in prompts:
 [prepare commit]             # summarize status and propose commit commands; do not stage/commit
 [summarize and commit]       # produce commit plan first; wait for approval
 [summarize and commit <path>] # same as above, scoped to the requested path(s)
+[summarize and commit by groups] # propose a topic-clustered commit series; wait for approval
 ```
 
 ### `[agents sync]`
@@ -164,6 +165,9 @@ After presenting the plan, wait for explicit user approval before staging or
 committing. If approved, stage only the planned files and commit with the
 proposed or user-edited message.
 
+When the worktree should be divided into multiple independently reviewable
+commits, use `[summarize and commit by groups]` instead.
+
 ### `[summarize and commit <path>]`
 
 Use when the user wants a commit plan scoped to one or more requested paths.
@@ -172,6 +176,77 @@ Codex must scope the audit, staging plan, and commit message to the requested
 path or paths only. Do not stage changes outside the requested scope unless
 required metadata is needed for that scope, such as `.gitmodules` for a
 submodule change. Explain any such exception clearly in the plan.
+
+### `[summarize and commit by groups]`
+
+Use when the worktree contains multiple independently reviewable topics that
+should be committed separately. This command is approval-gated.
+
+Codex must not stage or commit immediately.
+
+First ground the audit in the repository:
+
+- Read `AGENTS.md`, every Markdown file under `AGENTS/` if that directory
+  exists, and README files relevant to the changed paths.
+- Inspect Git status, staged and unstaged changes, ignored files, submodule
+  state, and the size and type of untracked artifacts.
+- Treat existing dirty-tree changes as user work unless they were clearly
+  produced by the current task.
+- Identify dependencies between code, configuration, tests, documentation,
+  generated review artifacts, and provenance records.
+
+Group changes by topic, ownership boundary, dependency order, and
+reviewability. Prefer commits that are independently understandable and
+verifiable.
+
+For each proposed commit, provide:
+
+- A concise subject line.
+- A comprehensive but compact message body.
+- Exact paths to stage.
+- Files and folders intentionally excluded.
+- Paths that should remain outside Git or receive a tightly scoped
+  `.gitignore` or `.git/info/exclude` entry.
+- Verification to run before staging.
+- Verification to run against the staged diff.
+- Any dependency on an earlier proposed commit.
+
+Rules:
+
+- Use explicit path staging only. Never use `git add .` or `git add -A`.
+- Do not stage unrelated dirty-tree changes.
+- Do not commit runtime outputs, logs, predictions, checkpoints, model
+  weights, medical-image volumes, Python caches, notebook checkpoints,
+  credentials, private host metadata, or large/transient generated artifacts.
+- Small review tables, summaries, notebooks, and figures may be included when
+  they are intentional repository or paper artifacts and pass the normal size,
+  provenance, and anonymity audit.
+- Avoid splitting one file across commits by default. If a file genuinely
+  contains changes for multiple groups, assign it to the most appropriate
+  group or propose an explicit hunk-staging plan for approval.
+- Order commits so prerequisites such as code, configuration, and tests land
+  before dependent documentation or synchronized summaries.
+- Refresh repo-local experiment summaries only at the correct point in the
+  sequence so `repo_commit`, source hashes, and provenance fields describe the
+  intended committed code/configuration state.
+- Do not push unless explicitly requested.
+
+After presenting the complete series, stop and wait for explicit approval. The
+user may approve all groups, edit the grouping, or approve selected groups.
+
+After approval, process one group at a time:
+
+1. Recheck the worktree for drift.
+2. Run the planned pre-stage verification.
+3. Stage only the approved explicit paths.
+4. Inspect `git diff --cached --check`, `git diff --cached --stat`, and
+   `git diff --cached --submodule`.
+5. Confirm no unrelated paths entered the index.
+6. Commit with the approved message.
+7. Record the commit hash and recheck status before starting the next group.
+
+If the worktree, dependencies, or verification results differ materially from
+the approved plan, stop and present a revised plan before continuing.
 
 ## Rsync-Only Safety Gate
 
