@@ -37,6 +37,14 @@ checkpoints/
 # tables may still be intended for commit. Sizes are approximate as of
 # 2026-06-30.
 
+# COPD case02 pTV preprocessing audit (~2.4M generated visual; notebooks are
+# the canonical review surface).
+experiments/2026-08-03_dual_inr_copd_six_arm/preprocessing_audit/
+
+# OASIS100 exploratory visualization trials (~6.1M; core covariance/violin
+# diagnostics are tracked).
+experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_dice_sdlogj/innovative_visualization_trials/
+
 # Duplicate local notebook export (~1.2M). Commit canonical review notebooks or
 # reports instead of ad hoc copy files.
 experiments/2026-06-25_lungct_directcp4stage_global_ncc_fdbe_all10_alpha_sweep/pareto_visual_review-Copy1.ipynb
