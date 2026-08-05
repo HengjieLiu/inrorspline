@@ -1,0 +1,15 @@
+name,lr,stage_epochs,stage_lr,early_stop_mode,stage_min_epochs,stage_patience,stage_check_interval,stage_rel_delta_total,stage_rel_delta_data,description
+F600_decay,0.01,"100,200,300","3e-2,1e-2,3e-3",none,,100,25,5e-5,2e-5,"fixed 600 epochs, decayed stage LR"
+F600_lr3e-2,0.03,"100,200,300",,none,,100,25,5e-5,2e-5,fixed 600 epochs
+A_bal_lr3e-2,0.03,"400,800,1300",,adaptive,"100,200,300","75,100,150",25,5e-5,2e-5,adaptive balanced plateau
+A_bal_lr1e-2,0.01,"400,800,1300",,adaptive,"100,200,300","75,100,150",25,5e-5,2e-5,adaptive balanced plateau
+A_fast_decay,0.01,"400,800,1300","3e-2,1e-2,3e-3",adaptive,"75,150,250","50,75,100",25,1e-4,5e-5,"adaptive fast plateau, decayed stage LR"
+F600_lr1e-2,0.01,"100,200,300",,none,,100,25,5e-5,2e-5,fixed 600 epochs
+F950_decay,0.01,"150,300,500","3e-2,1e-2,3e-3",none,,100,25,5e-5,2e-5,"fixed 950 epochs, decayed stage LR"
+F1550_lr3e-3,0.003,"250,500,800",,none,,100,25,5e-5,2e-5,fixed 1550 epochs
+F950_lr1e-2,0.01,"150,300,500",,none,,100,25,5e-5,2e-5,fixed 950 epochs
+A_safe_lr1e-2,0.01,"400,800,1300",,adaptive,"150,300,500","100,150,200",25,2e-5,1e-5,adaptive conservative plateau
+F950_lr3e-2,0.03,"150,300,500",,none,,100,25,5e-5,2e-5,fixed 950 epochs
+A_safe_lr3e-2,0.03,"400,800,1300",,adaptive,"150,300,500","100,150,200",25,2e-5,1e-5,adaptive conservative plateau
+F1550_lr3e-2,0.03,"250,500,800",,none,,100,25,5e-5,2e-5,fixed 1550 epochs
+F1550_lr1e-2,0.01,"250,500,800",,none,,100,25,5e-5,2e-5,fixed 1550 epochs
