@@ -1,0 +1,47 @@
+{
+  "generated": "2026-08-05 04:10:08 +0000",
+  "artifact": "oasis100_hd95_sdlogj_reviewer_diagnostics",
+  "metrics": {
+    "accuracy": "hd95_mean",
+    "sdlogj": "log_jdet_std_fg"
+  },
+  "accuracy_label": "Mean HD95",
+  "output_root": "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_hd95_sdlogj",
+  "source_links": {
+    "review_comment": "docs/offgrid_submission/review.md:76",
+    "current_pareto_package": "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100",
+    "oasis100_pareto_source_rows": "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/oasis100_pareto_source_rows.csv"
+  },
+  "row_counts": {
+    "sweep_case_rows": 3600,
+    "baseline_case_rows": 500,
+    "case_pair_rows": 4100,
+    "diagnostic_groups": 41,
+    "population_groups": 41,
+    "finite_correlation_groups": 41
+  },
+  "preflight": {
+    "sweep_case_rows": 3600,
+    "baseline_case_rows": 500,
+    "population_groups": 41,
+    "errors": []
+  },
+  "outputs": {
+    "expected_files": [
+      "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_hd95_sdlogj/README.md",
+      "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_hd95_sdlogj/covariance_diagnostics/case_pairs.csv",
+      "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_hd95_sdlogj/covariance_diagnostics/covariance_summary.csv",
+      "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_hd95_sdlogj/covariance_diagnostics/covariance_rotated_ellipses__hd95_mean_vs_log_jdet_std_fg.png",
+      "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_hd95_sdlogj/covariance_diagnostics/correlation_heatmap_by_method_alpha.png",
+      "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_hd95_sdlogj/covariance_diagnostics/README.md",
+      "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_hd95_sdlogj/covariance_diagnostics/manifest.json",
+      "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_hd95_sdlogj/violin_marginals/violin_source_rows.csv",
+      "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_hd95_sdlogj/violin_marginals/violin_marginals_full_alpha_grid.png",
+      "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_hd95_sdlogj/violin_marginals/violin_marginals_selected_points.png",
+      "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_hd95_sdlogj/violin_marginals/README.md",
+      "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_hd95_sdlogj/violin_marginals/manifest.json",
+      "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_hd95_sdlogj/manifest.json"
+    ],
+    "missing_or_empty": []
+  }
+}
