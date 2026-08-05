@@ -8,8 +8,9 @@ import json
 import math
 import sys
 import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch
@@ -63,6 +64,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stage-downsample", type=str, default="4,2,1")
     parser.add_argument("--stage-epochs", type=str, default="400,800,1300")
     parser.add_argument("--stage-lr", type=str, default="")
+    parser.add_argument("--stage-early-stop-mode", choices=["none", "adaptive"], default="none")
+    parser.add_argument("--stage-min-epochs", type=str, default="")
+    parser.add_argument("--stage-patience", type=str, default="100")
+    parser.add_argument("--stage-check-interval", type=str, default="25")
+    parser.add_argument("--stage-rel-delta-total", type=str, default="5e-5")
+    parser.add_argument("--stage-rel-delta-data", type=str, default="2e-5")
+    parser.add_argument("--runtime-candidate", type=str, default="")
+    parser.add_argument("--timing-detail", choices=["off", "coarse", "deep"], default="off")
+    parser.add_argument("--output-mode", choices=["full", "dvf_only"], default="full")
+    parser.add_argument("--prolongation-preserve-check", action="store_true")
+    parser.add_argument("--save-intermediate-dense", action="store_true")
     parser.add_argument("--antialias-sigma-scale", type=float, default=0.5)
     parser.add_argument("--antialias-radius-sigma", type=float, default=3.0)
     parser.add_argument("--out-root", type=Path, default=c.DEFAULT_RUN_ROOT)
@@ -224,6 +236,308 @@ class CheckpointSampler:
             )
 
 
+def _json_clean(value: Any) -> Any:
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, torch.device):
+        return str(value)
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, torch.Tensor):
+        if value.numel() == 1:
+            return value.detach().cpu().item()
+        return str(tuple(value.shape))
+    if isinstance(value, dict):
+        return {str(k): _json_clean(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_clean(v) for v in value]
+    return value
+
+
+@contextmanager
+def _null_section() -> Iterator[None]:
+    yield
+
+
+class TimingRecorder:
+    """Hierarchical wall-clock timing with optional CUDA synchronization."""
+
+    def __init__(self, detail: str = "off", device: Optional[torch.device] = None) -> None:
+        self.detail = str(detail)
+        self.enabled = self.detail != "off"
+        self.device = device
+        self.root_id = "script"
+        self.root_start = time.perf_counter()
+        self.root_end: Optional[float] = None
+        self.stack: List[str] = [self.root_id]
+        self.events: List[Dict[str, object]] = []
+        self._counter = 0
+        self._mark_counter = 0
+        self.notes: List[Dict[str, object]] = []
+        self.marks: List[Dict[str, object]] = []
+        self.stage_phase_summaries: List[Dict[str, object]] = []
+
+    def set_device(self, device: torch.device) -> None:
+        self.device = device
+
+    def sync(self) -> None:
+        if not self.enabled:
+            return
+        if self.device is not None and self.device.type == "cuda" and torch.cuda.is_available():
+            torch.cuda.synchronize(self.device)
+
+    def start(
+        self,
+        name: str,
+        *,
+        category: str = "",
+        metadata: Optional[Dict[str, object]] = None,
+        sync: bool = True,
+    ) -> Optional[Dict[str, object]]:
+        if not self.enabled:
+            return None
+        if sync:
+            self.sync()
+        now = time.perf_counter()
+        self._counter += 1
+        token: Dict[str, object] = {
+            "id": f"event_{self._counter:05d}",
+            "name": str(name),
+            "parent_id": self.stack[-1],
+            "parent_name": self.stack[-1],
+            "category": str(category),
+            "metadata": _json_clean(metadata or {}),
+            "start_perf": now,
+            "start_offset_sec": now - self.root_start,
+            "depth": max(0, len(self.stack) - 1),
+            "sync": bool(sync),
+        }
+        self.stack.append(str(token["id"]))
+        return token
+
+    def stop(self, token: Optional[Dict[str, object]], *, sync: Optional[bool] = None) -> float:
+        if not self.enabled or token is None:
+            return 0.0
+        do_sync = bool(token.get("sync")) if sync is None else bool(sync)
+        if do_sync:
+            self.sync()
+        now = time.perf_counter()
+        event_id = str(token["id"])
+        if not self.stack or self.stack[-1] != event_id:
+            raise RuntimeError(f"Timing stack mismatch while stopping {event_id}.")
+        self.stack.pop()
+        elapsed = now - float(token["start_perf"])
+        parent_id = str(token["parent_id"])
+        parent_name = "script" if parent_id == self.root_id else parent_id
+        event = {
+            "id": event_id,
+            "name": str(token["name"]),
+            "parent_id": parent_id,
+            "parent_name": parent_name,
+            "category": str(token.get("category", "")),
+            "metadata": token.get("metadata", {}),
+            "start_offset_sec": float(token["start_offset_sec"]),
+            "end_offset_sec": now - self.root_start,
+            "elapsed_sec": float(elapsed),
+            "depth": int(token["depth"]),
+        }
+        self.events.append(event)
+        return float(elapsed)
+
+    @contextmanager
+    def section(
+        self,
+        name: str,
+        *,
+        category: str = "",
+        metadata: Optional[Dict[str, object]] = None,
+        sync: bool = True,
+    ) -> Iterator[None]:
+        token = self.start(name, category=category, metadata=metadata, sync=sync)
+        try:
+            yield
+        finally:
+            self.stop(token)
+
+    def add_note(self, name: str, payload: Dict[str, object]) -> None:
+        if self.enabled:
+            self.notes.append({"name": str(name), "payload": _json_clean(payload)})
+
+    def mark(
+        self,
+        name: str,
+        *,
+        metadata: Optional[Dict[str, object]] = None,
+        sync: bool = True,
+    ) -> Optional[Dict[str, object]]:
+        if not self.enabled:
+            return None
+        if sync:
+            self.sync()
+        now = time.perf_counter()
+        self._mark_counter += 1
+        parent_id = self.stack[-1]
+        parent_name = "script" if parent_id == self.root_id else parent_id
+        row = {
+            "id": f"mark_{self._mark_counter:05d}",
+            "name": str(name),
+            "parent_id": parent_id,
+            "parent_name": parent_name,
+            "offset_sec": float(now - self.root_start),
+            "metadata": _json_clean(metadata or {}),
+            "sync": bool(sync),
+        }
+        self.marks.append(row)
+        return row
+
+    def add_stage_phase_summary(self, summary: Dict[str, object]) -> None:
+        if self.enabled:
+            self.stage_phase_summaries.append(_json_clean(summary))
+
+    def finalize(self) -> None:
+        if self.enabled:
+            self.sync()
+            self.root_end = time.perf_counter()
+
+    def reconciliation(self) -> List[Dict[str, object]]:
+        if not self.enabled:
+            return []
+        root_elapsed = (self.root_end or time.perf_counter()) - self.root_start
+        elapsed_by_id = {str(event["id"]): float(event["elapsed_sec"]) for event in self.events}
+        elapsed_by_id[self.root_id] = float(root_elapsed)
+        names_by_id = {str(event["id"]): str(event["name"]) for event in self.events}
+        names_by_id[self.root_id] = "script"
+        children_by_parent: Dict[str, float] = {}
+        counts_by_parent: Dict[str, int] = {}
+        for event in self.events:
+            parent_id = str(event["parent_id"])
+            children_by_parent[parent_id] = children_by_parent.get(parent_id, 0.0) + float(event["elapsed_sec"])
+            counts_by_parent[parent_id] = counts_by_parent.get(parent_id, 0) + 1
+        rows: List[Dict[str, object]] = []
+        for node_id, elapsed in elapsed_by_id.items():
+            children = children_by_parent.get(node_id, 0.0)
+            child_count = int(counts_by_parent.get(node_id, 0))
+            self_unaccounted = elapsed - children
+            tolerance_sec = max(0.5, 0.01 * max(abs(elapsed), 1e-9))
+            rows.append(
+                {
+                    "id": node_id,
+                    "name": names_by_id.get(node_id, node_id),
+                    "elapsed_sec": float(elapsed),
+                    "child_elapsed_sec": float(children),
+                    "self_unaccounted_sec": float(self_unaccounted),
+                    "abs_self_unaccounted_sec": float(abs(self_unaccounted)),
+                    "child_count": child_count,
+                    "tolerance_sec": float(tolerance_sec),
+                    "within_tolerance": bool(child_count == 0 or abs(self_unaccounted) <= tolerance_sec),
+                }
+            )
+        return sorted(rows, key=lambda row: (0 if row["id"] == self.root_id else 1, str(row["id"])))
+
+    def payload(self, *, args: argparse.Namespace, run_dir: Path, run_name: str) -> Dict[str, object]:
+        root_elapsed = (self.root_end or time.perf_counter()) - self.root_start
+        return {
+            "enabled": bool(self.enabled),
+            "detail": self.detail,
+            "created_at": c.now_text(),
+            "run_name": str(run_name),
+            "run_dir": str(run_dir),
+            "method": str(args.method),
+            "runtime_candidate": str(args.runtime_candidate) or None,
+            "output_mode": str(getattr(args, "output_mode", "full")),
+            "case_rank": int(args.case_rank),
+            "script_total_sec": float(root_elapsed),
+            "events": sorted(self.events, key=lambda row: float(row["start_offset_sec"])),
+            "marks": sorted(self.marks, key=lambda row: float(row["offset_sec"])),
+            "reconciliation": self.reconciliation(),
+            "stage_phase_summaries": list(self.stage_phase_summaries),
+            "notes": list(self.notes),
+        }
+
+
+class CudaPhaseAccumulator:
+    """Summarize optimizer-loop CUDA phase events without per-epoch log rows."""
+
+    def __init__(self, enabled: bool, device: torch.device) -> None:
+        self.enabled = bool(enabled and device.type == "cuda" and torch.cuda.is_available())
+        self.device = device
+        self.events: Dict[str, List[Tuple[torch.cuda.Event, torch.cuda.Event]]] = {}
+        self.wall_sec: Dict[str, float] = {}
+
+    @contextmanager
+    def phase(self, name: str) -> Iterator[None]:
+        if not self.enabled:
+            start_wall = time.perf_counter()
+            try:
+                yield
+            finally:
+                self.wall_sec[name] = self.wall_sec.get(name, 0.0) + (time.perf_counter() - start_wall)
+            return
+        start = torch.cuda.Event(enable_timing=True)
+        end = torch.cuda.Event(enable_timing=True)
+        start.record()
+        try:
+            yield
+        finally:
+            end.record()
+            self.events.setdefault(str(name), []).append((start, end))
+
+    def summary(self) -> Dict[str, float]:
+        if self.enabled:
+            torch.cuda.synchronize(self.device)
+            return {
+                str(name): float(sum(start.elapsed_time(end) for start, end in pairs) / 1000.0)
+                for name, pairs in sorted(self.events.items())
+            }
+        return {str(name): float(value) for name, value in sorted(self.wall_sec.items())}
+
+
+def timed_evaluate_from_dense_coords(
+    dense_coords: torch.Tensor,
+    batch: Dict[str, torch.Tensor | str | int | Dict[str, object]],
+    timer: Optional[TimingRecorder] = None,
+) -> Dict[str, object]:
+    if timer is None or not timer.enabled:
+        return c.evaluate_from_dense_coords(dense_coords, batch)
+
+    fixed = batch["fixed"]
+    moving = batch["moving"]
+    moving_seg = batch["moving_seg"]
+    fixed_seg = batch["fixed_seg"]
+    fixed_mask = batch["fixed_mask"]
+    assert isinstance(fixed, torch.Tensor)
+    assert isinstance(moving, torch.Tensor)
+    assert isinstance(moving_seg, torch.Tensor)
+    assert isinstance(fixed_seg, torch.Tensor)
+    assert isinstance(fixed_mask, torch.Tensor)
+
+    with torch.no_grad():
+        with timer.section("post_train_evaluation.image_warp", category="fixed_post_training"):
+            warped = c.warp_full(moving, dense_coords, mode="bilinear")
+        with timer.section("post_train_evaluation.seg_warp", category="fixed_post_training"):
+            warped_seg = c.warp_full(moving_seg, dense_coords, mode="nearest")
+        with timer.section("post_train_evaluation.dice", category="fixed_post_training", sync=False):
+            dice = c.dice_per_label(warped_seg, fixed_seg, moving_seg)
+        with timer.section("post_train_evaluation.hd95_asd", category="fixed_post_training", sync=False):
+            surface = c.surface_metrics_per_label(warped_seg, fixed_seg, moving_seg)
+        with timer.section("post_train_evaluation.dense_ncc", category="fixed_post_training"):
+            image_loss = float(c.ncc_loss(fixed[None, None], warped[None, None]).detach().cpu())
+
+    metrics: Dict[str, object] = {
+        "dense_coords": dense_coords.detach(),
+        "warped": warped.detach(),
+        "warped_seg": warped_seg.detach(),
+        "dice": dice,
+        "image_loss": image_loss,
+        "dice_mean": c.safe_nanmean(dice),
+        "foreground_voxels": int(fixed_mask.sum().detach().cpu()),
+    }
+    metrics.update(surface)
+    return metrics
+
+
 def method_key(args: argparse.Namespace) -> str:
     if args.method == "idir_original":
         return "idir_original_dense_siren_be_autograd"
@@ -251,10 +565,17 @@ def build_run_name(args: argparse.Namespace, lr: float) -> str:
     if args.run_name:
         return args.run_name
     if args.method == "direct_cp_8_4_2_be_bspline_analytic_multistage":
+        early_stop_suffix = ""
+        if str(args.stage_early_stop_mode) != "none":
+            early_stop_suffix = (
+                f"_es{args.stage_early_stop_mode}"
+                f"_min{args.stage_min_epochs.replace(',', '-')}"
+                f"_pat{args.stage_patience.replace(',', '-')}"
+            )
         return (
             f"{key}_rank{args.case_rank:03d}_sched{args.stage_full_cps.replace(',', '-')}"
             f"_ds{args.stage_downsample.replace(',', '-')}_e{args.stage_epochs.replace(',', '-')}"
-            f"_a{c.format_float(args.alpha)}_lr{c.format_float(lr)}"
+            f"_a{c.format_float(args.alpha)}_lr{c.format_float(lr)}{early_stop_suffix}"
         )
     if args.method == "dctfield_sampled_ncc_fd_be":
         return (
@@ -735,56 +1056,136 @@ def train_spline(
     device: torch.device,
     lr: float,
     sampler: Optional[CheckpointSampler] = None,
+    timer: Optional[TimingRecorder] = None,
 ) -> Dict[str, object]:
     cps = method_cps(args.method)
     if cps is None:
         raise ValueError(f"No cps for method {args.method}")
+
+    dense_grid_token = timer.start(
+        "training.initial_dense_grid",
+        category="fixed_stage_overhead",
+        metadata={"shape": list(c.IMAGE_SHAPE), "cps": int(cps)},
+    ) if timer is not None else None
     control_coords, control_shape = c.bspline_control_coords(c.IMAGE_SHAPE, cps, device)
     id_dense = c.make_coordinate_grid(c.IMAGE_SHAPE, device).detach()
-    generator = build_spline_generator(args, control_shape).to(device)
-    optimizer = torch.optim.Adam(generator.parameters(), lr=lr)
+    if timer is not None:
+        timer.stop(dense_grid_token)
+
     moving = batch["moving"]
     fixed_image = batch["fixed"]
     assert isinstance(moving, torch.Tensor)
     assert isinstance(fixed_image, torch.Tensor)
+
+    train_token = timer.start(
+        "training",
+        category="training",
+        metadata={
+            "stage_full_cps": [int(cps)],
+            "stage_downsample": [1],
+            "stage_requested_epochs": [int(args.epochs)],
+        },
+    ) if timer is not None else None
+    stage_token = timer.start(
+        "stage_0",
+        category="training_stage",
+        metadata={
+            "stage_idx": 0,
+            "full_cps": int(cps),
+            "downsample": 1,
+            "requested_epochs": int(args.epochs),
+            "lr": float(lr),
+            "single_stage_sinr_or_directcp": bool(not args.method.startswith("direct_cp_")),
+        },
+    ) if timer is not None else None
+    setup_token = timer.start(
+        "stage_0.stage_setup",
+        category="fixed_stage_overhead",
+        metadata={"stage_idx": 0, "cps": int(cps)},
+    ) if timer is not None else None
+    generator = build_spline_generator(args, control_shape).to(device)
+    optimizer = torch.optim.Adam(generator.parameters(), lr=lr)
+    if timer is not None:
+        stage_setup_sec = timer.stop(setup_token)
+    else:
+        stage_setup_sec = 0.0
+
     history: List[Dict[str, float]] = []
     global_ncc_diagnostic: List[Dict[str, float | str | bool]] = []
-    if sampler is not None:
+    if sampler is not None and sampler.enabled:
         generator.eval()
-        with torch.no_grad():
-            init_output = generator(control_coords, control_shape)
-            init_dense_disp = c.expand_bspline_controls(init_output, control_shape, c.IMAGE_SHAPE, cps)
-        sampler.record_dense(
-            epoch=0,
-            dense_disp_norm_xyz=init_dense_disp,
-            row_extra={"method": args.method, "checkpoint_source": "model_init"},
-        )
+        with timer.section("training.initial_checkpoint_sample", category="fixed_stage_overhead") if timer is not None else _null_section():
+            with torch.no_grad():
+                init_output = generator(control_coords, control_shape)
+                init_dense_disp = c.expand_bspline_controls(init_output, control_shape, c.IMAGE_SHAPE, cps)
+            sampler.record_dense(
+                epoch=0,
+                dense_disp_norm_xyz=init_dense_disp,
+                row_extra={"method": args.method, "checkpoint_source": "model_init"},
+            )
 
+    pre_loop_token = timer.start(
+        "stage_0.pre_loop_cuda_sync_and_memory_reset",
+        category="fixed_stage_overhead",
+        metadata={
+            "stage_idx": 0,
+            "definition": "CUDA synchronization and peak-memory-stat reset before epoch timing starts",
+        },
+    ) if timer is not None else None
     torch.cuda.synchronize()
     torch.cuda.reset_peak_memory_stats()
+    if timer is not None:
+        pre_loop_sync_sec = timer.stop(pre_loop_token)
+    else:
+        pre_loop_sync_sec = 0.0
     train_start = time.time()
+    loop_token = timer.start(
+        "stage_0.optimizer_loop",
+        category="step_proportional",
+        metadata={"stage_idx": 0, "requested_epochs": int(args.epochs)},
+    ) if timer is not None else None
+    phase_acc = CudaPhaseAccumulator(
+        bool(timer is not None and timer.enabled and timer.detail == "deep"),
+        device,
+    )
+    loop_logging_wall_sec = 0.0
     for epoch in range(1, int(args.epochs) + 1):
         generator.train()
-        output = generator(control_coords, control_shape)
-        control_disp = output.reshape(*control_shape, 3)
-        dense_disp = c.expand_bspline_controls(output, control_shape, c.IMAGE_SHAPE, cps)
-        warped = c.warp_full(moving, id_dense + dense_disp, mode="bilinear")
-        data_loss = c.ncc_loss(fixed_image[None, None], warped[None, None])
-        reg_loss = c.analytic_bspline_sampled_be(
-            control_disp,
-            c.IMAGE_SHAPE,
-            cps,
-            component_reduction="mean",
-        )
+        with phase_acc.phase("generator_forward"):
+            output = generator(control_coords, control_shape)
+        with phase_acc.phase("control_grid"):
+            control_disp = output.reshape(*control_shape, 3)
+        with phase_acc.phase("expand"):
+            dense_disp = c.expand_bspline_controls(output, control_shape, c.IMAGE_SHAPE, cps)
+        with phase_acc.phase("warp_ncc"):
+            warped = c.warp_full(moving, id_dense + dense_disp, mode="bilinear")
+            data_loss = c.ncc_loss(fixed_image[None, None], warped[None, None])
+        with phase_acc.phase("regularizer"):
+            reg_loss = c.analytic_bspline_sampled_be(
+                control_disp,
+                c.IMAGE_SHAPE,
+                cps,
+                component_reduction="mean",
+            )
         loss = data_loss + float(args.alpha) * reg_loss
-        optimizer.zero_grad(set_to_none=True)
-        loss.backward()
-        optimizer.step()
+        with phase_acc.phase("backward_step"):
+            optimizer.zero_grad(set_to_none=True)
+            loss.backward()
+            optimizer.step()
+        logging_start = time.perf_counter()
         entry = {
             "epoch": float(epoch),
+            "global_epoch": float(epoch),
+            "stage_idx": 0.0,
+            "stage_epoch": float(epoch),
+            "full_cps": float(cps),
+            "downsample": 1.0,
+            "domain_cps": float(cps),
             "loss": float(loss.detach().cpu()),
             "data_loss": float(data_loss.detach().cpu()),
             "reg_loss": float(reg_loss.detach().cpu()),
+            "alpha": float(args.alpha),
+            "lr": float(lr),
         }
         history.append(entry)
         if should_global_ncc_diagnostic(args, epoch, int(args.epochs)):
@@ -798,6 +1199,11 @@ def train_spline(
                     "eval_domain": "full_image",
                     "affects_training": False,
                     "eval_elapsed_sec": 0.0,
+                    "stage_idx": 0.0,
+                    "stage_epoch": float(epoch),
+                    "full_cps": float(cps),
+                    "downsample": 1.0,
+                    "domain_cps": float(cps),
                 }
             )
             print(json.dumps({"global_ncc_diagnostic": global_ncc_diagnostic[-1]}), flush=True)
@@ -812,6 +1218,10 @@ def train_spline(
                 row_extra={
                     "method": args.method,
                     "checkpoint_source": "post_optimizer_step",
+                    "stage_idx": 0,
+                    "stage_epoch": int(epoch),
+                    "full_cps": int(cps),
+                    "downsample": 1,
                     "loss": entry["loss"],
                     "data_loss": entry["data_loss"],
                     "reg_loss": entry["reg_loss"],
@@ -819,18 +1229,137 @@ def train_spline(
             )
         if epoch == 1 or epoch % int(args.eval_interval) == 0 or epoch == int(args.epochs):
             print(json.dumps(entry), flush=True)
-    torch.cuda.synchronize()
-    training_elapsed_sec = time.time() - train_start
-    training_peak_mem_gb = torch.cuda.max_memory_allocated() / (1024**3)
+        loop_logging_wall_sec += time.perf_counter() - logging_start
+    if timer is not None:
+        optimizer_loop_sec = timer.stop(loop_token)
+    else:
+        optimizer_loop_sec = 0.0
+    phase_summary = phase_acc.summary()
+    phase_summary["logging_early_stop_wall_sec"] = float(loop_logging_wall_sec)
+    phase_summary["actual_epochs"] = float(int(args.epochs))
+    phase_summary["stage_idx"] = 0.0
+    phase_summary["full_cps"] = float(cps)
+    phase_summary["downsample"] = 1.0
+    if timer is not None:
+        timer.add_stage_phase_summary(
+            {
+                "stage_idx": 0,
+                "full_cps": int(cps),
+                "downsample": 1,
+                "requested_epochs": int(args.epochs),
+                "actual_epochs": int(args.epochs),
+                "optimizer_loop_sec": float(optimizer_loop_sec),
+                "phase_totals_sec": phase_summary,
+            }
+        )
 
+    final_dense_token = timer.start(
+        "stage_0.final_output_dense_expand",
+        category="final_output_dense_expand",
+        metadata={"stage_idx": 0, "full_cps": int(cps)},
+    ) if timer is not None else None
     generator.eval()
     with torch.no_grad():
         final_output = generator(control_coords, control_shape)
         final_control_disp = final_output.reshape(*control_shape, 3).detach()
         final_dense_disp = c.expand_bspline_controls(final_output, control_shape, c.IMAGE_SHAPE, cps).detach()
-        metrics = c.evaluate_from_dense_coords(id_dense + final_dense_disp, batch)
+    if timer is not None:
+        final_output_dense_expand_sec = timer.stop(final_dense_token)
+        if str(getattr(args, "output_mode", "full")) == "dvf_only":
+            timer.mark(
+                "dvf_in_memory_ready",
+                metadata={
+                    "stage_idx": 0,
+                    "full_cps": int(cps),
+                    "definition": "immediately after single-stage final dense displacement expansion",
+                },
+                sync=False,
+            )
+    else:
+        final_output_dense_expand_sec = 0.0
+
+    stats_token = timer.start(
+        "stage_0.control_summary_stats",
+        category="fixed_stage_overhead",
+        metadata={"stage_idx": 0},
+    ) if timer is not None else None
+    ctrl_abs = final_control_disp.detach().abs().reshape(-1)
+    control_abs_max_norm = float(ctrl_abs.max().detach().cpu())
+    control_abs_p95_norm = float(torch.quantile(ctrl_abs, 0.95).detach().cpu())
+    if timer is not None:
+        control_summary_stats_sec = timer.stop(stats_token)
+    else:
+        control_summary_stats_sec = 0.0
+    torch.cuda.synchronize()
+    training_elapsed_sec = time.time() - train_start
+    training_peak_mem_gb = torch.cuda.max_memory_allocated() / (1024**3)
+    stage_timing = {
+        "loss_volume_setup_sec": 0.0,
+        "stage_setup_sec": float(stage_setup_sec + pre_loop_sync_sec),
+        "model_optimizer_setup_sec": float(stage_setup_sec),
+        "pre_loop_cuda_sync_and_memory_reset_sec": float(pre_loop_sync_sec),
+        "optimizer_loop_sec": float(optimizer_loop_sec),
+        "intermediate_dense_expand_sec": 0.0,
+        "final_output_dense_expand_sec": float(final_output_dense_expand_sec),
+        "final_dense_expand_sec": float(final_output_dense_expand_sec),
+        "dense_expand_role": "final_output",
+        "control_summary_stats_sec": float(control_summary_stats_sec),
+    }
+    if timer is not None:
+        stage_timing["stage_total_sec"] = timer.stop(stage_token)
+        timer.stop(train_token)
+
+    if str(getattr(args, "output_mode", "full")) == "dvf_only":
+        metrics: Dict[str, object] = {
+            "output_mode": "dvf_only",
+            "no_evaluation": True,
+            "evaluation_skipped": [
+                "image_warp_evaluation",
+                "segmentation_warp",
+                "dice",
+                "hd95_asd",
+                "dense_ncc",
+                "regularity_metrics",
+                "model_control_checkpoint_saves",
+                "full_csv_packaging",
+            ],
+        }
+    else:
+        metrics = timed_evaluate_from_dense_coords(id_dense + final_dense_disp, batch, timer=timer)
+    stage_summary = {
+        "stage_idx": 0,
+        "full_cps": int(cps),
+        "downsample": 1,
+        "domain_cps": int(cps),
+        "control_shape_zyx": list(int(v) for v in control_shape),
+        "eval_shape_zyx": list(int(v) for v in c.IMAGE_SHAPE),
+        "n_control": int(np.prod(tuple(int(v) for v in control_shape))),
+        "epochs": int(args.epochs),
+        "requested_epochs": int(args.epochs),
+        "actual_epochs": int(args.epochs),
+        "lr": float(lr),
+        "alpha": float(args.alpha),
+        "early_stop_mode": "none",
+        "min_epochs": int(args.epochs),
+        "patience": 0,
+        "check_interval": int(args.eval_interval),
+        "rel_delta_total": 0.0,
+        "rel_delta_data": 0.0,
+        "stop_reason": "requested_epochs_complete",
+        "loss_mode": "sinr_ncc_bspline_be",
+        "antialias_sigma": 0.0,
+        "antialias_kernel_size": 0,
+        "elapsed_sec": float(training_elapsed_sec),
+        "timing_breakdown": stage_timing,
+        "timing_phase_totals_sec": phase_summary,
+        "control_abs_max_norm": control_abs_max_norm,
+        "control_abs_p95_norm": control_abs_p95_norm,
+    }
     metrics["history"] = history
+    metrics["stage_history"] = history
     metrics["global_ncc_diagnostic"] = global_ncc_diagnostic
+    metrics["stage_summaries"] = [stage_summary]
+    metrics["prolongation_diagnostics"] = []
     metrics["generator"] = generator
     metrics["control_shape"] = control_shape
     metrics["control_coords"] = control_coords.detach()
@@ -840,32 +1369,131 @@ def train_spline(
     metrics["training_peak_mem_gb"] = training_peak_mem_gb
     metrics["param_count"] = c.count_trainable_params(generator)
     metrics["cps"] = cps
+    metrics["stage_full_cps"] = [int(cps)]
+    metrics["stage_downsample"] = [1]
+    metrics["stage_epochs"] = [int(args.epochs)]
+    metrics["stage_requested_epochs"] = [int(args.epochs)]
+    metrics["stage_actual_epochs"] = [int(args.epochs)]
+    metrics["stage_lr"] = [float(lr)]
+    metrics["stage_early_stop_mode"] = "none"
+    metrics["stage_min_epochs"] = [int(args.epochs)]
+    metrics["stage_patience"] = [0]
+    metrics["stage_check_interval"] = [int(args.eval_interval)]
+    metrics["stage_rel_delta_total"] = [0.0]
+    metrics["stage_rel_delta_data"] = [0.0]
+    metrics["stage_stop_reasons"] = ["requested_epochs_complete"]
+    metrics["prolongation_preserve_check"] = False
+    metrics["save_intermediate_dense"] = False
+    metrics["nested_control_shapes_zyx"] = {str(int(cps)): list(int(v) for v in control_shape)}
+    metrics["prolongation"] = "none_single_stage"
+    metrics["actual_epochs"] = int(args.epochs)
+    metrics["requested_epochs"] = int(args.epochs)
     return metrics
 
 
-def prolongation_diagnostics(
+def prolongate_control_grid(
     prev_control: torch.Tensor,
     prev_shape: Sequence[int],
-    prev_dense_full: torch.Tensor,
     target_shape: Sequence[int],
     target_cps: int,
     image_shape: Sequence[int],
     stage_idx: int,
+    *,
+    prev_dense_full: Optional[torch.Tensor] = None,
+    preserve_check: bool = False,
+    timer: Optional[TimingRecorder] = None,
 ) -> Tuple[torch.Tensor, List[Dict[str, object]]]:
-    prev_grid = c.flat_to_grid(prev_control.detach(), prev_shape)
-    exact_grid = c.cubic_bspline_dyadic_knot_insert_3d(prev_grid, target_shape)
-    rows: List[Dict[str, object]] = []
-    dense = c.expand_on_shape(c.grid_to_flat(exact_grid), target_shape, target_cps, image_shape, 1)
+    knot_token = timer.start(
+        f"stage_{stage_idx}.prolongation.pure_knot_insertion",
+        category="pure_knot_insertion",
+        metadata={"stage_idx": int(stage_idx), "target_cps": int(target_cps)},
+    ) if timer is not None else None
+    with torch.no_grad():
+        prev_grid = c.flat_to_grid(prev_control.detach(), prev_shape)
+        exact_grid = c.cubic_bspline_dyadic_knot_insert_3d(prev_grid, target_shape)
+    pure_knot_sec = timer.stop(knot_token) if timer is not None else 0.0
     row: Dict[str, object] = {
         "stage_idx": int(stage_idx),
         "target_cps": int(target_cps),
         "method": "exact_knot",
         "source_shape_zyx": list(int(v) for v in prev_shape),
         "target_shape_zyx": list(int(v) for v in target_shape),
+        "preserve_check_enabled": bool(preserve_check),
+        "timing_pure_knot_insertion_sec": float(pure_knot_sec),
+        "timing_prolongation_preserve_dense_expand_sec": 0.0,
+        "timing_prolongation_preserve_metrics_sec": 0.0,
     }
-    row.update(c.field_difference_metrics(dense - prev_dense_full, prefix="preserve_"))
-    rows.append(row)
+    if preserve_check:
+        if prev_dense_full is None:
+            raise RuntimeError("prolongation preserve check requires previous-stage dense field.")
+        dense_token = timer.start(
+            f"stage_{stage_idx}.prolongation.preserve_dense_expand",
+            category="prolongation_preserve_dense_expand",
+            metadata={"stage_idx": int(stage_idx), "target_cps": int(target_cps)},
+        ) if timer is not None else None
+        with torch.no_grad():
+            dense = c.expand_on_shape(c.grid_to_flat(exact_grid), target_shape, target_cps, image_shape, 1)
+        row["timing_prolongation_preserve_dense_expand_sec"] = (
+            timer.stop(dense_token) if timer is not None else 0.0
+        )
+        metrics_token = timer.start(
+            f"stage_{stage_idx}.prolongation.preserve_metrics",
+            category="prolongation_preserve_metrics",
+            metadata={"stage_idx": int(stage_idx)},
+        ) if timer is not None else None
+        row.update(c.field_difference_metrics(dense - prev_dense_full, prefix="preserve_"))
+        row["timing_prolongation_preserve_metrics_sec"] = (
+            timer.stop(metrics_token) if timer is not None else 0.0
+        )
+    rows: List[Dict[str, object]] = [row]
     return c.grid_to_flat(exact_grid).detach(), rows
+
+
+def stage_stop_decision(
+    rows: Sequence[Dict[str, object]],
+    *,
+    min_epochs: int,
+    patience: int,
+    check_interval: int,
+    rel_delta_total: float,
+    rel_delta_data: float,
+) -> Tuple[bool, str]:
+    if not rows:
+        return False, ""
+    epoch = int(float(rows[-1]["epoch"]))
+    if epoch < int(min_epochs) or epoch % int(check_interval) != 0:
+        return False, ""
+    window = max(1, int(check_interval))
+    patience = max(window, int(patience))
+    if len(rows) < patience + window:
+        return False, ""
+
+    def median_metric(metric: str, start: int, stop: int) -> float:
+        values = [float(row[metric]) for row in rows[start:stop]]
+        return float(np.median(np.asarray(values, dtype=np.float64)))
+
+    recent_start = len(rows) - window
+    prev_stop = len(rows) - patience
+    prev_start = max(0, prev_stop - window)
+    recent_loss = median_metric("loss", recent_start, len(rows))
+    prev_loss = median_metric("loss", prev_start, prev_stop)
+    recent_data = median_metric("data_loss", recent_start, len(rows))
+    prev_data = median_metric("data_loss", prev_start, prev_stop)
+
+    total_improvement = prev_loss - recent_loss
+    data_improvement = prev_data - recent_data
+    rel_total = total_improvement / max(abs(prev_loss), 1e-8)
+    rel_data = data_improvement / max(abs(prev_data), 1e-8)
+    if rel_total < float(rel_delta_total) and rel_data < float(rel_delta_data):
+        return (
+            True,
+            "adaptive_plateau:"
+            f"epoch={epoch};patience={patience};window={window};"
+            f"rel_total={rel_total:.6g};rel_data={rel_data:.6g};"
+            f"threshold_total={float(rel_delta_total):.6g};"
+            f"threshold_data={float(rel_delta_data):.6g}",
+        )
+    return False, ""
 
 
 def optimize_multistage_stage(
@@ -882,8 +1510,34 @@ def optimize_multistage_stage(
     global_epoch_offset: int,
     total_epochs: int,
     global_ncc_diagnostic: List[Dict[str, float | str | bool]],
+    early_stop_mode: str,
+    min_epochs: int,
+    patience: int,
+    check_interval: int,
+    rel_delta_total: float,
+    rel_delta_data: float,
     sampler: Optional[CheckpointSampler] = None,
-) -> Tuple[torch.Tensor, Dict[str, object], List[Dict[str, object]]]:
+    timer: Optional[TimingRecorder] = None,
+    is_final_stage: bool = False,
+    require_stage_dense: bool = True,
+) -> Tuple[Optional[torch.Tensor], Dict[str, object], List[Dict[str, object]]]:
+    stage_timing: Dict[str, float] = {}
+    stage_token = timer.start(
+        f"stage_{stage_idx}",
+        category="training_stage",
+        metadata={
+            "stage_idx": int(stage_idx),
+            "full_cps": int(full_cps),
+            "downsample": int(downsample),
+            "requested_epochs": int(epochs),
+            "lr": float(lr),
+        },
+    ) if timer is not None else None
+    loss_token = timer.start(
+        f"stage_{stage_idx}.loss_volume_setup",
+        category="fixed_stage_overhead",
+        metadata={"stage_idx": int(stage_idx), "downsample": int(downsample)},
+    ) if timer is not None else None
     fixed_l, blur_sigma, blur_kernel = c.make_loss_volume(
         fixed_image,
         int(downsample),
@@ -896,12 +1550,34 @@ def optimize_multistage_stage(
         float(args.antialias_sigma_scale),
         float(args.antialias_radius_sigma),
     )
+    if timer is not None:
+        stage_timing["loss_volume_setup_sec"] = timer.stop(loss_token)
+
+    setup_token = timer.start(
+        f"stage_{stage_idx}.stage_setup",
+        category="fixed_stage_overhead",
+        metadata={"stage_idx": int(stage_idx)},
+    ) if timer is not None else None
     eval_shape = tuple(int(v) for v in fixed_l.shape)
     domain_cps = c.domain_cps_from_full(int(full_cps), int(downsample))
     id_grid = c.make_coordinate_grid(eval_shape, fixed_image.device).detach()
     optimizer = torch.optim.Adam([control], lr=float(lr))
+    if timer is not None:
+        stage_timing["stage_setup_sec"] = timer.stop(setup_token)
+
     rows: List[Dict[str, object]] = []
+    stop_reason = "requested_epochs_complete"
     stage_start = time.time()
+    loop_token = timer.start(
+        f"stage_{stage_idx}.optimizer_loop",
+        category="step_proportional",
+        metadata={"stage_idx": int(stage_idx), "requested_epochs": int(epochs)},
+    ) if timer is not None else None
+    phase_acc = CudaPhaseAccumulator(
+        bool(timer is not None and timer.enabled and timer.detail == "deep"),
+        fixed_image.device,
+    )
+    loop_logging_early_stop_wall_sec = 0.0
     print(
         json.dumps(
             {
@@ -913,6 +1589,12 @@ def optimize_multistage_stage(
                 "eval_shape_zyx": list(eval_shape),
                 "epochs": int(epochs),
                 "lr": float(lr),
+                "early_stop_mode": str(early_stop_mode),
+                "min_epochs": int(min_epochs),
+                "patience": int(patience),
+                "check_interval": int(check_interval),
+                "rel_delta_total": float(rel_delta_total),
+                "rel_delta_data": float(rel_delta_data),
                 "image_loss": "sinr_ncc",
                 "regularizer": "analytic_cubic_bspline_be",
             }
@@ -920,20 +1602,26 @@ def optimize_multistage_stage(
         flush=True,
     )
     for epoch in range(1, int(epochs) + 1):
-        control_grid = c.flat_to_grid(control, control_shape)
-        dense_disp = c.expand_on_shape(control, control_shape, int(full_cps), eval_shape, int(downsample))
-        warped = c.warp_full(moving_l, id_grid + dense_disp, mode="bilinear")
-        data_loss = c.ncc_loss(fixed_l[None, None], warped[None, None])
-        reg_loss = c.analytic_bspline_sampled_be(
-            control_grid,
-            eval_shape,
-            int(domain_cps),
-            component_reduction="mean",
-        )
+        with phase_acc.phase("control_grid"):
+            control_grid = c.flat_to_grid(control, control_shape)
+        with phase_acc.phase("expand"):
+            dense_disp = c.expand_on_shape(control, control_shape, int(full_cps), eval_shape, int(downsample))
+        with phase_acc.phase("warp_ncc"):
+            warped = c.warp_full(moving_l, id_grid + dense_disp, mode="bilinear")
+            data_loss = c.ncc_loss(fixed_l[None, None], warped[None, None])
+        with phase_acc.phase("regularizer"):
+            reg_loss = c.analytic_bspline_sampled_be(
+                control_grid,
+                eval_shape,
+                int(domain_cps),
+                component_reduction="mean",
+            )
         loss = data_loss + float(args.alpha) * reg_loss
-        optimizer.zero_grad(set_to_none=True)
-        loss.backward()
-        optimizer.step()
+        with phase_acc.phase("backward_step"):
+            optimizer.zero_grad(set_to_none=True)
+            loss.backward()
+            optimizer.step()
+        logging_start = time.perf_counter()
         row = {
             "stage_idx": float(stage_idx),
             "epoch": float(epoch),
@@ -988,9 +1676,98 @@ def optimize_multistage_stage(
             )
         if epoch == 1 or epoch % int(args.eval_interval) == 0 or epoch == int(epochs):
             print(json.dumps(row), flush=True)
-    with torch.no_grad():
-        dense_full = c.expand_on_shape(control, control_shape, int(full_cps), c.IMAGE_SHAPE, 1)
+        should_break = False
+        if str(early_stop_mode) == "adaptive":
+            should_stop, reason = stage_stop_decision(
+                rows,
+                min_epochs=int(min_epochs),
+                patience=int(patience),
+                check_interval=int(check_interval),
+                rel_delta_total=float(rel_delta_total),
+                rel_delta_data=float(rel_delta_data),
+            )
+            if should_stop:
+                stop_reason = reason
+                print(
+                    json.dumps(
+                        {
+                            "stage_stop": int(stage_idx),
+                            "epoch": int(epoch),
+                            "requested_epochs": int(epochs),
+                            "stop_reason": stop_reason,
+                        }
+                    ),
+                    flush=True,
+                )
+                should_break = True
+        loop_logging_early_stop_wall_sec += time.perf_counter() - logging_start
+        if should_break:
+            break
+    if timer is not None:
+        stage_timing["optimizer_loop_sec"] = timer.stop(loop_token)
+    phase_summary = phase_acc.summary()
+    phase_summary["logging_early_stop_wall_sec"] = float(loop_logging_early_stop_wall_sec)
+    phase_summary["actual_epochs"] = float(int(rows[-1]["epoch"]) if rows else 0)
+    phase_summary["stage_idx"] = float(stage_idx)
+    phase_summary["full_cps"] = float(full_cps)
+    phase_summary["downsample"] = float(downsample)
+    if timer is not None:
+        timer.add_stage_phase_summary(
+            {
+                "stage_idx": int(stage_idx),
+                "full_cps": int(full_cps),
+                "downsample": int(downsample),
+                "requested_epochs": int(epochs),
+                "actual_epochs": int(rows[-1]["epoch"]) if rows else 0,
+                "optimizer_loop_sec": float(stage_timing.get("optimizer_loop_sec", 0.0)),
+                "phase_totals_sec": phase_summary,
+            }
+        )
+
+    dense_full: Optional[torch.Tensor] = None
+    stage_timing["intermediate_dense_expand_sec"] = 0.0
+    stage_timing["final_output_dense_expand_sec"] = 0.0
+    stage_timing["final_dense_expand_sec"] = 0.0
+    stage_timing["dense_expand_role"] = "skipped_intermediate"
+    if bool(require_stage_dense):
+        dense_name = "final_output_dense_expand" if is_final_stage else "intermediate_dense_expand"
+        dense_category = "final_output_dense_expand" if is_final_stage else "intermediate_dense_diagnostic"
+        dense_token = timer.start(
+            f"stage_{stage_idx}.{dense_name}",
+            category=dense_category,
+            metadata={"stage_idx": int(stage_idx), "full_cps": int(full_cps)},
+        ) if timer is not None else None
+        with torch.no_grad():
+            dense_full = c.expand_on_shape(control, control_shape, int(full_cps), c.IMAGE_SHAPE, 1)
+        dense_elapsed = timer.stop(dense_token) if timer is not None else 0.0
+        if is_final_stage:
+            stage_timing["final_output_dense_expand_sec"] = float(dense_elapsed)
+            stage_timing["dense_expand_role"] = "final_output"
+        else:
+            stage_timing["intermediate_dense_expand_sec"] = float(dense_elapsed)
+            stage_timing["dense_expand_role"] = "intermediate_diagnostic_or_save"
+        stage_timing["final_dense_expand_sec"] = float(dense_elapsed)
+        if is_final_stage and str(getattr(args, "output_mode", "full")) == "dvf_only" and timer is not None:
+            timer.mark(
+                "dvf_in_memory_ready",
+                metadata={
+                    "stage_idx": int(stage_idx),
+                    "full_cps": int(full_cps),
+                    "definition": "immediately after final-stage dense displacement expansion",
+                },
+                sync=False,
+            )
+    stats_token = timer.start(
+        f"stage_{stage_idx}.control_summary_stats",
+        category="fixed_stage_overhead",
+        metadata={"stage_idx": int(stage_idx)},
+    ) if timer is not None else None
     ctrl_abs = control.detach().abs().reshape(-1)
+    control_abs_max_norm = float(ctrl_abs.max().detach().cpu())
+    control_abs_p95_norm = float(torch.quantile(ctrl_abs, 0.95).detach().cpu())
+    if timer is not None:
+        stage_timing["control_summary_stats_sec"] = timer.stop(stats_token)
+    actual_epochs = int(rows[-1]["epoch"]) if rows else 0
     summary = {
         "stage_idx": int(stage_idx),
         "full_cps": int(full_cps),
@@ -999,17 +1776,30 @@ def optimize_multistage_stage(
         "control_shape_zyx": list(int(v) for v in control_shape),
         "eval_shape_zyx": list(eval_shape),
         "n_control": int(np.prod(tuple(int(v) for v in control_shape))),
-        "epochs": int(epochs),
+        "epochs": int(actual_epochs),
+        "requested_epochs": int(epochs),
+        "actual_epochs": int(actual_epochs),
         "lr": float(lr),
         "alpha": float(args.alpha),
+        "early_stop_mode": str(early_stop_mode),
+        "min_epochs": int(min_epochs),
+        "patience": int(patience),
+        "check_interval": int(check_interval),
+        "rel_delta_total": float(rel_delta_total),
+        "rel_delta_data": float(rel_delta_data),
+        "stop_reason": str(stop_reason),
         "loss_mode": "sinr_ncc_bspline_be",
         "antialias_sigma": float(blur_sigma),
         "antialias_kernel_size": int(blur_kernel),
         "elapsed_sec": float(time.time() - stage_start),
-        "control_abs_max_norm": float(ctrl_abs.max().detach().cpu()),
-        "control_abs_p95_norm": float(torch.quantile(ctrl_abs, 0.95).detach().cpu()),
+        "timing_breakdown": stage_timing,
+        "timing_phase_totals_sec": phase_summary,
+        "control_abs_max_norm": control_abs_max_norm,
+        "control_abs_p95_norm": control_abs_p95_norm,
     }
-    return dense_full.detach(), summary, rows
+    if timer is not None:
+        stage_timing["stage_total_sec"] = timer.stop(stage_token)
+    return dense_full.detach() if dense_full is not None else None, summary, rows
 
 
 def train_multistage_direct_cp(
@@ -1018,11 +1808,22 @@ def train_multistage_direct_cp(
     device: torch.device,
     lr: float,
     sampler: Optional[CheckpointSampler] = None,
+    timer: Optional[TimingRecorder] = None,
+    run_dir: Optional[Path] = None,
 ) -> Dict[str, object]:
     stage_cps = c.parse_int_list(str(args.stage_full_cps))
     stage_downsample = c.parse_stage_ints(str(args.stage_downsample), len(stage_cps))
     stage_epochs = c.parse_stage_ints(str(args.stage_epochs), len(stage_cps))
     stage_lr = c.parse_float_list(str(args.stage_lr), len(stage_cps), float(lr))
+    stage_early_stop_mode = str(args.stage_early_stop_mode)
+    if str(args.stage_min_epochs).strip():
+        stage_min_epochs = c.parse_stage_ints(str(args.stage_min_epochs), len(stage_cps))
+    else:
+        stage_min_epochs = list(stage_epochs)
+    stage_patience = c.parse_stage_ints(str(args.stage_patience), len(stage_cps))
+    stage_check_interval = c.parse_stage_ints(str(args.stage_check_interval), len(stage_cps))
+    stage_rel_delta_total = c.parse_float_list(str(args.stage_rel_delta_total), len(stage_cps), 5e-5)
+    stage_rel_delta_data = c.parse_float_list(str(args.stage_rel_delta_data), len(stage_cps), 2e-5)
     base_spacing = int(stage_cps[0])
     nested_shapes = c.build_nested_cp_shapes(c.IMAGE_SHAPE, base_spacing=base_spacing, spacings=stage_cps)
     c.assert_nested_schedule(nested_shapes, stage_cps)
@@ -1031,11 +1832,19 @@ def train_multistage_direct_cp(
     fixed_image = batch["fixed"]
     assert isinstance(moving, torch.Tensor)
     assert isinstance(fixed_image, torch.Tensor)
+    dense_grid_token = timer.start(
+        "training.initial_dense_grid",
+        category="fixed_stage_overhead",
+        metadata={"shape": list(c.IMAGE_SHAPE)},
+    ) if timer is not None else None
     id_dense = c.make_coordinate_grid(c.IMAGE_SHAPE, device).detach()
+    if timer is not None:
+        timer.stop(dense_grid_token)
     stage_summaries: List[Dict[str, object]] = []
     history: List[Dict[str, object]] = []
     global_ncc_diagnostic: List[Dict[str, float | str | bool]] = []
     prolong_rows: List[Dict[str, object]] = []
+    actual_stage_epochs: List[int] = []
     prev_control: Optional[torch.Tensor] = None
     prev_shape: Optional[Tuple[int, int, int]] = None
     prev_dense_full: Optional[torch.Tensor] = None
@@ -1044,35 +1853,62 @@ def train_multistage_direct_cp(
     final_control_shape: Optional[Tuple[int, int, int]] = None
     final_cps: Optional[int] = None
 
+    train_token = timer.start(
+        "training",
+        category="training",
+        metadata={
+            "stage_full_cps": stage_cps,
+            "stage_downsample": stage_downsample,
+            "stage_requested_epochs": stage_epochs,
+        },
+    ) if timer is not None else None
     torch.cuda.synchronize()
     torch.cuda.reset_peak_memory_stats()
     train_start = time.time()
-    if sampler is not None:
-        sampler.record_dense(
-            epoch=0,
-            dense_disp_norm_xyz=torch.zeros((*c.IMAGE_SHAPE, 3), dtype=torch.float32, device=device),
-            row_extra={"method": args.method, "checkpoint_source": "model_init"},
-        )
+    if sampler is not None and sampler.enabled:
+        with timer.section("training.initial_checkpoint_sample", category="fixed_stage_overhead") if timer is not None else _null_section():
+            sampler.record_dense(
+                epoch=0,
+                dense_disp_norm_xyz=torch.zeros((*c.IMAGE_SHAPE, 3), dtype=torch.float32, device=device),
+                row_extra={"method": args.method, "checkpoint_source": "model_init"},
+            )
+    global_epoch_offset = 0
+    requested_total_epochs = int(sum(stage_epochs))
     for stage_idx, (full_cps, downsample, epochs, stage_lr_value) in enumerate(
         zip(stage_cps, stage_downsample, stage_epochs, stage_lr)
     ):
-        global_epoch_offset = int(sum(stage_epochs[:stage_idx]))
         control_shape = tuple(int(v) for v in nested_shapes[int(full_cps)])
         control = torch.nn.Parameter(torch.zeros(int(np.prod(control_shape)), 3, device=device, dtype=torch.float32))
-        if prev_control is not None and prev_shape is not None and prev_dense_full is not None:
-            init_flat, rows = prolongation_diagnostics(
+        if prev_control is not None and prev_shape is not None:
+            prolong_token = timer.start(
+                f"stage_{stage_idx}.prolongation",
+                category="fixed_stage_overhead",
+                metadata={"stage_idx": int(stage_idx), "target_cps": int(full_cps)},
+            ) if timer is not None else None
+            init_flat, rows = prolongate_control_grid(
                 prev_control,
                 prev_shape,
-                prev_dense_full,
                 control_shape,
                 int(full_cps),
                 c.IMAGE_SHAPE,
                 int(stage_idx),
+                prev_dense_full=prev_dense_full,
+                preserve_check=bool(args.prolongation_preserve_check),
+                timer=timer,
             )
             with torch.no_grad():
                 control.copy_(init_flat)
+            prolong_elapsed = timer.stop(prolong_token) if timer is not None else 0.0
+            for row in rows:
+                row["timing_prolongation_sec"] = float(prolong_elapsed)
             prolong_rows.extend(rows)
             print(json.dumps({"prolongation": rows}, allow_nan=True), flush=True)
+        is_final_stage = stage_idx == len(stage_cps) - 1
+        require_stage_dense = bool(
+            is_final_stage
+            or args.prolongation_preserve_check
+            or args.save_intermediate_dense
+        )
         dense_full, summary, rows = optimize_multistage_stage(
             args,
             fixed_image,
@@ -1084,15 +1920,52 @@ def train_multistage_direct_cp(
             int(epochs),
             float(stage_lr_value),
             int(stage_idx),
-            global_epoch_offset,
-            int(sum(stage_epochs)),
+            int(global_epoch_offset),
+            int(requested_total_epochs),
             global_ncc_diagnostic,
+            stage_early_stop_mode,
+            int(stage_min_epochs[stage_idx]),
+            int(stage_patience[stage_idx]),
+            int(stage_check_interval[stage_idx]),
+            float(stage_rel_delta_total[stage_idx]),
+            float(stage_rel_delta_data[stage_idx]),
             sampler=sampler,
+            timer=timer,
+            is_final_stage=is_final_stage,
+            require_stage_dense=require_stage_dense,
         )
+        if bool(args.save_intermediate_dense) and not is_final_stage:
+            if dense_full is None:
+                raise RuntimeError("Intermediate dense save requested but no stage dense field was computed.")
+            if run_dir is None:
+                raise RuntimeError("Intermediate dense save requested without a run directory.")
+            save_token = timer.start(
+                f"stage_{stage_idx}.intermediate_dense_save",
+                category="intermediate_dense_diagnostic",
+                metadata={"stage_idx": int(stage_idx), "full_cps": int(full_cps)},
+            ) if timer is not None else None
+            fixed_id = str(batch["fixed_id"])
+            moving_id = str(batch["moving_id"])
+            dense_path = (
+                Path(run_dir)
+                / "intermediate_dense"
+                / f"disp_norm_stage{stage_idx + 1}_cps{int(full_cps)}_{fixed_id}_{moving_id}.npy"
+            )
+            dense_path.parent.mkdir(parents=True, exist_ok=True)
+            np.save(dense_path, dense_full.detach().cpu().numpy().astype(np.float32, copy=False))
+            save_elapsed = timer.stop(save_token) if timer is not None else 0.0
+            summary["intermediate_dense_path"] = str(dense_path)
+            timing_breakdown = summary.get("timing_breakdown")
+            if isinstance(timing_breakdown, dict):
+                timing_breakdown["intermediate_dense_save_sec"] = float(save_elapsed)
+        actual_epochs = int(summary.get("actual_epochs", epochs))
+        actual_stage_epochs.append(actual_epochs)
+        global_epoch_offset += actual_epochs
         prev_control = control.detach()
         prev_shape = control_shape
-        prev_dense_full = dense_full
-        final_dense = dense_full
+        prev_dense_full = dense_full if bool(args.prolongation_preserve_check) else None
+        if is_final_stage:
+            final_dense = dense_full
         final_control = control.detach()
         final_control_shape = control_shape
         final_cps = int(full_cps)
@@ -1101,10 +1974,37 @@ def train_multistage_direct_cp(
     torch.cuda.synchronize()
     training_elapsed_sec = time.time() - train_start
     training_peak_mem_gb = torch.cuda.max_memory_allocated() / (1024**3)
+    if timer is not None:
+        timer.stop(train_token)
     if final_dense is None or final_control is None or final_control_shape is None or final_cps is None:
         raise RuntimeError("Multistage training produced no final control field.")
-    metrics = c.evaluate_from_dense_coords(id_dense + final_dense.detach(), batch)
-    final_control_grid = c.flat_to_grid(final_control, final_control_shape).detach()
+    is_dvf_only = str(getattr(args, "output_mode", "full")) == "dvf_only"
+    if is_dvf_only:
+        metrics: Dict[str, object] = {
+            "output_mode": "dvf_only",
+            "evaluation_skipped": [
+                "image_warp_evaluation",
+                "segmentation_warp",
+                "dice",
+                "hd95_asd",
+                "dense_ncc",
+                "regularity_metrics",
+                "model_control_checkpoint_saves",
+                "full_csv_packaging",
+            ],
+        }
+    else:
+        eval_token = timer.start(
+            "post_train_evaluation",
+            category="fixed_post_training",
+            metadata={"stage_count": len(stage_summaries)},
+        ) if timer is not None else None
+        metrics = timed_evaluate_from_dense_coords(id_dense + final_dense.detach(), batch, timer=timer)
+        if timer is not None:
+            timer.stop(eval_token)
+        final_control_grid = c.flat_to_grid(final_control, final_control_shape).detach()
+        metrics["control_coords"] = torch.empty(0, 3, dtype=torch.float32)
+        metrics["control_disp"] = final_control_grid
     metrics["history"] = [
         {
             **row,
@@ -1118,8 +2018,6 @@ def train_multistage_direct_cp(
     metrics["stage_summaries"] = stage_summaries
     metrics["prolongation_diagnostics"] = prolong_rows
     metrics["control_shape"] = final_control_shape
-    metrics["control_coords"] = torch.empty(0, 3, dtype=torch.float32)
-    metrics["control_disp"] = final_control_grid
     metrics["dense_disp"] = final_dense.detach()
     metrics["training_elapsed_sec"] = training_elapsed_sec
     metrics["training_peak_mem_gb"] = training_peak_mem_gb
@@ -1128,7 +2026,20 @@ def train_multistage_direct_cp(
     metrics["stage_full_cps"] = stage_cps
     metrics["stage_downsample"] = stage_downsample
     metrics["stage_epochs"] = stage_epochs
+    metrics["stage_requested_epochs"] = stage_epochs
+    metrics["stage_actual_epochs"] = actual_stage_epochs
     metrics["stage_lr"] = stage_lr
+    metrics["stage_early_stop_mode"] = stage_early_stop_mode
+    metrics["stage_min_epochs"] = stage_min_epochs
+    metrics["stage_patience"] = stage_patience
+    metrics["stage_check_interval"] = stage_check_interval
+    metrics["stage_rel_delta_total"] = stage_rel_delta_total
+    metrics["stage_rel_delta_data"] = stage_rel_delta_data
+    metrics["stage_stop_reasons"] = [str(row.get("stop_reason")) for row in stage_summaries]
+    metrics["requested_epochs"] = requested_total_epochs
+    metrics["actual_epochs"] = int(sum(actual_stage_epochs))
+    metrics["prolongation_preserve_check"] = bool(args.prolongation_preserve_check)
+    metrics["save_intermediate_dense"] = bool(args.save_intermediate_dense)
     metrics["nested_control_shapes_zyx"] = {str(k): list(v) for k, v in nested_shapes.items()}
     metrics["prolongation"] = "exact crop-aligned cubic B-spline dyadic knot insertion"
     return metrics
@@ -1142,7 +2053,14 @@ def write_outputs(
     run_name: str,
     lr: float,
     total_elapsed_sec: float,
+    timer: Optional[TimingRecorder] = None,
 ) -> None:
+    write_token = timer.start(
+        "write_outputs",
+        category="output_writing",
+        metadata={"run_name": run_name},
+    ) if timer is not None else None
+    prep_token = timer.start("write_outputs.prepare_dense_disp", category="output_writing") if timer is not None else None
     fixed_id = str(batch["fixed_id"])
     moving_id = str(batch["moving_id"])
     dense_coords = metrics["dense_coords"]
@@ -1152,6 +2070,10 @@ def write_outputs(
     fixed_mask = batch["fixed_mask"]
     assert isinstance(fixed_mask, torch.Tensor)
     control_disp = metrics.get("control_disp")
+    if timer is not None:
+        timer.stop(prep_token)
+
+    reg_token = timer.start("write_outputs.regularity_metrics", category="output_writing") if timer is not None else None
     if isinstance(control_disp, torch.Tensor):
         reg_metrics, be_rows, diffusion_rows = c.regularity_metrics(
             dense_disp_norm,
@@ -1183,10 +2105,14 @@ def write_outputs(
             reg_metrics["idir_autograd_diffusion_chunk_size"] = int(args.autograd_be_chunk_size)
             c.add_native_analytic_be_columns(reg_metrics)
             c.add_native_analytic_diffusion_columns(reg_metrics)
+    if timer is not None:
+        timer.stop(reg_token)
 
     if args.save_final_dense:
-        c.save_dense_disp(run_dir / f"disp_norm_{fixed_id}_{moving_id}.npy", dense_coords)
+        with timer.section("write_outputs.save_final_dense", category="output_writing") if timer is not None else _null_section():
+            c.save_dense_disp(run_dir / f"disp_norm_{fixed_id}_{moving_id}.npy", dense_coords)
 
+    state_token = timer.start("write_outputs.save_model_control", category="output_writing") if timer is not None else None
     state: Dict[str, object] = {
         "args": vars(args),
         "run_name": run_name,
@@ -1209,7 +2135,25 @@ def write_outputs(
     if "control_disp" in metrics and "generator" not in metrics:
         state["control_disp"] = metrics["control_disp"].detach().cpu()  # type: ignore[union-attr]
         state["control_shape"] = metrics["control_shape"]
-    for key in ("stage_summaries", "prolongation_diagnostics", "stage_full_cps", "stage_downsample", "stage_epochs", "stage_lr"):
+    for key in (
+        "stage_summaries",
+        "prolongation_diagnostics",
+        "stage_full_cps",
+        "stage_downsample",
+        "stage_epochs",
+        "stage_requested_epochs",
+        "stage_actual_epochs",
+        "stage_lr",
+        "stage_early_stop_mode",
+        "stage_min_epochs",
+        "stage_patience",
+        "stage_check_interval",
+        "stage_rel_delta_total",
+        "stage_rel_delta_data",
+        "stage_stop_reasons",
+        "requested_epochs",
+        "actual_epochs",
+    ):
         if key in metrics:
             state[key] = metrics[key]
     torch.save(state, run_dir / "model_state.pt")
@@ -1230,7 +2174,10 @@ def write_outputs(
             },
             run_dir / "control_output.pt",
         )
+    if timer is not None:
+        timer.stop(state_token)
 
+    tables_token = timer.start("write_outputs.write_tables", category="output_writing") if timer is not None else None
     c.write_csv(run_dir / "history.csv", metrics["history"])  # type: ignore[arg-type]
     if "image_similarity_eval" in metrics and metrics["image_similarity_eval"]:
         c.write_csv(run_dir / "image_similarity_eval.csv", metrics["image_similarity_eval"])  # type: ignore[arg-type]
@@ -1247,7 +2194,10 @@ def write_outputs(
     c.write_csv(run_dir / "be_metrics.csv", be_rows)
     c.write_csv(run_dir / "diffusion_metrics.csv", diffusion_rows)
     c.write_json(run_dir / "mask_audit.json", batch["mask_audit"])
+    if timer is not None:
+        timer.stop(tables_token)
 
+    summary_token = timer.start("write_outputs.write_summary_done", category="output_writing") if timer is not None else None
     last = metrics["history"][-1]  # type: ignore[index]
     is_idir = args.method == "idir_original"
     is_direct_dvf = args.method == "direct_dvf_sampled_ncc_fd_be"
@@ -1324,6 +2274,7 @@ def write_outputs(
         "variant": str(args.variant),
         "method": args.method,
         "method_key": method_key(args),
+        "runtime_candidate": str(args.runtime_candidate) or None,
         "case_rank": int(args.case_rank),
         "original_case_index": int(batch["original_case_index"]),
         "fixed_id": fixed_id,
@@ -1331,6 +2282,8 @@ def write_outputs(
         "pair_file": str(batch["pair_file"]),
         "sorted_pair_file": str(batch["sorted_pair_file"]),
         "epochs": int(args.epochs),
+        "requested_epochs": int(metrics.get("requested_epochs", args.epochs)),
+        "actual_epochs": int(metrics.get("actual_epochs", args.epochs)),
         "eval_interval": int(args.eval_interval),
         "image_similarity_eval_interval": int(args.image_sim_eval_interval),
         "image_similarity_eval_name": (
@@ -1378,9 +2331,20 @@ def write_outputs(
         "stage_full_cps": metrics.get("stage_full_cps"),
         "stage_downsample": metrics.get("stage_downsample"),
         "stage_epochs": metrics.get("stage_epochs"),
+        "stage_requested_epochs": metrics.get("stage_requested_epochs"),
+        "stage_actual_epochs": metrics.get("stage_actual_epochs"),
         "stage_lr": metrics.get("stage_lr"),
+        "stage_early_stop_mode": metrics.get("stage_early_stop_mode"),
+        "stage_min_epochs": metrics.get("stage_min_epochs"),
+        "stage_patience": metrics.get("stage_patience"),
+        "stage_check_interval": metrics.get("stage_check_interval"),
+        "stage_rel_delta_total": metrics.get("stage_rel_delta_total"),
+        "stage_rel_delta_data": metrics.get("stage_rel_delta_data"),
+        "stage_stop_reasons": metrics.get("stage_stop_reasons"),
         "stage_summaries": metrics.get("stage_summaries"),
         "prolongation_diagnostics": metrics.get("prolongation_diagnostics"),
+        "prolongation_preserve_check": metrics.get("prolongation_preserve_check"),
+        "save_intermediate_dense": metrics.get("save_intermediate_dense"),
         "nested_control_shapes_zyx": metrics.get("nested_control_shapes_zyx"),
         "prolongation": metrics.get("prolongation"),
         "started_at": metrics.get("started_at"),
@@ -1405,11 +2369,180 @@ def write_outputs(
     c.write_json(run_dir / "summary.json", summary)
     (run_dir / "DONE").write_text("done\n")
     print(json.dumps(summary, indent=2, allow_nan=True, default=str), flush=True)
+    if timer is not None:
+        timer.stop(summary_token)
+        timer.stop(write_token)
+
+
+def write_dvf_only_file(
+    args: argparse.Namespace,
+    batch: Dict[str, torch.Tensor | str | int | Dict[str, object]],
+    metrics: Dict[str, object],
+    run_dir: Path,
+    timer: Optional[TimingRecorder] = None,
+) -> Dict[str, object]:
+    fixed_id = str(batch["fixed_id"])
+    moving_id = str(batch["moving_id"])
+    dense_disp = metrics["dense_disp"]
+    assert isinstance(dense_disp, torch.Tensor)
+    path = run_dir / f"disp_norm_{fixed_id}_{moving_id}.npy"
+
+    prep_token = timer.start(
+        "method_execution.dvf_file_prep",
+        category="dvf_file_output",
+        metadata={
+            "definition": "detach final dense displacement and move to a CPU float32 numpy array",
+        },
+    ) if timer is not None else None
+    dense_np = dense_disp.detach().cpu().numpy().astype(np.float32, copy=False)
+    if timer is not None:
+        timer.stop(prep_token)
+
+    write_token = timer.start(
+        "method_execution.dvf_file_write",
+        category="dvf_file_output",
+        metadata={
+            "path": str(path),
+            "definition": "numpy .npy serialization of normalized-grid xyz dense displacement",
+        },
+    ) if timer is not None else None
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.save(path, dense_np)
+    if timer is not None:
+        timer.stop(write_token)
+        timer.mark(
+            "dvf_file_ready",
+            metadata={
+                "path": str(path),
+                "definition": "immediately after dense DVF .npy write completes",
+            },
+            sync=False,
+        )
+    return {
+        "dvf_file_path": str(path),
+        "dense_output_units": "normalized_grid_xyz_displacement",
+        "dense_output_shape_zyx3": list(dense_np.shape),
+        "dense_output_dtype": str(dense_np.dtype),
+        "dense_output_file_format": "numpy_npy",
+    }
+
+
+def write_dvf_only_metadata(
+    args: argparse.Namespace,
+    batch: Dict[str, torch.Tensor | str | int | Dict[str, object]],
+    metrics: Dict[str, object],
+    run_dir: Path,
+    run_name: str,
+    lr: float,
+    total_elapsed_sec: float,
+    dvf_info: Dict[str, object],
+    sampler: CheckpointSampler,
+    timer: Optional[TimingRecorder] = None,
+) -> None:
+    token = timer.start(
+        "post_dvf_metadata_write",
+        category="post_dvf_metadata_write",
+        metadata={
+            "definition": "minimal metadata written after DVF endpoint; excluded from DVF-ready headline times",
+        },
+    ) if timer is not None else None
+    fixed_id = str(batch["fixed_id"])
+    moving_id = str(batch["moving_id"])
+    history = metrics.get("history", [])
+    last = history[-1] if isinstance(history, list) and history else {}
+    summary: Dict[str, object] = {
+        "run_name": run_name,
+        "run_dir": str(run_dir),
+        "variant": str(args.variant),
+        "method": args.method,
+        "method_key": method_key(args),
+        "runtime_candidate": str(args.runtime_candidate) or None,
+        "output_mode": "dvf_only",
+        "no_evaluation": True,
+        "evaluation_skipped": metrics.get("evaluation_skipped", []),
+        "dvf_endpoint_definition": "DVF in memory is marked immediately after final-stage dense displacement expansion.",
+        "dvf_file_endpoint_definition": "DVF file is marked immediately after normalized-grid dense displacement .npy write.",
+        "case_rank": int(args.case_rank),
+        "original_case_index": int(batch["original_case_index"]),
+        "fixed_id": fixed_id,
+        "moving_id": moving_id,
+        "pair_file": str(batch["pair_file"]),
+        "sorted_pair_file": str(batch["sorted_pair_file"]),
+        "epochs": int(args.epochs),
+        "requested_epochs": int(metrics.get("requested_epochs", args.epochs)),
+        "actual_epochs": int(metrics.get("actual_epochs", args.epochs)),
+        "eval_interval": int(args.eval_interval),
+        "lr": float(lr),
+        "alpha": float(args.alpha),
+        "seed": int(args.seed),
+        "cps": metrics.get("cps"),
+        "bspline_order": 3,
+        "bspline_mode": "disp",
+        "grid_order": "pytorch",
+        "stage_full_cps": metrics.get("stage_full_cps"),
+        "stage_downsample": metrics.get("stage_downsample"),
+        "stage_epochs": metrics.get("stage_epochs"),
+        "stage_requested_epochs": metrics.get("stage_requested_epochs"),
+        "stage_actual_epochs": metrics.get("stage_actual_epochs"),
+        "stage_lr": metrics.get("stage_lr"),
+        "stage_early_stop_mode": metrics.get("stage_early_stop_mode"),
+        "stage_min_epochs": metrics.get("stage_min_epochs"),
+        "stage_patience": metrics.get("stage_patience"),
+        "stage_check_interval": metrics.get("stage_check_interval"),
+        "stage_rel_delta_total": metrics.get("stage_rel_delta_total"),
+        "stage_rel_delta_data": metrics.get("stage_rel_delta_data"),
+        "stage_stop_reasons": metrics.get("stage_stop_reasons"),
+        "stage_summaries": metrics.get("stage_summaries"),
+        "prolongation_diagnostics": metrics.get("prolongation_diagnostics"),
+        "prolongation_preserve_check": metrics.get("prolongation_preserve_check"),
+        "save_intermediate_dense": metrics.get("save_intermediate_dense"),
+        "nested_control_shapes_zyx": metrics.get("nested_control_shapes_zyx"),
+        "prolongation": metrics.get("prolongation"),
+        "control_shape": metrics.get("control_shape"),
+        "param_count": metrics.get("param_count"),
+        "started_at": metrics.get("started_at"),
+        "completed_at": c.now_text(),
+        "training_elapsed_sec": float(metrics["training_elapsed_sec"]),
+        "training_peak_mem_gb": float(metrics["training_peak_mem_gb"]),
+        "total_elapsed_sec": float(total_elapsed_sec),
+        "final_loss": last.get("loss") if isinstance(last, dict) else None,
+        "final_data_loss": last.get("data_loss") if isinstance(last, dict) else None,
+        "final_reg_loss": last.get("reg_loss") if isinstance(last, dict) else None,
+        "image_loss": "sinr_ncc_training_only",
+        "regularizer": "be_bspline_analytic",
+        "foreground_metric_mask": "fixed_image_positive",
+        "segmentation_mask_role": "loaded_but_not_evaluated_in_dvf_only_mode",
+        "timing_detail": str(args.timing_detail),
+        **dvf_info,
+    }
+    summary.update(batch["mask_audit"])  # type: ignore[arg-type]
+    if sampler.enabled:
+        with timer.section("post_dvf_metadata_write.sampler_save", category="post_dvf_metadata_write") if timer is not None else _null_section():
+            sampler.save()
+    c.write_json(run_dir / "summary.json", summary)
+    (run_dir / "DONE").write_text("done\n")
+    print(json.dumps(summary, indent=2, allow_nan=True, default=str), flush=True)
+    if timer is not None:
+        timer.stop(token)
 
 
 def main() -> None:
     args = parse_args()
+    timer = TimingRecorder(str(args.timing_detail))
     lr = float(args.lr if args.lr is not None else default_lr(args.method))
+    if str(args.output_mode) == "dvf_only":
+        supported_dvf_only = {
+            "direct_cp_8_4_2_be_bspline_analytic_multistage",
+            "sinr_cps4_be_bspline_analytic",
+            "sinr_cps2_be_bspline_analytic",
+        }
+        if args.method not in supported_dvf_only:
+            raise ValueError(
+                "--output-mode dvf_only is only implemented for DirectCP 8-4-2 multistage "
+                "and SINR cps4/cps2."
+            )
+        if not bool(args.save_final_dense):
+            raise ValueError("--output-mode dvf_only requires --save-final-dense.")
     if args.validate_case_only:
         case = c.resolve_case(rank=args.case_rank, pair_file=args.pair_file, oasis_root=args.oasis_root)
         print(json.dumps(case.__dict__, indent=2), flush=True)
@@ -1432,43 +2565,69 @@ def main() -> None:
 
     total_start = time.time()
     started_at = c.now_text()
-    device = c.set_cuda_device(args.gpu)
-    torch.manual_seed(int(args.seed))
-    np.random.seed(int(args.seed))
-    batch = c.load_oasis_case(
-        rank=int(args.case_rank),
-        device=device,
-        oasis_root=Path(args.oasis_root),
-        pair_file=Path(args.pair_file),
+    setup_token = timer.start("setup", category="setup")
+    with timer.section("setup.device", category="setup"):
+        device = c.set_cuda_device(args.gpu)
+        timer.set_device(device)
+    with timer.section("setup.seed", category="setup"):
+        torch.manual_seed(int(args.seed))
+        np.random.seed(int(args.seed))
+    with timer.section("setup.case_load", category="setup"):
+        batch = c.load_oasis_case(
+            rank=int(args.case_rank),
+            device=device,
+            oasis_root=Path(args.oasis_root),
+            pair_file=Path(args.pair_file),
+        )
+    timer.mark(
+        "case_load_complete",
+        metadata={
+            "definition": "loaded-images start point; fixed/moving images and labels are resident on the selected device",
+        },
     )
-    validate_expected_case(
-        args,
-        original_index=int(batch["original_case_index"]),
-        fixed_id=str(batch["fixed_id"]),
-        moving_id=str(batch["moving_id"]),
-    )
-    print(
-        json.dumps(
-            {
-                "run_dir": str(run_dir),
-                "method": args.method,
-                "method_key": key,
-                "gpu": args.gpu,
-                "case_rank": batch["case_rank"],
-                "original_case_index": batch["original_case_index"],
-                "fixed_id": batch["fixed_id"],
-                "moving_id": batch["moving_id"],
-                "mask_audit": batch["mask_audit"],
-                "alpha": args.alpha,
-                "lr": lr,
-                "epochs": args.epochs,
-            },
-            allow_nan=True,
-        ),
-        flush=True,
-    )
-    sampler = CheckpointSampler(args=args, batch=batch, device=device, run_dir=run_dir)
+    with timer.section("setup.case_validate_print", category="setup"):
+        validate_expected_case(
+            args,
+            original_index=int(batch["original_case_index"]),
+            fixed_id=str(batch["fixed_id"]),
+            moving_id=str(batch["moving_id"]),
+        )
+        print(
+            json.dumps(
+                {
+                    "run_dir": str(run_dir),
+                    "method": args.method,
+                    "method_key": key,
+                    "gpu": args.gpu,
+                    "case_rank": batch["case_rank"],
+                    "original_case_index": batch["original_case_index"],
+                    "fixed_id": batch["fixed_id"],
+                    "moving_id": batch["moving_id"],
+                    "mask_audit": batch["mask_audit"],
+                    "alpha": args.alpha,
+                    "lr": lr,
+                    "epochs": args.epochs,
+                    "stage_early_stop_mode": args.stage_early_stop_mode,
+                    "runtime_candidate": str(args.runtime_candidate) or None,
+                    "timing_detail": str(args.timing_detail),
+                    "output_mode": str(args.output_mode),
+                    "prolongation_preserve_check": bool(args.prolongation_preserve_check),
+                    "save_intermediate_dense": bool(args.save_intermediate_dense),
+                },
+                allow_nan=True,
+            ),
+            flush=True,
+        )
+    with timer.section("setup.sampler_init", category="setup"):
+        sampler = CheckpointSampler(args=args, batch=batch, device=device, run_dir=run_dir)
+    timer.stop(setup_token)
 
+    method_token = timer.start(
+        "method_execution",
+        category="method_execution",
+        metadata={"method": args.method, "runtime_candidate": str(args.runtime_candidate) or None},
+    )
+    active_timer = timer if timer.enabled else None
     if args.method == "idir_original":
         metrics = train_idir(args, batch, device, lr, sampler=sampler)
     elif args.method == "direct_dvf_sampled_ncc_fd_be":
@@ -1476,13 +2635,44 @@ def main() -> None:
     elif args.method == "dctfield_sampled_ncc_fd_be":
         metrics = train_dctfield(args, batch, device, lr, sampler=sampler)
     elif args.method == "direct_cp_8_4_2_be_bspline_analytic_multistage":
-        metrics = train_multistage_direct_cp(args, batch, device, lr, sampler=sampler)
+        metrics = train_multistage_direct_cp(
+            args,
+            batch,
+            device,
+            lr,
+            sampler=sampler,
+            timer=active_timer,
+            run_dir=run_dir,
+        )
     else:
-        metrics = train_spline(args, batch, device, lr, sampler=sampler)
-    sampler.save()
+        metrics = train_spline(args, batch, device, lr, sampler=sampler, timer=active_timer)
     metrics["started_at"] = started_at
-    total_elapsed_sec = time.time() - total_start
-    write_outputs(args, batch, metrics, run_dir, run_name, lr, total_elapsed_sec)
+    metrics["timing_detail"] = str(args.timing_detail)
+    if str(args.output_mode) == "dvf_only":
+        dvf_info = write_dvf_only_file(args, batch, metrics, run_dir, timer=active_timer)
+        timer.stop(method_token)
+        total_elapsed_sec = time.time() - total_start
+        write_dvf_only_metadata(
+            args,
+            batch,
+            metrics,
+            run_dir,
+            run_name,
+            lr,
+            total_elapsed_sec,
+            dvf_info,
+            sampler,
+            timer=active_timer,
+        )
+    else:
+        timer.stop(method_token)
+        with timer.section("sampler_save", category="output_writing"):
+            sampler.save()
+        total_elapsed_sec = time.time() - total_start
+        write_outputs(args, batch, metrics, run_dir, run_name, lr, total_elapsed_sec, timer=active_timer)
+    if timer.enabled:
+        timer.finalize()
+        c.write_json(run_dir / "timing.json", timer.payload(args=args, run_dir=run_dir, run_name=run_name))
 
 
 if __name__ == "__main__":
