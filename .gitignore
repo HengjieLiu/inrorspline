@@ -58,6 +58,20 @@ experiments/2026-08-04_oasis_directcp842_*/**/command_timing_*.csv
 experiments/2026-08-04_oasis_directcp842_*/**/launcher_state.json
 experiments/2026-08-04_oasis_directcp842_*/**/persistent_worker_timing_*.csv
 
+# DirectCP runtime raw aggregates and dry-run manifests (~6.6M; curated
+# acceptance, timing, and reviewer reports are tracked instead).
+experiments/2026-08-04_oasis_directcp842_runtime_sweep/dry_run/
+experiments/2026-08-04_oasis_directcp842_runtime_sweep/**/case_metrics_combined.csv
+experiments/2026-08-04_oasis_directcp842_runtime_sweep/**/prolongation_metrics_combined.csv
+experiments/2026-08-04_oasis_directcp842_runtime_sweep/**/regularity_metrics_combined.csv
+experiments/2026-08-04_oasis_directcp842_runtime_sweep/**/stage_summaries_combined.csv
+experiments/2026-08-04_oasis_directcp842_runtime_sweep/**/summary_runs.csv
+experiments/2026-08-04_oasis_directcp842_runtime_sweep/**/summary_runs.json
+
+# Persistent-process smoke worker summaries (~small transient validation;
+# first10 worker summaries are tracked).
+experiments/2026-08-04_oasis_directcp842_persistent_process_dvf_timing/persistent_worker_summary_smoke_*.json
+
 # Duplicate local notebook export (~1.2M). Commit canonical review notebooks or
 # reports instead of ad hoc copy files.
 experiments/2026-06-25_lungct_directcp4stage_global_ncc_fdbe_all10_alpha_sweep/pareto_visual_review-Copy1.ipynb
