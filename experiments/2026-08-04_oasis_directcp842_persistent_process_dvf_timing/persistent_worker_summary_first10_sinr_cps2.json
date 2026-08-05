@@ -1,0 +1,23 @@
+{
+  "completed_at": "2026-08-05 03:47:24 +0000",
+  "candidate": "sinr_cps2",
+  "phase": "first10",
+  "rank_count": 10,
+  "ranks": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "completed_count": 10,
+  "done_count": 10,
+  "timing_json_count": 10,
+  "dense_dvf_count": 10,
+  "persistent_worker_pid": 3327207
+}

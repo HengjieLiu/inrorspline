@@ -1,0 +1,13 @@
+{
+  "completed_at": "2026-08-04 22:58:24 +0000",
+  "phase": "rank0",
+  "command_row_count": 2,
+  "method_row_count": 2,
+  "stage_row_count": 6,
+  "grouped_row_count": 32,
+  "reconciliation_row_count": 70,
+  "savings_row_count": 42,
+  "previous_conservative_row_count": 14,
+  "missing_payloads": [],
+  "evaluation_event_count": 0
+}
