@@ -45,6 +45,19 @@ experiments/2026-08-03_dual_inr_copd_six_arm/preprocessing_audit/
 # diagnostics are tracked).
 experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_dice_sdlogj/innovative_visualization_trials/
 
+# OASIS100 HD95 exploratory visualization trials (~6.0M; canonical covariance
+# and violin diagnostics are tracked).
+experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/reviewer_response/oasis100_hd95_sdlogj/innovative_visualization_trials/
+
+# DirectCP runtime host/process logs (~465K; curated aggregate reports replace
+# them).
+experiments/2026-08-04_oasis_directcp842_*/**/gpu_state_*.csv
+experiments/2026-08-04_oasis_directcp842_*/**/job_manifest_*
+experiments/2026-08-04_oasis_directcp842_*/**/launch_summary_*.json
+experiments/2026-08-04_oasis_directcp842_*/**/command_timing_*.csv
+experiments/2026-08-04_oasis_directcp842_*/**/launcher_state.json
+experiments/2026-08-04_oasis_directcp842_*/**/persistent_worker_timing_*.csv
+
 # Duplicate local notebook export (~1.2M). Commit canonical review notebooks or
 # reports instead of ad hoc copy files.
 experiments/2026-06-25_lungct_directcp4stage_global_ncc_fdbe_all10_alpha_sweep/pareto_visual_review-Copy1.ipynb
