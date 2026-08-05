@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Build OASIS100 Dice-vs-SDlogJ reviewer-response diagnostics."""
+"""Build OASIS100 accuracy-vs-SDlogJ reviewer-response diagnostics."""
 
 from __future__ import annotations
 
@@ -30,10 +30,15 @@ import plot_first10_first20_alpha5_saved_baselines as oasis_plot  # noqa: E402
 import plot_first10_first20_alpha5_saved_baselines_plus_directcp842_lr1e3 as oasis_plus  # noqa: E402
 
 
-OUTPUT_ROOT = (
+DEFAULT_DICE_OUTPUT_ROOT = (
     c.REPO_ROOT
     / "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/"
     "reviewer_response/oasis100_dice_sdlogj"
+)
+DEFAULT_HD95_OUTPUT_ROOT = (
+    c.REPO_ROOT
+    / "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/"
+    "reviewer_response/oasis100_hd95_sdlogj"
 )
 PARETO_ROOT = c.REPO_ROOT / "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100"
 REVIEW_COMMENT = c.REPO_ROOT / "docs/offgrid_submission/review.md"
@@ -42,6 +47,10 @@ OASIS100_SOURCE_ROWS = PARETO_ROOT / "oasis100_pareto_source_rows.csv"
 ACC_KEY = "dice_mean"
 REG_KEY = "log_jdet_std_fg"
 ACC_LABEL = "Mean Dice"
+ACC_TITLE = "Dice"
+ACC_SHORT = "dice"
+ACC_TILT_TEXT = "A downward left-to-right tilt means cases with higher SDlogJ tend to have lower Dice."
+ACC_RELATION_TEXT = "higher case-level SDlogJ is associated with lower Dice"
 REG_LABEL = "Foreground SDlogJ"
 
 SWEEP_METHODS = [
@@ -59,7 +68,7 @@ BASELINE_METHODS = [
     "bs4_sitreg_v0",
     "greedy",
 ]
-SELECTED_ALPHAS = {
+DICE_SELECTED_ALPHAS = {
     "idir_original_dense_siren_be_autograd": 1.0,
     "sinr_cps4_be_bspline_analytic": 1000.0,
     "direct_cp_cps4_be_bspline_analytic": 1000.0,
@@ -67,11 +76,44 @@ SELECTED_ALPHAS = {
     "direct_cp_cps2_be_bspline_analytic": 1000.0,
     f100.DCP842_METHOD: 1000.0,
 }
+HD95_SELECTED_ALPHAS = {
+    "idir_original_dense_siren_be_autograd": 10.0,
+    "sinr_cps4_be_bspline_analytic": 10000.0,
+    "direct_cp_cps4_be_bspline_analytic": 10000.0,
+    "sinr_cps2_be_bspline_analytic": 10000.0,
+    "direct_cp_cps2_be_bspline_analytic": 10000.0,
+    f100.DCP842_METHOD: 10000.0,
+}
+METRIC_CONFIGS = {
+    "dice_mean": {
+        "label": "Mean Dice",
+        "title": "Dice",
+        "short": "dice",
+        "default_output_root": DEFAULT_DICE_OUTPUT_ROOT,
+        "selected_alphas": DICE_SELECTED_ALPHAS,
+        "tilt_text": "A downward left-to-right tilt means cases with higher SDlogJ tend to have lower Dice.",
+        "relation_text": "higher case-level SDlogJ is associated with lower Dice",
+        "better_text": "higher is better",
+    },
+    "hd95_mean": {
+        "label": "Mean HD95",
+        "title": "HD95",
+        "short": "hd95",
+        "default_output_root": DEFAULT_HD95_OUTPUT_ROOT,
+        "selected_alphas": HD95_SELECTED_ALPHAS,
+        "tilt_text": "An upward left-to-right tilt means cases with higher SDlogJ tend to have higher, worse HD95.",
+        "relation_text": "higher case-level SDlogJ is associated with higher, worse HD95",
+        "better_text": "lower is better",
+    },
+}
+SELECTED_ALPHAS = dict(DICE_SELECTED_ALPHAS)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output-root", type=Path, default=OUTPUT_ROOT)
+    parser.add_argument("--accuracy-key", choices=sorted(METRIC_CONFIGS), default="dice_mean")
+    parser.add_argument("--accuracy-label", default=None)
+    parser.add_argument("--output-root", type=Path, default=None)
     parser.add_argument("--first10-main-root", type=Path, default=f100.FIRST10_MAIN_ROOT)
     parser.add_argument("--first10-cps2-prelim-root", type=Path, default=f100.FIRST10_CPS2_PRELIM_ROOT)
     parser.add_argument("--first10-cps2-completion-root", type=Path, default=f100.FIRST10_CPS2_COMPLETION_ROOT)
@@ -84,6 +126,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dpi", type=int, default=300)
     parser.add_argument("--preflight-only", action="store_true")
     return parser.parse_args()
+
+
+def configure_metric(args: argparse.Namespace) -> Path:
+    global ACC_KEY, ACC_LABEL, ACC_TITLE, ACC_SHORT, ACC_TILT_TEXT, ACC_RELATION_TEXT, SELECTED_ALPHAS
+
+    config = METRIC_CONFIGS[str(args.accuracy_key)]
+    ACC_KEY = str(args.accuracy_key)
+    ACC_LABEL = str(args.accuracy_label or config["label"])
+    ACC_TITLE = str(config["title"])
+    ACC_SHORT = str(config["short"])
+    ACC_TILT_TEXT = str(config["tilt_text"])
+    ACC_RELATION_TEXT = str(config["relation_text"])
+    SELECTED_ALPHAS = dict(config["selected_alphas"])  # type: ignore[arg-type]
+    return Path(args.output_root) if args.output_root is not None else Path(config["default_output_root"])
 
 
 def as_float(value: object) -> float:
@@ -127,6 +183,18 @@ def repo_path(path: Path) -> str:
         return str(path.resolve().relative_to(c.REPO_ROOT.resolve()))
     except ValueError:
         return str(path)
+
+
+def artifact_prefix() -> str:
+    return f"oasis100_{ACC_SHORT}_sdlogj"
+
+
+def covariance_plot_name() -> str:
+    return f"covariance_rotated_ellipses__{ACC_KEY}_vs_{REG_KEY}.png"
+
+
+def covariance_column_name() -> str:
+    return f"sdlogj_{ACC_SHORT}_covariance"
 
 
 def group_label(method: str, alpha: str) -> str:
@@ -213,7 +281,7 @@ def case_pair_rows(sweep_rows: Sequence[Mapping[str, object]], baseline_rows: Se
             "original_case_index": int(as_float(row.get("original_case_index"))),
             "fixed_id": str(row.get("fixed_id")),
             "moving_id": str(row.get("moving_id")),
-            "dice_mean": as_float(row.get(ACC_KEY)),
+            ACC_KEY: as_float(row.get(ACC_KEY)),
             "log_jdet_std_fg": as_float(row.get(REG_KEY)),
             "source_run_name": str(row.get("run_name")),
         }
@@ -289,10 +357,10 @@ def covariance_summary(case_pairs: Sequence[Mapping[str, object]]) -> List[Dict[
                 "group_label": group_label(method, alpha),
                 "n": n,
                 "sdlogj_mean": float(np.mean(xs)) if n else float("nan"),
-                "dice_mean": float(np.mean(ys)) if n else float("nan"),
+                ACC_KEY: float(np.mean(ys)) if n else float("nan"),
                 "sdlogj_std": x_std,
-                "dice_std": y_std,
-                "sdlogj_dice_covariance": cov,
+                f"{ACC_SHORT}_std": y_std,
+                covariance_column_name(): cov,
                 "pearson_r": pearson(xs, ys),
                 "spearman_rho": spearman(xs, ys),
                 "cov_ellipse_eigenvalue_1": eig1,
@@ -310,11 +378,11 @@ def plot_covariance_ellipses(summary_rows: Sequence[Mapping[str, object]], outpu
         rows.sort(key=lambda row: as_float(row["alpha"]))
         color = str(oasis_plot.METHOD_SPECS[method]["color"])
         xs = [as_float(row["sdlogj_mean"]) for row in rows]
-        ys = [as_float(row["dice_mean"]) for row in rows]
+        ys = [as_float(row[ACC_KEY]) for row in rows]
         ax.plot(xs, ys, color=color, linewidth=1.35, alpha=0.75, zorder=2)
         for row in rows:
             x = as_float(row["sdlogj_mean"])
-            y = as_float(row["dice_mean"])
+            y = as_float(row[ACC_KEY])
             eig1 = as_float(row["cov_ellipse_eigenvalue_1"])
             eig2 = as_float(row["cov_ellipse_eigenvalue_2"])
             angle = as_float(row["cov_ellipse_angle_degrees"])
@@ -341,7 +409,7 @@ def plot_covariance_ellipses(summary_rows: Sequence[Mapping[str, object]], outpu
         color = str(oasis_plot.METHOD_SPECS[method]["color"])
         ax.scatter(
             [as_float(row["sdlogj_mean"])],
-            [as_float(row["dice_mean"])],
+            [as_float(row[ACC_KEY])],
             s=58,
             marker="D",
             color=color,
@@ -352,7 +420,7 @@ def plot_covariance_ellipses(summary_rows: Sequence[Mapping[str, object]], outpu
         )
     ax.set_xlabel(REG_LABEL)
     ax.set_ylabel(ACC_LABEL)
-    ax.set_title("OASIS100 Dice vs SDlogJ with rotated 1-SD covariance ellipses")
+    ax.set_title(f"OASIS100 {ACC_TITLE} vs SDlogJ with rotated 1-SD covariance ellipses")
     ax.grid(True, alpha=0.25)
     ax.legend(fontsize=8, ncol=2, frameon=True)
     fig.tight_layout()
@@ -379,7 +447,7 @@ def plot_correlation_heatmap(summary_rows: Sequence[Mapping[str, object]], outpu
     ax.set_yticks(range(len(SWEEP_METHODS)))
     ax.set_yticklabels([display_label(method) for method in SWEEP_METHODS])
     ax.set_xlabel("alpha")
-    ax.set_title("Pearson r between case-level SDlogJ and Dice")
+    ax.set_title(f"Pearson r between case-level SDlogJ and {ACC_TITLE}")
     for i in range(matrix.shape[0]):
         for j in range(matrix.shape[1]):
             value = matrix[i, j]
@@ -405,16 +473,16 @@ def group_values(case_pairs: Sequence[Mapping[str, object]], selected_only: bool
                 continue
         groups[(method, alpha)].append(row)
     labels: List[str] = []
-    dice: List[np.ndarray] = []
+    accuracy: List[np.ndarray] = []
     sdlogj: List[np.ndarray] = []
     colors: List[str] = []
     for key, rows in sorted(groups.items(), key=lambda item: group_sort_key(item[0])):
         method, alpha = key
         labels.append(group_label(method, alpha))
-        dice.append(np.asarray([as_float(row[ACC_KEY]) for row in rows], dtype=np.float64))
+        accuracy.append(np.asarray([as_float(row[ACC_KEY]) for row in rows], dtype=np.float64))
         sdlogj.append(np.asarray([as_float(row[REG_KEY]) for row in rows], dtype=np.float64))
         colors.append(str(oasis_plot.METHOD_SPECS[method]["color"]))
-    return labels, dice, sdlogj, colors
+    return labels, accuracy, sdlogj, colors
 
 
 def draw_violin_panel(ax: plt.Axes, values: Sequence[np.ndarray], labels: Sequence[str], colors: Sequence[str], ylabel: str) -> None:
@@ -440,10 +508,10 @@ def plot_violin_marginals(
     selected_only: bool,
     dpi: int,
 ) -> Path:
-    labels, dice, sdlogj, colors = group_values(case_pairs, selected_only)
+    labels, accuracy, sdlogj, colors = group_values(case_pairs, selected_only)
     width = 11.2 if selected_only else 18.0
     fig, axes = plt.subplots(2, 1, figsize=(width, 8.4), sharex=True)
-    draw_violin_panel(axes[0], dice, labels, colors, ACC_LABEL)
+    draw_violin_panel(axes[0], accuracy, labels, colors, ACC_LABEL)
     draw_violin_panel(axes[1], sdlogj, labels, colors, REG_LABEL)
     title = "selected operating points and baselines" if selected_only else "full alpha grid and baselines"
     fig.suptitle(f"OASIS100 marginal distributions: {title}", fontsize=14)
@@ -463,7 +531,7 @@ def output_status(paths: Sequence[Path]) -> Dict[str, object]:
 
 def write_root_readme(output_root: Path, manifest: Mapping[str, object]) -> None:
     lines = [
-        "# OASIS100 Dice-SDlogJ Reviewer Diagnostics",
+        f"# OASIS100 {ACC_TITLE}-SDlogJ Reviewer Diagnostics",
         "",
         "This package is a reviewer-response diagnostic beside the current Figure 2 artifact; it does not replace the paper figure.",
         "",
@@ -474,6 +542,7 @@ def write_root_readme(output_root: Path, manifest: Mapping[str, object]) -> None
         f"- Current OASIS100 Pareto source rows: `{OASIS100_SOURCE_ROWS.relative_to(c.REPO_ROOT)}`",
         "- Covariance diagnostics: `covariance_diagnostics/README.md`",
         "- Violin marginal diagnostics: `violin_marginals/README.md`",
+        "- Innovative visualization trials: `innovative_visualization_trials/README.md`",
         "",
         "## Scope",
         "",
@@ -485,7 +554,8 @@ def write_root_readme(output_root: Path, manifest: Mapping[str, object]) -> None
         "",
         "## Interpretation",
         "",
-        "- Rotated covariance ellipses and correlation tables address whether case-level SDlogJ and Dice move together.",
+        f"- `{ACC_LABEL}`: {METRIC_CONFIGS[ACC_KEY]['better_text']}.",
+        f"- Rotated covariance ellipses and correlation tables address whether case-level SDlogJ and {ACC_TITLE} move together.",
         "- Violin plots disentangle the marginal spread along each axis, but they do not show covariance.",
         "",
     ]
@@ -494,40 +564,44 @@ def write_root_readme(output_root: Path, manifest: Mapping[str, object]) -> None
 
 
 def write_covariance_readme(out_dir: Path, manifest: Mapping[str, object]) -> None:
+    pearson_range = manifest.get("pearson_range", [])
+    if isinstance(pearson_range, list) and len(pearson_range) == 2:
+        range_text = f"about `{as_float(pearson_range[0]):.2f}` to `{as_float(pearson_range[1]):.2f}`"
+    else:
+        range_text = "the finite range reported in `manifest.json`"
     lines = [
         "# Covariance Diagnostics",
         "",
-        "These outputs use paired case-level OASIS100 Dice and foreground SDlogJ values for each method/alpha group.",
+        f"These outputs use paired case-level OASIS100 {ACC_TITLE} and foreground SDlogJ values for each method/alpha group.",
         "",
         "## Files",
         "",
-        "- `case_pairs.csv`: paired case-level Dice/SDlogJ rows.",
+        f"- `case_pairs.csv`: paired case-level {ACC_TITLE}/SDlogJ rows.",
         "- `covariance_summary.csv`: covariance, Pearson correlation, Spearman correlation, and rotated ellipse parameters by group.",
-        "- `covariance_rotated_ellipses__dice_mean_vs_log_jdet_std_fg.png`: 2D Pareto-style diagnostic using rotated 1-SD covariance ellipses.",
+        f"- `{covariance_plot_name()}`: 2D Pareto-style diagnostic using rotated 1-SD covariance ellipses.",
         "- `correlation_heatmap_by_method_alpha.png`: Pearson correlation by method and alpha.",
         "- `manifest.json`: provenance and file checks.",
         "",
         "## Reading Notes",
         "",
         "- Raw covariance is unit-dependent, so Pearson `r` and Spearman `rho` are the main interpretable summaries.",
-        "- Ellipse angle is derived from the sample covariance matrix of `(SDlogJ, Dice)` across cases.",
+        f"- `{ACC_LABEL}`: {METRIC_CONFIGS[ACC_KEY]['better_text']}.",
+        f"- Ellipse angle is derived from the sample covariance matrix of `(SDlogJ, {ACC_TITLE})` across cases.",
         f"- Missing/empty output files: `{len(manifest['outputs']['missing_or_empty'])}`.",
         "",
         "## How To Read The Figures",
         "",
-        "`covariance_rotated_ellipses__dice_mean_vs_log_jdet_std_fg.png` is the",
-        "Dice-vs-SDlogJ Pareto view with rotated covariance ellipses. Each point is a",
+        f"`{covariance_plot_name()}` is the",
+        f"{ACC_TITLE}-vs-SDlogJ Pareto view with rotated covariance ellipses. Each point is a",
         "method/alpha setting averaged over OASIS `N=100`. The ellipse shows paired",
         "case-level spread: horizontal spread is SDlogJ variation, vertical spread is",
-        "Dice variation, and ellipse tilt shows whether the two metrics covary across",
-        "cases. A downward left-to-right tilt means cases with higher SDlogJ tend to",
-        "have lower Dice.",
+        f"{ACC_TITLE} variation, and ellipse tilt shows whether the two metrics covary across",
+        f"cases. {ACC_TILT_TEXT}",
         "",
         "`correlation_heatmap_by_method_alpha.png` is the compact numerical summary of",
         "the same question. Each cell is the Pearson correlation between case-level",
-        "SDlogJ and Dice for one method/alpha group, ranging from `-1` to `1`. In this",
-        "diagnostic package, the correlations are consistently negative, about `-0.82`",
-        "to `-0.46`, so higher case-level SDlogJ is associated with lower Dice within",
+        f"SDlogJ and {ACC_TITLE} for one method/alpha group, ranging from `-1` to `1`. In this",
+        f"diagnostic package, finite correlations range from {range_text}, so {ACC_RELATION_TEXT} within",
         "each plotted method/regularization setting. Blank cells indicate alpha values",
         "not used by that method family.",
         "",
@@ -539,12 +613,12 @@ def write_violin_readme(out_dir: Path, manifest: Mapping[str, object]) -> None:
     lines = [
         "# Violin Marginal Diagnostics",
         "",
-        "These outputs split the original 2D Dice-SDlogJ relationship into separate 1D marginal distributions.",
+        f"These outputs split the original 2D {ACC_TITLE}-SDlogJ relationship into separate 1D marginal distributions.",
         "",
         "## Files",
         "",
         "- `violin_source_rows.csv`: paired case-level rows used for both violin plots.",
-        "- `violin_marginals_full_alpha_grid.png`: Dice and SDlogJ violins for the full alpha grid plus baselines.",
+        f"- `violin_marginals_full_alpha_grid.png`: {ACC_TITLE} and SDlogJ violins for the full alpha grid plus baselines.",
         "- `violin_marginals_selected_points.png`: compact view for best/reference sweep points plus baselines.",
         "- `manifest.json`: provenance and file checks.",
         "",
@@ -571,6 +645,7 @@ def run_preflight(args: argparse.Namespace) -> Tuple[List[Dict[str, object]], Li
 
 def main() -> None:
     args = parse_args()
+    output_root = configure_metric(args)
     sweep_rows, baseline_rows, errors = run_preflight(args)
     population_rows = oasis_plot.population_summary(list(sweep_rows) + list(baseline_rows))
     preflight = {
@@ -587,7 +662,6 @@ def main() -> None:
     if errors:
         raise RuntimeError("OASIS100 reviewer diagnostic preflight failed:\n" + "\n".join(errors[:80]))
 
-    output_root = Path(args.output_root)
     covariance_dir = output_root / "covariance_diagnostics"
     violin_dir = output_root / "violin_marginals"
     case_pairs = case_pair_rows(sweep_rows, baseline_rows)
@@ -596,7 +670,7 @@ def main() -> None:
     cov_paths = [
         covariance_dir / "case_pairs.csv",
         covariance_dir / "covariance_summary.csv",
-        covariance_dir / "covariance_rotated_ellipses__dice_mean_vs_log_jdet_std_fg.png",
+        covariance_dir / covariance_plot_name(),
         covariance_dir / "correlation_heatmap_by_method_alpha.png",
         covariance_dir / "README.md",
         covariance_dir / "manifest.json",
@@ -611,7 +685,7 @@ def main() -> None:
 
     c.write_csv(covariance_dir / "case_pairs.csv", case_pairs)
     c.write_csv(covariance_dir / "covariance_summary.csv", cov_rows)
-    plot_covariance_ellipses(cov_rows, covariance_dir / "covariance_rotated_ellipses__dice_mean_vs_log_jdet_std_fg.png", args.dpi)
+    plot_covariance_ellipses(cov_rows, covariance_dir / covariance_plot_name(), args.dpi)
     plot_correlation_heatmap(cov_rows, covariance_dir / "correlation_heatmap_by_method_alpha.png", args.dpi)
 
     c.write_csv(violin_dir / "violin_source_rows.csv", case_pairs)
@@ -631,12 +705,15 @@ def main() -> None:
         "population_groups": len(population_rows),
         "finite_correlation_groups": len(finite_correlation_rows),
     }
+    pearson_values = [as_float(row["pearson_r"]) for row in cov_rows if math.isfinite(as_float(row["pearson_r"]))]
 
     cov_manifest = {
         "generated": c.now_text(),
-        "artifact": "oasis100_dice_sdlogj_covariance_diagnostics",
+        "artifact": f"{artifact_prefix()}_covariance_diagnostics",
         "metrics": {"x": REG_KEY, "y": ACC_KEY},
+        "accuracy_label": ACC_LABEL,
         "row_counts": row_counts,
+        "pearson_range": [min(pearson_values), max(pearson_values)] if pearson_values else [],
         "interpretation": "Pearson and Spearman correlations are emphasized because raw covariance is unit-dependent.",
         "outputs": output_status(cov_paths),
     }
@@ -644,11 +721,13 @@ def main() -> None:
     write_covariance_readme(covariance_dir, cov_manifest)
     cov_manifest["outputs"] = output_status(cov_paths)
     write_manifest(covariance_dir / "manifest.json", cov_manifest)
+    write_covariance_readme(covariance_dir, cov_manifest)
 
     violin_manifest = {
         "generated": c.now_text(),
-        "artifact": "oasis100_dice_sdlogj_violin_marginals",
-        "metrics": {"dice": ACC_KEY, "sdlogj": REG_KEY},
+        "artifact": f"{artifact_prefix()}_violin_marginals",
+        "metrics": {"accuracy": ACC_KEY, "sdlogj": REG_KEY},
+        "accuracy_label": ACC_LABEL,
         "selected_alphas": SELECTED_ALPHAS,
         "row_counts": row_counts,
         "interpretation": "Violin plots clarify marginal spread but do not show covariance.",
@@ -658,10 +737,13 @@ def main() -> None:
     write_violin_readme(violin_dir, violin_manifest)
     violin_manifest["outputs"] = output_status(violin_paths)
     write_manifest(violin_dir / "manifest.json", violin_manifest)
+    write_violin_readme(violin_dir, violin_manifest)
 
     root_manifest = {
         "generated": c.now_text(),
-        "artifact": "oasis100_dice_sdlogj_reviewer_diagnostics",
+        "artifact": f"{artifact_prefix()}_reviewer_diagnostics",
+        "metrics": {"accuracy": ACC_KEY, "sdlogj": REG_KEY},
+        "accuracy_label": ACC_LABEL,
         "output_root": repo_path(output_root),
         "source_links": {
             "review_comment": f"{REVIEW_COMMENT.relative_to(c.REPO_ROOT)}:76",

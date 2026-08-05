@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Try alternative OASIS100 Dice-vs-SDlogJ reviewer-response visualizations."""
+"""Try alternative OASIS100 accuracy-vs-SDlogJ reviewer-response visualizations."""
 
 from __future__ import annotations
 
@@ -30,18 +30,23 @@ import plot_first10_first20_alpha5_saved_baselines as oasis_plot  # noqa: E402
 import plot_first10_first20_alpha5_saved_baselines_plus_directcp842_lr1e3 as oasis_plus  # noqa: E402
 
 
-DIAGNOSTIC_ROOT = (
+DEFAULT_DICE_DIAGNOSTIC_ROOT = (
     c.REPO_ROOT
     / "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/"
     "reviewer_response/oasis100_dice_sdlogj"
 )
-DEFAULT_OUTPUT_ROOT = DIAGNOSTIC_ROOT / "innovative_visualization_trials"
-DEFAULT_CASE_PAIRS = DIAGNOSTIC_ROOT / "covariance_diagnostics/case_pairs.csv"
-DEFAULT_COVARIANCE_SUMMARY = DIAGNOSTIC_ROOT / "covariance_diagnostics/covariance_summary.csv"
+DEFAULT_HD95_DIAGNOSTIC_ROOT = (
+    c.REPO_ROOT
+    / "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/"
+    "reviewer_response/oasis100_hd95_sdlogj"
+)
 
 ACC_KEY = "dice_mean"
 REG_KEY = "log_jdet_std_fg"
 ACC_LABEL = "Mean Dice"
+ACC_TITLE = "Dice"
+ACC_SHORT = "dice"
+ACC_RELATION_TEXT = "high deformation irregularity and lower Dice"
 REG_LABEL = "Foreground SDlogJ"
 
 SWEEP_METHODS = [
@@ -59,7 +64,7 @@ BASELINE_METHODS = [
     "bs4_sitreg_v0",
     "greedy",
 ]
-SELECTED_ALPHAS = {
+DICE_SELECTED_ALPHAS = {
     "idir_original_dense_siren_be_autograd": 1.0,
     "sinr_cps4_be_bspline_analytic": 1000.0,
     "direct_cp_cps4_be_bspline_analytic": 1000.0,
@@ -67,16 +72,69 @@ SELECTED_ALPHAS = {
     "direct_cp_cps2_be_bspline_analytic": 1000.0,
     f100.DCP842_METHOD: 1000.0,
 }
+HD95_SELECTED_ALPHAS = {
+    "idir_original_dense_siren_be_autograd": 10.0,
+    "sinr_cps4_be_bspline_analytic": 10000.0,
+    "direct_cp_cps4_be_bspline_analytic": 10000.0,
+    "sinr_cps2_be_bspline_analytic": 10000.0,
+    "direct_cp_cps2_be_bspline_analytic": 10000.0,
+    f100.DCP842_METHOD: 10000.0,
+}
+METRIC_CONFIGS = {
+    "dice_mean": {
+        "label": "Mean Dice",
+        "title": "Dice",
+        "short": "dice",
+        "diagnostic_root": DEFAULT_DICE_DIAGNOSTIC_ROOT,
+        "selected_alphas": DICE_SELECTED_ALPHAS,
+        "relation_text": "high deformation irregularity and lower Dice",
+        "better_text": "higher is better",
+    },
+    "hd95_mean": {
+        "label": "Mean HD95",
+        "title": "HD95",
+        "short": "hd95",
+        "diagnostic_root": DEFAULT_HD95_DIAGNOSTIC_ROOT,
+        "selected_alphas": HD95_SELECTED_ALPHAS,
+        "relation_text": "high deformation irregularity and higher, worse HD95",
+        "better_text": "lower is better",
+    },
+}
+SELECTED_ALPHAS = dict(DICE_SELECTED_ALPHAS)
 ALL_ALPHA_LABELS = ["0", "0.01", "0.1", "1", "10", "100", "1000", "10000", "100000"]
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--case-pairs", type=Path, default=DEFAULT_CASE_PAIRS)
-    parser.add_argument("--covariance-summary", type=Path, default=DEFAULT_COVARIANCE_SUMMARY)
-    parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    parser.add_argument("--accuracy-key", choices=sorted(METRIC_CONFIGS), default="dice_mean")
+    parser.add_argument("--accuracy-label", default=None)
+    parser.add_argument("--diagnostic-root", type=Path, default=None)
+    parser.add_argument("--case-pairs", type=Path, default=None)
+    parser.add_argument("--covariance-summary", type=Path, default=None)
+    parser.add_argument("--output-root", type=Path, default=None)
     parser.add_argument("--dpi", type=int, default=300)
     return parser.parse_args()
+
+
+def configure_metric(args: argparse.Namespace) -> Tuple[Path, Path, Path]:
+    global ACC_KEY, ACC_LABEL, ACC_TITLE, ACC_SHORT, ACC_RELATION_TEXT, SELECTED_ALPHAS
+
+    config = METRIC_CONFIGS[str(args.accuracy_key)]
+    diagnostic_root = Path(args.diagnostic_root) if args.diagnostic_root is not None else Path(config["diagnostic_root"])
+    ACC_KEY = str(args.accuracy_key)
+    ACC_LABEL = str(args.accuracy_label or config["label"])
+    ACC_TITLE = str(config["title"])
+    ACC_SHORT = str(config["short"])
+    ACC_RELATION_TEXT = str(config["relation_text"])
+    SELECTED_ALPHAS = dict(config["selected_alphas"])  # type: ignore[arg-type]
+    case_pairs = Path(args.case_pairs) if args.case_pairs is not None else diagnostic_root / "covariance_diagnostics/case_pairs.csv"
+    covariance_summary = (
+        Path(args.covariance_summary)
+        if args.covariance_summary is not None
+        else diagnostic_root / "covariance_diagnostics/covariance_summary.csv"
+    )
+    output_root = Path(args.output_root) if args.output_root is not None else diagnostic_root / "innovative_visualization_trials"
+    return case_pairs, covariance_summary, output_root
 
 
 def as_float(value: object) -> float:
@@ -273,7 +331,7 @@ def plot_small_multiple_case_clouds(case_pairs: Sequence[Mapping[str, str]], out
         [
             "One panel per selected method/reference point. Each dot is one OASIS case; the larger dot is the group mean.",
             "",
-            "This view is useful when the main question is whether high-SDlogJ cases are also low-Dice cases without putting every method into one crowded axis.",
+            f"This view is useful when the main question is whether high-SDlogJ cases are also unusual-{ACC_TITLE} cases without putting every method into one crowded axis.",
         ],
     )
     return [out_path, out_dir / "README.md"]
@@ -296,12 +354,12 @@ def plot_correlation_slope_panels(summary_rows: Sequence[Mapping[str, str]], out
     axes[1].set_xlabel("alpha")
     for ax in axes:
         ax.axhline(0.0, color="#202020", linewidth=0.8, alpha=0.7)
-        ax.set_ylim(-1.0, 0.1)
+        ax.set_ylim(-1.0, 1.0)
         ax.grid(True, alpha=0.24)
     axes[0].legend(fontsize=8, ncol=2, frameon=True)
     axes[1].set_xticks(range(len(ALL_ALPHA_LABELS)))
     axes[1].set_xticklabels(ALL_ALPHA_LABELS, rotation=35, ha="right")
-    fig.suptitle("Correlation between case-level SDlogJ and Dice across alpha", fontsize=14)
+    fig.suptitle(f"Correlation between case-level SDlogJ and {ACC_TITLE} across alpha", fontsize=14)
     fig.tight_layout(rect=(0, 0, 1, 0.955))
     out_path = out_dir / "correlation_vs_alpha_lines.png"
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -313,7 +371,7 @@ def plot_correlation_slope_panels(summary_rows: Sequence[Mapping[str, str]], out
         [
             "Pearson and Spearman correlations are plotted as method-wise trends over alpha.",
             "",
-            "This is the cleanest view for asking whether the SDlogJ-Dice covariance changes with regularization strength.",
+            f"This is the cleanest view for asking whether the SDlogJ-{ACC_TITLE} covariance changes with regularization strength.",
         ],
     )
     return [out_path, out_dir / "README.md"]
@@ -355,7 +413,7 @@ def plot_ridge_marginals(case_pairs: Sequence[Mapping[str, str]], out_dir: Path,
         out_dir / "README.md",
         "Ridge Marginals",
         [
-            "Horizontal ridgelines show the one-dimensional Dice and SDlogJ distributions.",
+            f"Horizontal ridgelines show the one-dimensional {ACC_TITLE} and SDlogJ distributions.",
             "",
             "Compared with full-grid violins, this keeps group labels readable on the y-axis and makes many groups easier to scan.",
         ],
@@ -444,9 +502,9 @@ def plot_paired_rank_dumbbell(case_pairs: Sequence[Mapping[str, str]], out_dir: 
         out_dir / "README.md",
         "Paired-Rank Dumbbell/Trace Plot",
         [
-            "Cases are sorted by mean SDlogJ across selected method points, then SDlogJ and Dice traces are shown for each method.",
+            f"Cases are sorted by mean SDlogJ across selected method points, then SDlogJ and {ACC_TITLE} traces are shown for each method.",
             "",
-            "This view is useful for seeing whether the same difficult cases drive high deformation irregularity and lower Dice.",
+            f"This view is useful for seeing whether the same difficult cases drive {ACC_RELATION_TEXT}.",
         ],
     )
     return [out_path, out_dir / "README.md"]
@@ -463,7 +521,7 @@ def plot_hexbin_density(case_pairs: Sequence[Mapping[str, str]], summary_rows: S
         mean_rows.sort(key=lambda row: as_float(row["alpha"]))
         ax.plot(
             [as_float(row["sdlogj_mean"]) for row in mean_rows],
-            [as_float(row["dice_mean"]) for row in mean_rows],
+            [as_float(row[ACC_KEY]) for row in mean_rows],
             color="white",
             linewidth=2.2,
             alpha=0.95,
@@ -471,7 +529,7 @@ def plot_hexbin_density(case_pairs: Sequence[Mapping[str, str]], summary_rows: S
         )
         ax.scatter(
             [as_float(row["sdlogj_mean"]) for row in mean_rows],
-            [as_float(row["dice_mean"]) for row in mean_rows],
+            [as_float(row[ACC_KEY]) for row in mean_rows],
             color=color_for(method),
             edgecolor="white",
             linewidth=0.6,
@@ -497,7 +555,7 @@ def plot_hexbin_density(case_pairs: Sequence[Mapping[str, str]], summary_rows: S
         [
             "Each panel pools all case-level method/alpha observations for one method, then overlays the mean Pareto curve.",
             "",
-            "This reduces overplotting and shows where case/alpha observations concentrate in the Dice-SDlogJ plane.",
+            f"This reduces overplotting and shows where case/alpha observations concentrate in the {ACC_TITLE}-SDlogJ plane.",
         ],
     )
     return [out_path, out_dir / "README.md"]
@@ -558,7 +616,7 @@ def plot_joint_corner(case_pairs: Sequence[Mapping[str, str]], out_dir: Path, dp
         out_dir / "README.md",
         "Joint Corner Plots",
         [
-            "Each selected method panel combines a case-level SDlogJ-vs-Dice scatter plot with marginal histograms.",
+            f"Each selected method panel combines a case-level SDlogJ-vs-{ACC_TITLE} scatter plot with marginal histograms.",
             "",
             "This is bulkier than the main Pareto plot, but it is very readable for a small set of key method comparisons.",
         ],
@@ -569,11 +627,13 @@ def plot_joint_corner(case_pairs: Sequence[Mapping[str, str]], out_dir: Path, dp
 def write_root_readme(output_root: Path, manifest: Mapping[str, object]) -> None:
     write_readme(
         output_root / "README.md",
-        "OASIS100 Dice-SDlogJ Innovative Visualization Trials",
+        f"OASIS100 {ACC_TITLE}-SDlogJ Innovative Visualization Trials",
         [
             "This exploratory package tries several alternatives to the dense ellipse Figure 2 style.",
             "",
-            "All plots are derived from the existing paired OASIS100 case-level Dice/SDlogJ rows; no registrations or raw data are rerun.",
+            f"All plots are derived from the existing paired OASIS100 case-level {ACC_TITLE}/SDlogJ rows; no registrations or raw data are rerun.",
+            "",
+            f"`{ACC_LABEL}`: {METRIC_CONFIGS[ACC_KEY]['better_text']}.",
             "",
             "## Subfolders",
             "",
@@ -596,10 +656,10 @@ def write_root_readme(output_root: Path, manifest: Mapping[str, object]) -> None
 
 def main() -> None:
     args = parse_args()
+    case_pairs_path, covariance_summary_path, output_root = configure_metric(args)
     oasis_plus.configure_plot_module(float(f100.DCP842_LR))
-    case_pairs = read_csv_rows(args.case_pairs)
-    summary_rows = read_csv_rows(args.covariance_summary)
-    output_root = Path(args.output_root)
+    case_pairs = read_csv_rows(case_pairs_path)
+    summary_rows = read_csv_rows(covariance_summary_path)
 
     outputs: List[Path] = []
     outputs.extend(plot_small_multiple_case_clouds(case_pairs, output_root / "small_multiple_case_clouds", args.dpi))
@@ -612,9 +672,12 @@ def main() -> None:
 
     manifest = {
         "generated": c.now_text(),
-        "artifact": "oasis100_dice_sdlogj_innovative_visualization_trials",
-        "source_case_pairs": repo_path(Path(args.case_pairs)),
-        "source_covariance_summary": repo_path(Path(args.covariance_summary)),
+        "artifact": f"oasis100_{ACC_SHORT}_sdlogj_innovative_visualization_trials",
+        "metrics": {"accuracy": ACC_KEY, "sdlogj": REG_KEY},
+        "accuracy_label": ACC_LABEL,
+        "selected_alphas": SELECTED_ALPHAS,
+        "source_case_pairs": repo_path(case_pairs_path),
+        "source_covariance_summary": repo_path(covariance_summary_path),
         "output_root": repo_path(output_root),
         "row_counts": {
             "case_pairs": len(case_pairs),
