@@ -28,4 +28,7 @@ and container paths out of the notebooks and their saved outputs.
   landmark verification.
 - `lungct_copd_case02_ptvprep_visual_audit.ipynb`: COPD case02 pTV-style crop
   and 1 mm preprocessing audit, using the same radiology orientation convention
-  as the 4DCT notebook plus pTVReg outlier-landmark overlays.
+  as the 4DCT notebook plus pTVReg outlier-landmark overlays. Re-execution
+  requires `INRORSPLINE_REPO_ROOT`, `COPD02_PTVPREP_CASE_DIR`, and
+  `COPD02_PTVREG_MAT` to point at the repo, COPD02 pTVPrep case folder, and
+  selected pTVReg rerun deformation `.mat`.
