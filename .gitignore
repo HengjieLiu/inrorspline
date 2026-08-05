@@ -62,6 +62,8 @@ experiments/2026-08-04_oasis_directcp842_*/**/persistent_worker_timing_*.csv
 # acceptance, timing, and reviewer reports are tracked instead).
 experiments/2026-08-04_oasis_directcp842_runtime_sweep/dry_run/
 experiments/2026-08-04_oasis_directcp842_runtime_sweep/**/case_metrics_combined.csv
+experiments/2026-08-04_oasis_directcp842_runtime_sweep/**/job_manifest*
+experiments/2026-08-04_oasis_directcp842_runtime_sweep/**/launch_summary*.json
 experiments/2026-08-04_oasis_directcp842_runtime_sweep/**/prolongation_metrics_combined.csv
 experiments/2026-08-04_oasis_directcp842_runtime_sweep/**/regularity_metrics_combined.csv
 experiments/2026-08-04_oasis_directcp842_runtime_sweep/**/stage_summaries_combined.csv
