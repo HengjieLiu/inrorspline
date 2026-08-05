@@ -1935,3 +1935,337 @@ Next decision:
 - Known limitation: the P artifact is pTV-style but its legacy crop bounds do
   not exactly equal official pTVReg MATLAB bounds. Consequently P/MR are
   matched to each other, while pTVReg remains a contextual, tagged reference.
+
+### P17: OASIS DirectCP 8-4-2 Runtime Optimization Sweep
+
+- Status: completed 2026-08-04; smoke and first10 aggregation passed with
+  `140/140` first10 summaries and `errors=[]`.
+- Purpose: improve practical runtime for OASIS DirectCP `8-4-2` while retaining
+  most of the current best alpha-1000 accuracy, so the reviewer-facing runtime
+  argument can report optimization time and total time.
+- Dataset: OASIS BrainMR seed-3 shuffled first10 ranks `0-9`; smoke ranks
+  `0,4,8`.
+- Method: `direct_cp_8_4_2_be_bspline_analytic_multistage`; alpha `1000`;
+  cps schedule `8,4,2`; image downsample schedule `4,2,1`; seed `1`.
+- Candidate matrix: shorter fixed schedules `250,500,800`, `150,300,500`, and
+  `100,200,300`; higher LRs from `3e-3` through selected `1e-1`; and adaptive
+  plateau-stopping candidates with recorded per-stage minimums, patience, and
+  loss-improvement thresholds.
+- Baseline for decision: current DirectCP `8-4-2` first10 alpha-1000 Dice
+  `0.8070`, HD95 `2.2020`, training `194.8 s`, total `229.7 s`.
+- Promotion criteria: smoke candidates must avoid nonfinite failures and stay
+  within `0.05` Dice and `0.5 mm` HD95 of matched DirectCP `8-4-2` baseline.
+  First10 tiers compare with DirectCP cps2, SINR cps2, and the user-accepted
+  `0.02` Dice / `0.2 mm` HD95 degradation window.
+- Output root:
+  `/database/inrorspline/runs/oasis_directcp842_runtime_sweep_alpha1000_v1`.
+- Review root:
+  `experiments/2026-08-04_oasis_directcp842_runtime_sweep/`.
+- Launch environment: Docker container `py310sitreg_v1_test1`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1`, planned GPUs `0,1,2,3`.
+- Known limitation: first10 runtime/accuracy screening only; any candidate used
+  in paper-facing claims should be explicitly tagged unless extended to the
+  intended final OASIS population.
+
+### P18: OASIS DirectCP 8-4-2 Single-GPU Serial Runtime Control
+
+- Status: completed 2026-08-04; both serial rank-0 jobs completed with `DONE`
+  and no active GPU processes remained afterward.
+- Purpose: check whether the P17 runtime reduction is underestimated or
+  distorted by running four jobs concurrently. Run the original MR-D-BSCP /
+  DirectCP `8-4-2` reference and the `A_fast_decay` candidate serially on one
+  GPU, leaving the other visible GPUs idle.
+- Dataset: OASIS BrainMR seed-3 shuffled rank `0` only, fixed `0333`, moving
+  `0115`, original sorted index `158`.
+- Methods:
+  - Original MR-D-BSCP / DirectCP `8-4-2`: alpha `1000`, lr `1e-3`, cps
+    `8,4,2`, downsample `4,2,1`, stage epochs `400,800,1300`.
+  - `A_fast_decay`: alpha `1000`, base lr `1e-2`, stage lr
+    `3e-2,1e-2,3e-3`, cps `8,4,2`, downsample `4,2,1`, max stage epochs
+    `400,800,1300`, adaptive minimums `75,150,250`, patience `50,75,100`.
+- Execution: Docker container `py310sitreg_v1_test1`, GPU `0` only, one job at
+  a time. Confirm no compute processes before launch.
+- Output root:
+  `/database/inrorspline/runs/oasis_directcp842_single_gpu_control_alpha1000_v1`.
+- Review root:
+  `experiments/2026-08-04_oasis_directcp842_single_gpu_control/`.
+- Primary metrics: training elapsed seconds, total elapsed seconds, wall-clock
+  command seconds, actual epochs, Dice, and HD95.
+- Actual result on rank `0`: original MR-D-BSCP / DirectCP `8-4-2` ran
+  `2500` epochs with train/total/wall `186.69/216.20/226.14 s`; `A_fast_decay`
+  ran `600` epochs with train/total/wall `151.08/181.89/191.18 s`. Speedups:
+  `1.24x` train, `1.19x` total script, `1.18x` command wall. Dice/HD95 changed
+  from `0.76074/2.65234` to `0.75901/2.66425`.
+- Interpretation: the modest runtime reduction is not mainly a four-GPU
+  concurrency artifact; fixed per-stage and post-training costs prevent epoch
+  reduction from translating linearly into wall time.
+- Known limitation: single case timing control only; if results differ
+  materially from P17, extend to first10 serial or one-GPU queued runs before
+  making paper-facing runtime claims.
+
+### P19: OASIS DirectCP 8-4-2 Detailed Timing Breakdown
+
+- Status: completed 2026-08-04; smoke, rank-0, and first10 serial timing all
+  passed with `20/20` first10 jobs complete and timing JSONs present.
+- Purpose: decompose DirectCP `8-4-2` wall time into reconciled setup,
+  per-stage fixed overhead, optimizer-loop step-proportional work,
+  post-training evaluation, and output-writing categories. This follows P18,
+  where large epoch reduction produced only modest wall-clock reduction.
+- Dataset: OASIS BrainMR seed-3 shuffled protocol. Validate on rank `0` first
+  (fixed `0333`, moving `0115`, original sorted index `158`), then run ranks
+  `0-9` serially if rank-0 timing reconciliation passes.
+- Methods:
+  - Original MR-D-BSCP / DirectCP `8-4-2`: alpha `1000`, lr `1e-3`, cps
+    `8,4,2`, downsample `4,2,1`, stage epochs `400,800,1300`, no early stop.
+  - `A_fast_decay`: alpha `1000`, base lr `1e-2`, stage lr
+    `3e-2,1e-2,3e-3`, cps `8,4,2`, downsample `4,2,1`, max stage epochs
+    `400,800,1300`, adaptive minimums `75,150,250`, patience `50,75,100`.
+- Timing mode: `run_one.py --timing-detail deep` for the multistage DirectCP
+  path only. Existing non-timing experiments keep the default `off` behavior.
+- Execution order: tiny `1,1,1` epoch smoke, serial rank-0 pair on GPU `0`,
+  analyzer reconciliation, then first10 serial pair on GPU `0` if accounting
+  passes. GPUs `1-3` are intentionally unused by the launcher.
+- Output root:
+  `/database/inrorspline/runs/oasis_directcp842_timing_breakdown_alpha1000_v1`.
+- Review root:
+  `experiments/2026-08-04_oasis_directcp842_timing_breakdown/`.
+- Expected artifacts: per-run `timing.json`, phase-specific
+  `command_timing_<phase>.csv`, `timing_reconciliation.csv`,
+  `timing_stage_breakdown.csv`, `timing_method_comparison.csv`,
+  `timing_stage_linear_fits.csv`, and `timing_report.md`.
+- Acceptance checks: `py_compile` modified/new scripts passed; smoke,
+  rank-0, and first10 all wrote `DONE`, `summary.json`, and `timing.json`.
+  First10 analyzer reported residual failures `0`, parent intervals with large
+  self-unaccounted time `0`, external uninstrumented wall mean `4.29 s`, and
+  no non-target GPU compute-app observations.
+- First10 result: original MR-D-BSCP / DirectCP `8-4-2` averaged wall/script/
+  training/optimizer-loop `247.76/243.47/206.12/110.59 s` with Dice/HD95
+  `0.80697/2.2020` over `2500` epochs. `A_fast_decay` averaged
+  `206.62/202.32/161.79/63.69 s` with Dice/HD95 `0.80581/2.2147` over
+  `577.5` epochs.
+- First10 interpretation: `A_fast_decay` saved `41.14 s` wall per case
+  (`1.207x` speedup) and `46.89 s` optimizer-loop time while losing only
+  `0.00116` Dice and increasing HD95 by `0.0127 mm`. The modest wall speedup
+  despite a `1922.5` epoch reduction is explained by fixed/io known cost of
+  about `132.10 s` for original and `137.80 s` for `A_fast_decay`.
+- Known limitation: detailed timing instrumentation, especially deep CUDA
+  event collection, may add small overhead. Comparisons are therefore made
+  between methods under the same timing mode.
+
+### P20: OASIS DirectCP 8-4-2 DVF-Only Runtime Timing
+
+- Status: completed 2026-08-04; smoke and full rank-0 serial timing passed.
+- Purpose: measure the practical runtime needed to go from OASIS input images to
+  a dense DirectCP `8-4-2` DVF, without post-training evaluation or full
+  metric/output packaging. This follows P19, where fixed evaluation/output costs
+  complicated interpretation of epoch-count savings.
+- Dataset: OASIS BrainMR seed-3 shuffled rank `0` only, fixed `0333`, moving
+  `0115`, original sorted index `158`.
+- Methods:
+  - Original MR-D-BSCP / DirectCP `8-4-2`: alpha `1000`, lr `1e-3`, cps
+    `8,4,2`, downsample `4,2,1`, stage epochs `400,800,1300`, no early stop.
+  - `A_fast_decay`: alpha `1000`, base lr `1e-2`, stage lr
+    `3e-2,1e-2,3e-3`, cps `8,4,2`, downsample `4,2,1`, max stage epochs
+    `400,800,1300`, adaptive minimums `75,150,250`, patience `50,75,100`.
+- Timing mode: `run_one.py --output-mode dvf_only --timing-detail deep` for the
+  multistage DirectCP path only. DVF endpoints are marked at final dense
+  expansion in memory and after dense `.npy` write on disk.
+- Execution order: tiny `1,1,1` epoch smoke for both methods, analyzer check
+  that evaluation/output events are absent from the DVF endpoint, then full
+  serial rank-0 original and `A_fast_decay` on GPU `0`.
+- Output root:
+  `/database/inrorspline/runs/oasis_directcp842_dvf_only_timing_alpha1000_v1`.
+- Review root:
+  `experiments/2026-08-04_oasis_directcp842_dvf_only_timing/`.
+- Expected artifacts: `dvf_only_timing_report.md`,
+  `dvf_only_method_comparison.csv`, `dvf_only_stage_breakdown.csv`,
+  `dvf_only_grouped_breakdown.csv`, `dvf_only_reconciliation.csv`, and
+  `command_timing_dvf_only_rank0.csv`.
+- Acceptance checks: `py_compile` passed for `run_one.py`,
+  `run_directcp842_dvf_only_timing.py`, and
+  `analyze_directcp842_dvf_only_timing.py` after redirecting pycache to `/tmp`.
+  Smoke and full rank-0 runs wrote `DONE`, `summary.json`, `timing.json`, and
+  dense DVF `.npy` for both methods. Rank-0 analyzer reported reconciliation
+  residual failures `0`, parent intervals with large self-unaccounted time `0`,
+  evaluation/full-output events `0`, and no non-target GPU compute-app
+  observations.
+- Rank-0 result: original MR-D-BSCP / DirectCP `8-4-2` ran `2500` epochs and
+  reached DVF-in-memory/DVF-file/external-wall in `234.18/234.26/238.22 s`.
+  `A_fast_decay` ran `600` epochs and reached DVF-in-memory/DVF-file/external
+  wall in `175.22/175.28/178.99 s`.
+- Rank-0 interpretation: `A_fast_decay` saved `58.96 s` to in-memory DVF and
+  `58.98 s` to DVF file (`59.24 s` command wall). Most of the saving came from
+  optimizer-loop time (`52.20 s`), with additional non-loop training reduction
+  (`8.41 s`). Dense DVF file write itself was only about `0.03-0.04 s`.
+- Known limitation: this is a rank-0 timing characterization only. It is meant
+  to isolate input-image-to-DVF runtime, not to report Dice/HD95/regularity.
+
+### P21: OASIS DirectCP 8-4-2 Production DVF Timing And Transition Benchmark
+
+- Status: completed 2026-08-04 after production smoke, diagnostic smoke,
+  CPU/GPU transition benchmark, full rank-0 production pair, and analyzer
+  reconciliation passed.
+- Purpose: convert the DirectCP `8-4-2` DVF-only path from conservative
+  diagnostic timing to production timing by skipping intermediate dense
+  expansion/preservation checks unless explicitly requested. Separately
+  benchmark CPU/GPU runtime and numerical agreement for dense expansion, pure
+  knot insertion, and preservation checks.
+- Dataset: OASIS BrainMR seed-3 shuffled rank `0` only, fixed `0333`, moving
+  `0115`, original sorted index `158`.
+- Methods:
+  - Original MR-D-BSCP / DirectCP `8-4-2`: alpha `1000`, lr `1e-3`, cps
+    `8,4,2`, downsample `4,2,1`, stage epochs `400,800,1300`, no early stop.
+  - `A_fast_decay`: alpha `1000`, base lr `1e-2`, stage lr
+    `3e-2,1e-2,3e-3`, cps `8,4,2`, downsample `4,2,1`, max stage epochs
+    `400,800,1300`, adaptive minimums `75,150,250`, patience `50,75,100`.
+- Timing mode: `run_one.py --output-mode dvf_only --timing-detail deep` with
+  production defaults `--prolongation-preserve-check` off and
+  `--save-intermediate-dense` off. Diagnostic mode can reproduce conservative
+  checks by passing `--prolongation-preserve-check`.
+- Output root:
+  `/database/inrorspline/runs/oasis_directcp842_production_dvf_timing_alpha1000_v1`.
+- Review root:
+  `experiments/2026-08-04_oasis_directcp842_production_dvf_timing/`.
+- Expected artifacts: production `dvf_only_timing_report.md`,
+  `dvf_only_method_comparison.csv`, `dvf_only_stage_breakdown.csv`,
+  `dvf_only_previous_conservative_comparison.csv`,
+  `transition_kernel_benchmark.csv`, and
+  `transition_kernel_benchmark_report.md`.
+- Actual rank-0 production results: original MR-D-BSCP / DirectCP `8-4-2`
+  ran `2500` epochs and reached full-script DVF-in-memory/DVF-file/external
+  wall in `174.72/174.78/177.85 s`; loaded-images-to-DVF-memory/file was
+  `149.83/149.89 s`. `A_fast_decay` ran `600` epochs and reached full-script
+  DVF-in-memory/DVF-file/external wall in `129.29/129.36/132.00 s`;
+  loaded-images-to-DVF-memory/file was `101.27/101.33 s`.
+- Actual savings: `A_fast_decay` saved `45.42 s` to full-script in-memory DVF,
+  `45.42 s` to full-script DVF file, and `45.84 s` command wall relative to
+  original. Loaded-images-to-DVF-memory/file savings were `48.56/48.56 s`.
+  Optimizer-loop savings were `49.56 s`; non-loop training was essentially
+  unchanged (`-0.22 s`) after diagnostic dense expansions were removed.
+- Production-vs-conservative timing comparison: skipping intermediate
+  diagnostic dense expansion/preservation checks reduced original full-script
+  DVF-in-memory time from `234.18 s` to `174.72 s` and `A_fast_decay` from
+  `175.22 s` to `129.29 s`.
+- CPU/GPU transition benchmark result: dense expansion and knot insertion
+  matched exactly within tolerance (`max_abs_diff=0`, tolerance `1e-5`) for all
+  synthetic rank-0 schedule-shape tests. GPU medians were faster than CPU for
+  dense expansion (`33.50x`, `55.22x`, `78.05x` for cps `8,4,2`) and pure knot
+  insertion (`2.26x` for `8->4`, `15.87x` for `4->2`). These kernels are
+  already PyTorch tensor operations and already run on CUDA in normal GPU
+  DirectCP runs; the main avoidable overhead was diagnostic dense
+  expansion/preservation checking.
+- Acceptance: `2/2` production rank-0 jobs completed; `2/2` dense DVF files,
+  `summary.json`, `timing.json`, and `DONE` files were present; evaluation and
+  full-output event counts were `0`; reconciliation residual failures were
+  `0`; parent self-unaccounted warnings were `0`; non-target GPU compute-app
+  observations were `0`.
+- Known limitation: this run isolates runtime; no Dice/HD95/regularity metrics
+  are computed in production DVF-only mode.
+
+### P22: OASIS DirectCP 8-4-2 Persistent-Process DVF Timing First10
+
+- Status: completed 2026-08-04 after smoke, full first10 persistent workers,
+  DVF-only analyzer, and persistent-process analyzer passed.
+- Purpose: measure practical persistent-process input-image-to-DVF runtime by
+  running OASIS seed-3 shuffled ranks `0-9` sequentially inside one long-lived
+  Python worker subprocess per candidate. Rank `0` is the cold first case;
+  ranks `1-9` estimate warm persistent-process throughput after CUDA/PyTorch
+  and cuDNN first-use overhead has been paid.
+- Dataset: OASIS BrainMR seed-3 shuffled ranks `0-9`, original sorted indices
+  `158,62,14,69,47,137,110,6,116,88`.
+- Methods:
+  - Original MR-D-BSCP / DirectCP `8-4-2`: alpha `1000`, lr `1e-3`, cps
+    `8,4,2`, downsample `4,2,1`, stage epochs `400,800,1300`, no early stop.
+  - `A_fast_decay`: alpha `1000`, base lr `1e-2`, stage lr
+    `3e-2,1e-2,3e-3`, cps `8,4,2`, downsample `4,2,1`, max stage epochs
+    `400,800,1300`, adaptive minimums `75,150,250`, patience `50,75,100`.
+- Timing mode: production `run_one.py --output-mode dvf_only
+  --timing-detail deep` with diagnostic preservation checks and intermediate
+  dense saves off.
+- Process model: one worker subprocess for original and one separate worker
+  subprocess for `A_fast_decay`; this avoids giving the second method the first
+  method's warm CUDA state.
+- Output root:
+  `/database/inrorspline/runs/oasis_directcp842_persistent_dvf_timing_alpha1000_v1`.
+- Review root:
+  `experiments/2026-08-04_oasis_directcp842_persistent_process_dvf_timing/`.
+- Expected artifacts: `persistent_process_timing_report.md`,
+  `persistent_process_summary.csv`, `persistent_process_case_timing.csv`,
+  `persistent_process_savings.csv`, `dvf_only_method_comparison.csv`,
+  `dvf_only_stage_breakdown.csv`, and `command_timing_dvf_only_first10.csv`.
+- Actual cold rank-0 results: original MR-D-BSCP / DirectCP `8-4-2`
+  full-script DVF-in-memory/DVF-file/wall `177.41/177.48/177.49 s`;
+  `A_fast_decay` `144.55/144.63/144.64 s`.
+- Actual warm ranks `1-9` results: original full-script
+  DVF-in-memory/DVF-file/wall mean `62.48/62.55/62.56 s` with wall standard
+  deviation `0.17 s`; `A_fast_decay` `15.07/15.18/15.19 s` with wall
+  standard deviation `0.69 s`.
+- Actual amortized ranks `0-9` results: original full-script
+  DVF-in-memory/DVF-file/wall mean `73.97/74.05/74.06 s`; `A_fast_decay`
+  `28.02/28.12/28.14 s`.
+- Actual speed comparison: on warm persistent-process cases, `A_fast_decay`
+  saved `47.40 s` to in-memory DVF, `47.37 s` to DVF file, and `47.37 s`
+  wall per case, with mean epochs `575` vs original `2500`. On amortized
+  first10 including cold rank0, `A_fast_decay` saved `45.95 s` to in-memory
+  DVF and `45.92 s` wall per case.
+- Acceptance: smoke and full first10 completed; `20/20` first10 case rows had
+  dense DVF, `summary.json`, `timing.json`, and `DONE`; evaluation/full-output
+  event count was `0`; reconciliation residual failures were `0`; parent
+  self-unaccounted warnings were `0`; non-target GPU compute-app observations
+  were `0`.
+- Known limitation: `cold_minus_warm_mean` estimates first-use overhead plus
+  rank-0-specific case/runtime differences; it is not a pure hardware
+  constant. This run isolates runtime only and intentionally skips evaluation
+  metrics.
+
+### P23: OASIS SINR cps4/cps2 Persistent-Process DVF Timing First10
+
+- Status: completed 2026-08-04 after SINR smoke, full first10 persistent
+  workers, DVF-only analyzer, and persistent-process analyzer passed.
+- Purpose: add SINR cps4 and SINR cps2 to the same persistent-process
+  input-image-to-DVF timing surface as DirectCP `8-4-2`, so cold rank-0,
+  warm ranks `1-9`, and amortized first10 runtime can be compared in one
+  report.
+- Dataset: OASIS BrainMR seed-3 shuffled ranks `0-9`, original sorted indices
+  `158,62,14,69,47,137,110,6,116,88`.
+- Methods:
+  - `sinr_cps4_be_bspline_analytic`: alpha `1000`, cps `4`, lr `1e-4`,
+    `2500` epochs, seed `1`, no early stopping.
+  - `sinr_cps2_be_bspline_analytic`: alpha `1000`, cps `2`, lr `1e-4`,
+    `2500` epochs, seed `1`, no early stopping.
+- Timing mode: production `run_one.py --output-mode dvf_only
+  --timing-detail deep`. DVF-only mode skips image/segmentation evaluation,
+  Dice, HD95/ASD, dense NCC, regularity metrics, model/control checkpoint
+  saves, and full packaging.
+- Process model: one worker subprocess for SINR cps4 and one separate worker
+  subprocess for SINR cps2; rank `0` is the cold first case in each worker,
+  and ranks `1-9` are warm persistent-process cases.
+- Output root:
+  `/database/inrorspline/runs/oasis_directcp842_persistent_dvf_timing_alpha1000_v1`.
+- Review root:
+  `experiments/2026-08-04_oasis_directcp842_persistent_process_dvf_timing/`.
+- Expected artifacts: updated `persistent_process_timing_report.md`,
+  `persistent_process_summary.csv`, `persistent_process_case_timing.csv`,
+  `persistent_process_pairwise_runtime_comparison.csv`,
+  `persistent_process_cold_warm_breakdown.csv`,
+  `dvf_only_method_comparison.csv`, `dvf_only_stage_breakdown.csv`, and
+  `command_timing_dvf_only_first10.csv`.
+- Actual SINR runtime:
+  - `sinr_cps4` cold rank0 wall `182.81 s`; warm ranks `1-9` wall
+    `107.49 +/- 0.09 s`; amortized ranks `0-9` wall
+    `115.02 +/- 23.82 s`.
+  - `sinr_cps2` cold rank0 wall `356.54 s`; warm ranks `1-9` wall
+    `271.45 +/- 0.15 s`; amortized ranks `0-9` wall
+    `279.96 +/- 26.91 s`.
+- Warm persistent-process comparison: `sinr_cps4` was `44.93 s` slower than
+  original DirectCP `8-4-2` and `92.30 s` slower than `A_fast_decay` by
+  external wall; `sinr_cps2` was `208.89 s` slower than original DirectCP
+  `8-4-2` and `256.26 s` slower than `A_fast_decay`.
+- Acceptance: combined report has `40/40` case rows, `80` stage rows, dense
+  DVF/timing/DONE present for all command rows, SINR epochs all `2500`,
+  evaluation/full-output event count `0`, reconciliation residual failures
+  `0`, parent self-unaccounted warnings `0`, and non-target GPU compute-app
+  observations `0`.
+- Known limitation: this extension isolates runtime only and intentionally
+  skips evaluation metrics. Existing DirectCP P22 outputs are reused rather
+  than rerun.
