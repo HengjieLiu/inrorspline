@@ -74,6 +74,21 @@ experiments/2026-08-04_oasis_directcp842_runtime_sweep/**/summary_runs.json
 # first10 worker summaries are tracked).
 experiments/2026-08-04_oasis_directcp842_persistent_process_dvf_timing/persistent_worker_summary_smoke_*.json
 
+# OASIS cps4 runtime host/process logs and raw aggregates (~1.7M; curated
+# screening and persistent timing summaries are tracked).
+experiments/2026-08-05_oasis_cps4_single_stage_runtime_sweep/**/gpu_state_*.csv
+experiments/2026-08-05_oasis_cps4_single_stage_runtime_sweep/**/command_timing_*.csv
+experiments/2026-08-05_oasis_cps4_single_stage_runtime_sweep/**/job_manifest*
+experiments/2026-08-05_oasis_cps4_single_stage_runtime_sweep/**/launch_summary*.json
+experiments/2026-08-05_oasis_cps4_single_stage_runtime_sweep/**/launcher_state.json
+experiments/2026-08-05_oasis_cps4_single_stage_runtime_sweep/**/persistent_worker_timing_*.csv
+experiments/2026-08-05_oasis_cps4_single_stage_runtime_sweep/**/persistent_worker_summary_cps4_dvf_only_*.json
+experiments/2026-08-05_oasis_cps4_single_stage_runtime_sweep/**/case_metrics_combined.csv
+experiments/2026-08-05_oasis_cps4_single_stage_runtime_sweep/**/prolongation_metrics_combined.csv
+experiments/2026-08-05_oasis_cps4_single_stage_runtime_sweep/**/regularity_metrics_combined.csv
+experiments/2026-08-05_oasis_cps4_single_stage_runtime_sweep/**/stage_summaries_combined.csv
+experiments/2026-08-05_oasis_cps4_single_stage_runtime_sweep/dvf_only_direct_savings.csv
+
 # Duplicate local notebook export (~1.2M). Commit canonical review notebooks or
 # reports instead of ad hoc copy files.
 experiments/2026-06-25_lungct_directcp4stage_global_ncc_fdbe_all10_alpha_sweep/pareto_visual_review-Copy1.ipynb
