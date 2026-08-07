@@ -70,6 +70,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stage-check-interval", type=str, default="25")
     parser.add_argument("--stage-rel-delta-total", type=str, default="5e-5")
     parser.add_argument("--stage-rel-delta-data", type=str, default="2e-5")
+    parser.add_argument("--stage-min-delta", type=str, default="")
     parser.add_argument("--runtime-candidate", type=str, default="")
     parser.add_argument("--timing-detail", choices=["off", "coarse", "deep"], default="off")
     parser.add_argument("--output-mode", choices=["full", "dvf_only"], default="full")
@@ -1061,6 +1062,17 @@ def train_spline(
     cps = method_cps(args.method)
     if cps is None:
         raise ValueError(f"No cps for method {args.method}")
+    single_stage_early_stop_mode = str(args.stage_early_stop_mode)
+    if str(args.stage_min_epochs).strip():
+        single_stage_min_epochs = c.parse_stage_ints(str(args.stage_min_epochs), 1)[0]
+    else:
+        single_stage_min_epochs = int(args.epochs)
+    single_stage_patience = c.parse_stage_ints(str(args.stage_patience), 1)[0]
+    single_stage_check_interval = c.parse_stage_ints(str(args.stage_check_interval), 1)[0]
+    if str(args.stage_min_delta).strip():
+        single_stage_min_delta = c.parse_float_list(str(args.stage_min_delta), 1, 0.0)[0]
+    else:
+        single_stage_min_delta = 0.0
 
     dense_grid_token = timer.start(
         "training.initial_dense_grid",
@@ -1112,6 +1124,12 @@ def train_spline(
 
     history: List[Dict[str, float]] = []
     global_ncc_diagnostic: List[Dict[str, float | str | bool]] = []
+    best_loss = float("inf")
+    best_data_loss = float("nan")
+    best_reg_loss = float("nan")
+    best_epoch = 0
+    early_stop_epoch: Optional[int] = None
+    early_stop_reason = "requested_epochs_complete"
     if sampler is not None and sampler.enabled:
         generator.eval()
         with timer.section("training.initial_checkpoint_sample", category="fixed_stage_overhead") if timer is not None else _null_section():
@@ -1188,6 +1206,12 @@ def train_spline(
             "lr": float(lr),
         }
         history.append(entry)
+        current_loss = float(entry["loss"])
+        if best_epoch == 0 or (best_loss - current_loss) >= float(single_stage_min_delta):
+            best_loss = current_loss
+            best_data_loss = float(entry["data_loss"])
+            best_reg_loss = float(entry["reg_loss"])
+            best_epoch = int(epoch)
         if should_global_ncc_diagnostic(args, epoch, int(args.epochs)):
             global_ncc_diagnostic.append(
                 {
@@ -1230,13 +1254,42 @@ def train_spline(
         if epoch == 1 or epoch % int(args.eval_interval) == 0 or epoch == int(args.epochs):
             print(json.dumps(entry), flush=True)
         loop_logging_wall_sec += time.perf_counter() - logging_start
+        if str(single_stage_early_stop_mode) == "adaptive":
+            can_stop = (
+                int(epoch) >= int(single_stage_min_epochs)
+                and int(epoch) % max(1, int(single_stage_check_interval)) == 0
+                and (int(epoch) - int(best_epoch)) >= max(1, int(single_stage_patience))
+            )
+            if can_stop:
+                early_stop_epoch = int(epoch)
+                early_stop_reason = (
+                    "adaptive_plateau:"
+                    f"epoch={int(epoch)};best_epoch={int(best_epoch)};"
+                    f"patience={int(single_stage_patience)};"
+                    f"min_delta={float(single_stage_min_delta):.6g};"
+                    f"best_loss={float(best_loss):.8g};"
+                    f"current_loss={float(current_loss):.8g}"
+                )
+                print(
+                    json.dumps(
+                        {
+                            "single_stage_stop": 0,
+                            "epoch": int(epoch),
+                            "requested_epochs": int(args.epochs),
+                            "stop_reason": early_stop_reason,
+                        }
+                    ),
+                    flush=True,
+                )
+                break
     if timer is not None:
         optimizer_loop_sec = timer.stop(loop_token)
     else:
         optimizer_loop_sec = 0.0
+    actual_epochs = int(history[-1]["epoch"]) if history else 0
     phase_summary = phase_acc.summary()
     phase_summary["logging_early_stop_wall_sec"] = float(loop_logging_wall_sec)
-    phase_summary["actual_epochs"] = float(int(args.epochs))
+    phase_summary["actual_epochs"] = float(actual_epochs)
     phase_summary["stage_idx"] = 0.0
     phase_summary["full_cps"] = float(cps)
     phase_summary["downsample"] = 1.0
@@ -1247,7 +1300,7 @@ def train_spline(
                 "full_cps": int(cps),
                 "downsample": 1,
                 "requested_epochs": int(args.epochs),
-                "actual_epochs": int(args.epochs),
+                "actual_epochs": int(actual_epochs),
                 "optimizer_loop_sec": float(optimizer_loop_sec),
                 "phase_totals_sec": phase_summary,
             }
@@ -1334,18 +1387,24 @@ def train_spline(
         "control_shape_zyx": list(int(v) for v in control_shape),
         "eval_shape_zyx": list(int(v) for v in c.IMAGE_SHAPE),
         "n_control": int(np.prod(tuple(int(v) for v in control_shape))),
-        "epochs": int(args.epochs),
+        "epochs": int(actual_epochs),
         "requested_epochs": int(args.epochs),
-        "actual_epochs": int(args.epochs),
+        "actual_epochs": int(actual_epochs),
         "lr": float(lr),
         "alpha": float(args.alpha),
-        "early_stop_mode": "none",
-        "min_epochs": int(args.epochs),
-        "patience": 0,
-        "check_interval": int(args.eval_interval),
+        "early_stop_mode": str(single_stage_early_stop_mode),
+        "min_epochs": int(single_stage_min_epochs),
+        "patience": int(single_stage_patience) if str(single_stage_early_stop_mode) == "adaptive" else 0,
+        "check_interval": int(single_stage_check_interval),
         "rel_delta_total": 0.0,
         "rel_delta_data": 0.0,
-        "stop_reason": "requested_epochs_complete",
+        "min_delta": float(single_stage_min_delta),
+        "stop_reason": str(early_stop_reason),
+        "early_stop_epoch": int(early_stop_epoch) if early_stop_epoch is not None else None,
+        "best_loss": float(best_loss),
+        "best_loss_epoch": int(best_epoch),
+        "best_data_loss": float(best_data_loss),
+        "best_reg_loss": float(best_reg_loss),
         "loss_mode": "sinr_ncc_bspline_be",
         "antialias_sigma": 0.0,
         "antialias_kernel_size": 0,
@@ -1373,20 +1432,27 @@ def train_spline(
     metrics["stage_downsample"] = [1]
     metrics["stage_epochs"] = [int(args.epochs)]
     metrics["stage_requested_epochs"] = [int(args.epochs)]
-    metrics["stage_actual_epochs"] = [int(args.epochs)]
+    metrics["stage_actual_epochs"] = [int(actual_epochs)]
     metrics["stage_lr"] = [float(lr)]
-    metrics["stage_early_stop_mode"] = "none"
-    metrics["stage_min_epochs"] = [int(args.epochs)]
-    metrics["stage_patience"] = [0]
-    metrics["stage_check_interval"] = [int(args.eval_interval)]
+    metrics["stage_early_stop_mode"] = str(single_stage_early_stop_mode)
+    metrics["stage_min_epochs"] = [int(single_stage_min_epochs)]
+    metrics["stage_patience"] = [int(single_stage_patience) if str(single_stage_early_stop_mode) == "adaptive" else 0]
+    metrics["stage_check_interval"] = [int(single_stage_check_interval)]
     metrics["stage_rel_delta_total"] = [0.0]
     metrics["stage_rel_delta_data"] = [0.0]
-    metrics["stage_stop_reasons"] = ["requested_epochs_complete"]
+    metrics["stage_min_delta"] = [float(single_stage_min_delta)]
+    metrics["stage_stop_reasons"] = [str(early_stop_reason)]
+    metrics["early_stop_epoch"] = int(early_stop_epoch) if early_stop_epoch is not None else None
+    metrics["early_stop_reason"] = str(early_stop_reason)
+    metrics["best_loss"] = float(best_loss)
+    metrics["best_loss_epoch"] = int(best_epoch)
+    metrics["best_data_loss"] = float(best_data_loss)
+    metrics["best_reg_loss"] = float(best_reg_loss)
     metrics["prolongation_preserve_check"] = False
     metrics["save_intermediate_dense"] = False
     metrics["nested_control_shapes_zyx"] = {str(int(cps)): list(int(v) for v in control_shape)}
     metrics["prolongation"] = "none_single_stage"
-    metrics["actual_epochs"] = int(args.epochs)
+    metrics["actual_epochs"] = int(actual_epochs)
     metrics["requested_epochs"] = int(args.epochs)
     return metrics
 
@@ -2150,9 +2216,16 @@ def write_outputs(
         "stage_check_interval",
         "stage_rel_delta_total",
         "stage_rel_delta_data",
+        "stage_min_delta",
         "stage_stop_reasons",
         "requested_epochs",
         "actual_epochs",
+        "early_stop_epoch",
+        "early_stop_reason",
+        "best_loss",
+        "best_loss_epoch",
+        "best_data_loss",
+        "best_reg_loss",
     ):
         if key in metrics:
             state[key] = metrics[key]
@@ -2340,7 +2413,14 @@ def write_outputs(
         "stage_check_interval": metrics.get("stage_check_interval"),
         "stage_rel_delta_total": metrics.get("stage_rel_delta_total"),
         "stage_rel_delta_data": metrics.get("stage_rel_delta_data"),
+        "stage_min_delta": metrics.get("stage_min_delta"),
         "stage_stop_reasons": metrics.get("stage_stop_reasons"),
+        "early_stop_epoch": metrics.get("early_stop_epoch"),
+        "early_stop_reason": metrics.get("early_stop_reason"),
+        "best_loss": metrics.get("best_loss"),
+        "best_loss_epoch": metrics.get("best_loss_epoch"),
+        "best_data_loss": metrics.get("best_data_loss"),
+        "best_reg_loss": metrics.get("best_reg_loss"),
         "stage_summaries": metrics.get("stage_summaries"),
         "prolongation_diagnostics": metrics.get("prolongation_diagnostics"),
         "prolongation_preserve_check": metrics.get("prolongation_preserve_check"),
@@ -2491,7 +2571,14 @@ def write_dvf_only_metadata(
         "stage_check_interval": metrics.get("stage_check_interval"),
         "stage_rel_delta_total": metrics.get("stage_rel_delta_total"),
         "stage_rel_delta_data": metrics.get("stage_rel_delta_data"),
+        "stage_min_delta": metrics.get("stage_min_delta"),
         "stage_stop_reasons": metrics.get("stage_stop_reasons"),
+        "early_stop_epoch": metrics.get("early_stop_epoch"),
+        "early_stop_reason": metrics.get("early_stop_reason"),
+        "best_loss": metrics.get("best_loss"),
+        "best_loss_epoch": metrics.get("best_loss_epoch"),
+        "best_data_loss": metrics.get("best_data_loss"),
+        "best_reg_loss": metrics.get("best_reg_loss"),
         "stage_summaries": metrics.get("stage_summaries"),
         "prolongation_diagnostics": metrics.get("prolongation_diagnostics"),
         "prolongation_preserve_check": metrics.get("prolongation_preserve_check"),
@@ -2533,13 +2620,14 @@ def main() -> None:
     if str(args.output_mode) == "dvf_only":
         supported_dvf_only = {
             "direct_cp_8_4_2_be_bspline_analytic_multistage",
+            "direct_cp_cps4_be_bspline_analytic",
             "sinr_cps4_be_bspline_analytic",
             "sinr_cps2_be_bspline_analytic",
         }
         if args.method not in supported_dvf_only:
             raise ValueError(
-                "--output-mode dvf_only is only implemented for DirectCP 8-4-2 multistage "
-                "and SINR cps4/cps2."
+                "--output-mode dvf_only is only implemented for DirectCP 8-4-2 multistage, "
+                "DirectCP cps4, and SINR cps4/cps2."
             )
         if not bool(args.save_final_dense):
             raise ValueError("--output-mode dvf_only requires --save-final-dense.")
