@@ -2269,3 +2269,81 @@ Next decision:
 - Known limitation: this extension isolates runtime only and intentionally
   skips evaluation metrics. Existing DirectCP P22 outputs are reused rather
   than rerun.
+
+### P24: OASIS cps4 Runtime Sweep For D-BSCP And SINR
+
+- Status: completed 2026-08-06.
+- Purpose: adapt the MR-D-BSCP runtime-optimization workflow to single-stage
+  `D-BSCP cps4` and `SINR cps4`, screening faster fixed-epoch and adaptive
+  learning-rate variants before any controlled sequential persistent-process
+  timing follow-up.
+- Dataset: OASIS BrainMR seed-3 shuffled ranks `0-9`, original sorted indices
+  `158,62,14,69,47,137,110,6,116,88`.
+- Methods:
+  - `direct_cp_cps4_be_bspline_analytic` (`D-BSCP cps4`): alpha `1000`;
+    rerun baseline `lr=1e-3`, `2500` epochs; candidates
+    `D_F1000_lr3e-3`, `D_F600_lr1e-2`, `D_F400_lr3e-2`,
+    `D_A_lr1e-2`, and `D_A_lr3e-2`.
+  - `sinr_cps4_be_bspline_analytic` (`SINR cps4`): alpha `1000`; rerun
+    baseline `lr=1e-4`, `2500` epochs; candidates `S_F1500_lr3e-4`,
+    `S_F1000_lr1e-3`, `S_F600_lr3e-3`, `S_A_lr1e-3`, and
+    `S_A_lr3e-3`.
+- Adaptive early stopping: single-stage total training loss only, no extra
+  evaluation pass; stop only after the candidate-specific `min_epochs`, after
+  `patience` epochs without at least `min_delta=1e-4` improvement.
+- Screening mode: full evaluation/output mode because Dice, HD95, ASD, and
+  regularity metrics are required to decide whether a candidate is promising.
+- Promising gate: same-method first10 Dice drop `<=0.02`, HD95 increase
+  `<=0.2 mm`, and either full-pipeline runtime improvement `>=25%` or clear
+  epoch reduction with no accuracy loss. Existing DirectCP cps2 and SINR cps2
+  rows are comparison anchors, not rerun in this sweep.
+- Output root:
+  `/database/inrorspline/runs/oasis_cps4_single_stage_runtime_sweep_alpha1000_v1`.
+- Review root:
+  `experiments/2026-08-05_oasis_cps4_single_stage_runtime_sweep/`.
+- Screening artifacts: `method_ordered_report.md`, `candidate_summary.csv`,
+  `case_results.csv`, `accuracy_runtime_tradeoff.csv`,
+  `promising_candidates.csv`, `job_manifest.csv/json`, and
+  `launch_summary.json`.
+- Screening completion: dry-run manifest expected `120` jobs; rank-0 smoke
+  completed `12/12`; full first10 screening completed `120/120` with zero
+  launcher failures and zero aggregation errors.
+- Promising screening candidates:
+  - `D_A_lr1e-2`: Dice `0.7946`, HD95 `2.3653`, total elapsed `105.4 s`,
+    full-pipeline saving `35.9%`, mean epochs `476.9`.
+  - `D_F600_lr1e-2`: Dice `0.7949`, HD95 `2.3795`, total elapsed `117.7 s`,
+    full-pipeline saving `28.4%`, mean epochs `600.0`.
+  - `D_F1000_lr3e-3`: Dice `0.7958`, HD95 `2.3343`, total elapsed
+    `120.0 s`, full-pipeline saving `27.0%`, mean epochs `1000.0`.
+  - `S_F1000_lr1e-3`: Dice `0.7866`, HD95 `2.2503`, total elapsed
+    `131.0 s`, full-pipeline saving `31.7%`, mean epochs `1000.0`.
+  - `S_A_lr1e-3`: Dice `0.7813`, HD95 `2.2331`, total elapsed `134.4 s`,
+    full-pipeline saving `29.9%`, mean epochs `846.4`.
+- Rejected fast/high-LR candidates: `D_A_lr3e-2`, `D_F400_lr3e-2`,
+  `S_A_lr3e-3`, and `S_F600_lr3e-3` failed the HD95/Dice tolerance despite
+  runtime savings. `S_F1500_lr3e-4` preserved accuracy but did not meet the
+  runtime gate.
+- cps2 anchor comparison: none of the promising cps4 candidates beat their
+  same-family cps2 reference on both Dice and HD95; cps2 rows remain anchors
+  and were not rerun here.
+- Follow-up persistent DVF-only timing: ran baselines plus the five promising
+  candidates as one persistent worker per candidate on GPU `0`, ranks `0-9`
+  serially. Smoke completed `14/14`; full timing completed `70/70`; dense DVF,
+  `summary.json`, `timing.json`, and `DONE` existed for every run. Validation
+  reported evaluation/full-output events `0`, non-target GPU observations `0`,
+  reconciliation residual failures `0`, and parent self-unaccounted warnings
+  `0`.
+- Warm persistent-process DVF-file time from loaded images, ranks `1-9`:
+  D-BSCP baseline `80.80 s`; `D_F1000_lr3e-3` `31.83 s`; `D_F600_lr1e-2`
+  `19.13 s`; `D_A_lr1e-2` `15.12 s`. SINR baseline `106.92 s`;
+  `S_F1000_lr1e-3` `42.73 s`; `S_A_lr1e-3` `37.04 s`.
+- Persistent timing artifacts: `persistent_cps4_dvf_timing_report.md`,
+  `persistent_cps4_summary.csv`, `persistent_cps4_case_timing.csv`,
+  `persistent_cps4_runtime_vs_baseline.csv`, and
+  `persistent_cps4_screen_and_timing.csv`.
+- Launch environment: Docker container `py310sitreg_v1_test1`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1`; requested GPUs `0,1,2,3`.
+- Known limitation: this is a first10 screening sweep, not a final
+  full-population result. Screening runtime is full evaluation/output runtime;
+  persistent timing is DVF-only and intentionally excludes evaluation and full
+  packaging.
