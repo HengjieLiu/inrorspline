@@ -1,0 +1,390 @@
+{
+  "created_utc": "2026-08-11T18:04:58.020546+00:00",
+  "rows": [
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "headline_native_snap_tre_mm",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1D"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "headline_native_subvoxel_tre_mm",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1D"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "registration_grid_snap_tre_mm",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1D"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "registration_grid_subvoxel_tre_mm",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1D"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "direct_inr_snap_tre_mm",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1D"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "direct_inr_subvoxel_tre_mm",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1D"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "training_wall_seconds",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1D"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "total_wall_seconds",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1D"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "regularity_diffusion_l2_fg",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1D"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "regularity_bending_energy_fg",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1D"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "regularity_log_jdet_std_fg",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1D"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "regularity_jdet_le0_pct_fg",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1D"
+    },
+    {
+      "loss_branch_identifier": "idir_type_be",
+      "mean": null,
+      "metric": "headline_native_snap_tre_mm",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1B"
+    },
+    {
+      "loss_branch_identifier": "idir_type_be",
+      "mean": null,
+      "metric": "headline_native_subvoxel_tre_mm",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1B"
+    },
+    {
+      "loss_branch_identifier": "idir_type_be",
+      "mean": null,
+      "metric": "registration_grid_snap_tre_mm",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1B"
+    },
+    {
+      "loss_branch_identifier": "idir_type_be",
+      "mean": null,
+      "metric": "registration_grid_subvoxel_tre_mm",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1B"
+    },
+    {
+      "loss_branch_identifier": "idir_type_be",
+      "mean": null,
+      "metric": "direct_inr_snap_tre_mm",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1B"
+    },
+    {
+      "loss_branch_identifier": "idir_type_be",
+      "mean": null,
+      "metric": "direct_inr_subvoxel_tre_mm",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1B"
+    },
+    {
+      "loss_branch_identifier": "idir_type_be",
+      "mean": null,
+      "metric": "training_wall_seconds",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1B"
+    },
+    {
+      "loss_branch_identifier": "idir_type_be",
+      "mean": null,
+      "metric": "total_wall_seconds",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1B"
+    },
+    {
+      "loss_branch_identifier": "idir_type_be",
+      "mean": null,
+      "metric": "regularity_diffusion_l2_fg",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1B"
+    },
+    {
+      "loss_branch_identifier": "idir_type_be",
+      "mean": null,
+      "metric": "regularity_bending_energy_fg",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1B"
+    },
+    {
+      "loss_branch_identifier": "idir_type_be",
+      "mean": null,
+      "metric": "regularity_log_jdet_std_fg",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1B"
+    },
+    {
+      "loss_branch_identifier": "idir_type_be",
+      "mean": null,
+      "metric": "regularity_jdet_le0_pct_fg",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1B"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "headline_native_snap_tre_mm",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1A"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "headline_native_subvoxel_tre_mm",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1A"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "registration_grid_snap_tre_mm",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1A"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "registration_grid_subvoxel_tre_mm",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1A"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "direct_inr_snap_tre_mm",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1A"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "direct_inr_subvoxel_tre_mm",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1A"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "training_wall_seconds",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1A"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "total_wall_seconds",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1A"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "regularity_diffusion_l2_fg",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1A"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "regularity_bending_energy_fg",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1A"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "regularity_log_jdet_std_fg",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1A"
+    },
+    {
+      "loss_branch_identifier": "dual_native_reg",
+      "mean": null,
+      "metric": "regularity_jdet_le0_pct_fg",
+      "n": 0,
+      "sd": null,
+      "variant": "PL1A"
+    },
+    {
+      "loss_branch_identifier": "ptv_lcc_isotv",
+      "mean": 0.99094878634486,
+      "metric": "headline_native_snap_tre_mm",
+      "n": 10,
+      "sd": 0.17265668942395865,
+      "variant": "PL1C"
+    },
+    {
+      "loss_branch_identifier": "ptv_lcc_isotv",
+      "mean": 1.0985406251126075,
+      "metric": "headline_native_subvoxel_tre_mm",
+      "n": 10,
+      "sd": 0.13145421953075362,
+      "variant": "PL1C"
+    },
+    {
+      "loss_branch_identifier": "ptv_lcc_isotv",
+      "mean": 1.2225633074684035,
+      "metric": "registration_grid_snap_tre_mm",
+      "n": 10,
+      "sd": 0.13059420039973174,
+      "variant": "PL1C"
+    },
+    {
+      "loss_branch_identifier": "ptv_lcc_isotv",
+      "mean": 1.1010731569089574,
+      "metric": "registration_grid_subvoxel_tre_mm",
+      "n": 10,
+      "sd": 0.13026764848599362,
+      "variant": "PL1C"
+    },
+    {
+      "loss_branch_identifier": "ptv_lcc_isotv",
+      "mean": 1.2179257832149424,
+      "metric": "direct_inr_snap_tre_mm",
+      "n": 10,
+      "sd": 0.12865304570974298,
+      "variant": "PL1C"
+    },
+    {
+      "loss_branch_identifier": "ptv_lcc_isotv",
+      "mean": 1.1047799420216342,
+      "metric": "direct_inr_subvoxel_tre_mm",
+      "n": 10,
+      "sd": 0.13043716167448957,
+      "variant": "PL1C"
+    },
+    {
+      "loss_branch_identifier": "ptv_lcc_isotv",
+      "mean": 86.56635286845267,
+      "metric": "training_wall_seconds",
+      "n": 10,
+      "sd": 4.63433081159706,
+      "variant": "PL1C"
+    },
+    {
+      "loss_branch_identifier": "ptv_lcc_isotv",
+      "mean": 119.04072202704847,
+      "metric": "total_wall_seconds",
+      "n": 10,
+      "sd": 5.916776683721458,
+      "variant": "PL1C"
+    },
+    {
+      "loss_branch_identifier": "ptv_lcc_isotv",
+      "mean": 0.01555584385913158,
+      "metric": "regularity_diffusion_l2_fg",
+      "n": 10,
+      "sd": 0.006596337324970753,
+      "variant": "PL1C"
+    },
+    {
+      "loss_branch_identifier": "ptv_lcc_isotv",
+      "mean": 0.04192610841455073,
+      "metric": "regularity_bending_energy_fg",
+      "n": 10,
+      "sd": 0.02393119275137927,
+      "variant": "PL1C"
+    },
+    {
+      "loss_branch_identifier": "ptv_lcc_isotv",
+      "mean": 0.20991775800708518,
+      "metric": "regularity_log_jdet_std_fg",
+      "n": 10,
+      "sd": 0.05985320158612878,
+      "variant": "PL1C"
+    },
+    {
+      "loss_branch_identifier": "ptv_lcc_isotv",
+      "mean": 0.00011859935802669948,
+      "metric": "regularity_jdet_le0_pct_fg",
+      "n": 10,
+      "sd": 0.0002937269302779626,
+      "variant": "PL1C"
+    }
+  ],
+  "schema_version": 1
+}
