@@ -2347,3 +2347,296 @@ Next decision:
   full-population result. Screening runtime is full evaluation/output runtime;
   persistent timing is DVF-only and intentionally excludes evaluation and full
   packaging.
+
+### P25: OASIS cps2 Runtime Sweep For D-BSCP And SINR
+
+- Status: completed 2026-08-07; implementation, smoke, screening, persistent
+  timing, clean D-BSCP baseline timing rerun, and final aggregation handled by
+  Codex.
+- Purpose: repeat the completed cps4 runtime-optimization workflow for
+  single-stage `D-BSCP cps2` and `SINR cps2`, screening faster fixed-epoch and
+  adaptive variants before controlled persistent-process DVF-only timing.
+- Dataset: OASIS BrainMR seed-3 shuffled ranks `0-9`, original sorted indices
+  `158,62,14,69,47,137,110,6,116,88`.
+- Methods:
+  - `direct_cp_cps2_be_bspline_analytic` (`D-BSCP cps2`): alpha `1000`;
+    rerun baseline `lr=1e-3`, `2500` epochs; candidates
+    `D2_F1000_lr3e-3`, `D2_F600_lr1e-2`, `D2_F400_lr3e-2`,
+    `D2_A_lr1e-2`, and `D2_A_lr3e-2`.
+  - `sinr_cps2_be_bspline_analytic` (`SINR cps2`): alpha `1000`; rerun
+    baseline `lr=1e-4`, `2500` epochs; candidates `S2_F1500_lr3e-4`,
+    `S2_F1000_lr1e-3`, `S2_F600_lr3e-3`, `S2_A_lr1e-3`, and
+    `S2_A_lr3e-3`.
+- Adaptive early stopping: single-stage total training loss only, no extra
+  evaluation pass; stop only after the candidate-specific `min_epochs`, after
+  `patience` epochs without at least `min_delta=1e-4` improvement.
+- Screening mode: full evaluation/output mode because Dice, HD95, ASD, and
+  regularity metrics are required to decide whether a candidate is promising.
+- Promising gate: same-method first10 Dice drop `<=0.02`, HD95 increase
+  `<=0.2 mm`, and either full-pipeline runtime improvement `>=25%` or clear
+  epoch reduction with no accuracy loss. Existing cps4 and MR-D-BSCP rows are
+  contextual anchors, not the primary gate.
+- Screening output root:
+  `/database/inrorspline/runs/oasis_cps2_single_stage_runtime_sweep_alpha1000_v1`.
+- Persistent DVF-only output root:
+  `/database/inrorspline/runs/oasis_cps2_single_stage_persistent_dvf_timing_alpha1000_v1`.
+- Review root:
+  `experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/`.
+- Expected screening artifacts: `method_ordered_report.md`,
+  `candidate_summary.csv`, `case_results.csv`,
+  `accuracy_runtime_tradeoff.csv`, `promising_candidates.csv`,
+  `job_manifest.csv/json`, and `launch_summary.json`.
+- Expected persistent timing artifacts: `persistent_cps2_dvf_timing_report.md`,
+  `persistent_cps2_summary.csv`, `persistent_cps2_case_timing.csv`,
+  `persistent_cps2_runtime_vs_baseline.csv`, and
+  `persistent_cps2_screen_and_timing.csv`.
+- Launch environment: Docker container `py310sitreg_v1_test1`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1`; requested screening GPUs `0,1,2,3`
+  and persistent timing GPU `0`.
+- Completion summary:
+  - Screening completed `120/120` full-evaluation jobs.
+  - Promising D-BSCP cps2 candidates: `D2_A_lr3e-2`, `D2_A_lr1e-2`,
+    `D2_F400_lr3e-2`, and `D2_F600_lr1e-2`.
+  - Promising SINR cps2 candidates: `S2_F1000_lr1e-3`, `S2_A_lr1e-3`,
+    and `S2_F1500_lr3e-4`.
+  - Persistent DVF-only timing completed `90/90` rows with dense DVFs present,
+    failed subprocesses `0`, DVF-only evaluation/full-output events `0`,
+    reconciliation residual failures `0`, parent self-unaccounted warnings `0`,
+    and non-target GPU compute-app observations `0`.
+  - Warm ranks `1-9` external wall: D-BSCP cps2 baseline `86.00 s/case`,
+    `D2_A_lr3e-2` `8.82 s/case`; SINR cps2 baseline `273.91 s/case`,
+    `S2_F1000_lr1e-3` `109.39 s/case`.
+- Known limitation: this is a first10 screening sweep. Screening runtime is
+  full evaluation/output runtime; persistent timing is DVF-only and
+  intentionally excludes evaluation and full packaging.
+
+### P26: OASIS MR-SINR 8/4/2 Revision Pilot
+
+- Status: completed 2026-08-07; technical pilot passed, but composed MR-SINR
+  was not promoted based on the recorded pilot decision.
+- Purpose: test whether the intended composed-field MR-SINR schedule is
+  technically stable and worth promoting to seed-3 first10/first100 runs, with
+  a continued/re-query SINR ablation for comparison.
+- Dataset: OASIS BrainMR.
+- Split config:
+  `configs/splits/oasis/pair_test_200_shuffled_seed000003.txt`.
+- Pilot case: seed-3 rank `0`, pair `(0333, 0115)`, original sorted
+  `pair_test_200` index `158`.
+- Methods:
+  - `mr_sinr842_composed`: independent SINR residual stages at BSCP
+    `8,4,2`, training each finer stage on the original moving image warped by
+    the frozen composed previous stages, with final pull-field composition
+    `phi842(x)=phi8(phi4(phi2(x)))`.
+  - `mr_sinr842_requery`: one continued SINR generator re-queried at BSCP
+    `8,4,2`, optimizing an absolute field at each stage without composition.
+- Optimization: alpha `1000`, total `2500` epochs, stage epochs
+  `400,800,1300`, downsample factors `4,2,1`, SINR omega `50.0`, default SINR
+  LR `1e-4`, full-image global NCC plus analytic cubic B-spline BE per stage.
+- Foreground and metrics: fixed raw image-positive foreground,
+  `fixed_image > 0`, for foreground-scoped regularity; segmentation labels are
+  only for Dice/HD95/ASD.
+- Output root:
+  `/database/inrorspline/runs/oasis_mr_sinr842_revision_pilot_v1`.
+- Review root:
+  `experiments/2026-08-07_oasis_mr_sinr842_revision/`.
+- Expected artifacts: normal per-run `run_one.py` outputs plus
+  `pilot_comparison_summary.csv/json`, `pilot_decision.json`,
+  `pilot_report.md`, combined metric tables, composed-vs-sequential warp
+  diagnostics, and re-query transition-jump diagnostics.
+- Launch environment: Docker container `py310sitreg_v1_test1`, image
+  `hengjieliu96/dl_dir:py310sitreg_v1`, GPU selected at launch.
+- Known limitation: rank-0 one-case pilot only. The composed final deformation
+  is not a single B-spline field, so final BE/diffusion regularity is dense
+  posthoc regularity; per-stage training regularization remains analytic
+  B-spline BE.
+
+### P27: LungCT DUAL-INR pTV 1 mm Fixed-Lung-Mask Revision
+
+- Status: completed 2026-08-07. Smoke passed; full-length cases `01` and `08`
+  completed for both loss branches in the pilot; full ten-case scale-up
+  completed with `20/20` accepted records and `20/20` posthoc regularity
+  records.
+- Purpose: add a controlled DIR-Lab 4DCT DUAL-INR revision on the canonical
+  pTVReg iso1mm image domain using the fixed T00 lung mask as both optimization
+  sampling mask and posthoc metric mask.
+- Dataset: DIR-Lab 4DCT only.
+- Cases: pilot `01` and `08`; full scale-up cases `01-10` completed after
+  pilot inspection.
+- Direction: T50 moving image to T00 fixed image.
+- Protocol tag:
+  `ptv_landmark_crop_1mm_fixed_t00_lungmask_dual_inr_revision`.
+- Variants:
+  - `PL1D`: DUAL-native regularization branch, loss identifier
+    `dual_native_reg`.
+  - `PL1B`: IDIR-type coordinate-autograd bending-energy branch, loss
+    identifier `idir_type_be`.
+- Common model/settings: released DUAL SIREN `3-256-256-3`, omega `10/30`,
+  semantic/lobe/segmentation loss disabled with `mask_weight=0`, stage lengths
+  `400,400,800,900`, image factors `8,4,2,1`, total steps `2500`, seed `42`
+  unless explicitly overridden.
+- IDIR-type BE convention: preserve the audited IDIR coordinate-autograd
+  bending-energy batch-size scaling; default pilot weight `10.0`.
+- Output root:
+  `${SCRATCH_ROOT}/runs/lungct_dual_inr_1mm_lungmask_revision_v1` or the
+  equivalent container path supplied by
+  `INRORSPLINE_DUAL_LUNGMASK_REVISION_RUN_ROOT`.
+- Review root:
+  `experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_revision/`.
+- Expected artifacts: resolved job manifest, smoke/pilot/full trackers,
+  `optimization_index.csv/json`, `regularity_metrics.csv/json`,
+  `population_statistics.csv/json`, `acceptance_report.md/json`, and
+  `pilot_readout.md` or full-cohort readout.
+- Pilot result: native snap TRE mean was `0.9282 +/- 0.2310 mm` for `PL1D`
+  and `0.9481 +/- 0.1793 mm` for `PL1B`; foreground SDlogJ was
+  `0.125992 +/- 0.041732` for `PL1D` and `0.149517 +/- 0.048923` for
+  `PL1B`; both branches had foreground `J<=0` percentage `0.0`.
+- Full result: native snap TRE mean was `0.9815 +/- 0.1686 mm` for `PL1D` and
+  `0.9865 +/- 0.1689 mm` for `PL1B`; reg-grid subvoxel TRE was
+  `1.1174 +/- 0.1289 mm` for `PL1D` and `1.1068 +/- 0.1296 mm` for `PL1B`.
+  Against native snap TRE references, PL1D beat pTVReg in `3/10` cases and
+  MR-D-BSCP pTV-loss `w=0.055` in `3/10` cases; PL1B beat pTVReg in `0/10`
+  cases and MR-D-BSCP in `2/10` cases.
+- Runtime: `PL1D` pilot training wall time averaged `352.2 s`; `PL1B`
+  averaged `569.5 s`, reflecting the added IDIR-type coordinate-autograd BE
+  cost.
+- Full runtime: `PL1D` total wall time averaged `443.7 +/- 35.9 s`; `PL1B`
+  averaged `638.4 +/- 38.1 s`.
+- Acceptance: technical only; require expected artifacts, finite metrics,
+  protocol `PL`, fixed T00 lung-mask sampling and metric rules, exact stages,
+  and completed posthoc regularity. TRE and regularity magnitude are not
+  completion gates.
+- Known limitation: pilot records are protocol/implementation checks, not a
+  selected full-cohort result. Do not compare this row as method-only evidence
+  against native IDIR, pTVReg, DirectCP/SINR, or older DUAL rows unless crop,
+  mask, metric, interpolation, loss, and regularization conventions are
+  explicitly matched or tagged.
+
+### P28: LungCT DUAL-INR pTV 1 mm Fixed-Lung-Mask Author-Schedule Revision
+
+- Status: completed 2026-08-07 after P27 full-cohort review; full `PL1A`
+  cohort completed with `10/10` accepted records and `10/10` posthoc
+  regularity records.
+- Purpose: test whether P27's weaker aggregate TRE is caused by the controlled
+  MR-style image pyramid by running the same `PL` pTVReg 1 mm fixed T00
+  lung-mask protocol with the released DUAL-INR original blur schedule.
+- Dataset: DIR-Lab 4DCT only.
+- Cases: full cases `01-10`.
+- Direction: T50 moving image to T00 fixed image.
+- Protocol tag:
+  `ptv_landmark_crop_1mm_fixed_t00_lungmask_dual_inr_author_schedule_revision`.
+- Variant:
+  - `PL1A`: protocol `PL`, loss identifier `dual_native_reg`, original DUAL
+    blur sigmas `4,2,0`, adaptive convergence transitions, total steps `3000`,
+    semantic/lobe/segmentation loss disabled with `mask_weight=0`.
+- Model/settings: released DUAL SIREN `3-256-256-3`, omega `10/30`, native
+  DUAL Laplacian/negative-Jacobian regularization with weights `0.01/0.01`,
+  fine regularizer scale `0.1`, seed `42` unless explicitly overridden.
+- Output root:
+  `${SCRATCH_ROOT}/runs/lungct_dual_inr_1mm_lungmask_author_schedule_v1` or
+  the equivalent container path supplied at launch.
+- Review root:
+  `experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_author_schedule/`.
+- Acceptance: technical only; require expected artifacts, finite metrics,
+  protocol `PL`, fixed T00 lung-mask sampling and metric rules, exact blur
+  sigmas `[4,2,0]`, all three blur stages visited, and completed posthoc
+  regularity. TRE and regularity magnitude are not completion gates.
+- Result: native snap TRE mean was `0.9758 +/- 0.1752 mm`; reg-grid subvoxel
+  TRE was `1.1144 +/- 0.1280 mm`; foreground SDlogJ was
+  `0.143408 +/- 0.037411`; foreground `J<=0` percentage was `0.0`.
+- Comparison: PL1A beat pTVReg native snap TRE in `3/10` cases and MR-D-BSCP
+  pTV-loss `w=0.055` in `3/10` cases. It beat PL1D in `5/10` cases, improving
+  PL native-reg aggregate TRE only slightly (`0.9758` vs `0.9815 mm`) and not
+  closing the gap to pTVReg/MR-D-BSCP.
+- Runtime: PL1A total wall time averaged `359.2 +/- 10.8 s`.
+- Known limitation: this is not the author A1 row, because A1 used author
+  five-lobe crop/sampling; this row isolates schedule while retaining the P27
+  fixed-lung-mask pTVReg 1 mm protocol.
+
+### P29: LungCT DUAL-INR Camera-Ready TRE/stdlogJ Curve Candidates
+
+- Status: Stage 0 implementation, Stage 1 PL1C default, compact Stage 2
+  sweep, and Stage 3 PL1A local refinement completed 2026-08-11.
+- Purpose: add a small number of defensible DUAL-INR-family curve candidates
+  to the camera-ready DIR-Lab TRE versus stdlogJ figure without running an
+  unnecessarily broad hyperparameter sweep.
+- Dataset: DIR-Lab 4DCT only.
+- Cases: all cases `01-10` for every curve point used for figure selection.
+- Direction: T50 moving image to T00 fixed image.
+- Protocol tag:
+  `ptv_landmark_crop_1mm_fixed_t00_lungmask_dual_inr_camera_ready_curve`.
+- Image/mask contract: pTVReg 1 mm isotropic image domain; unmasked image
+  intensities; fixed T00 1 mm lung mask for sampling and metric masks; no
+  moving-mask optimization; no semantic/lobe/segmentation loss.
+- Candidate variants:
+  - `PL1D`: image pyramid `[8,4,2,1]`, native DUAL regularization.
+  - `PL1B`: image pyramid `[8,4,2,1]`, IDIR-type bending energy.
+  - `PL1A`: original blur `[4,2,0]`, native DUAL regularization.
+  - `PL1C`: original blur `[4,2,0]`, sampled pTVReg-style LCC plus sampled
+    physical-unit isoTV regularization.
+- Compact sweep plan:
+  - Native DUAL and BE variants: multipliers `[0.01,0.1,1,10,100]`.
+  - `PL1C`: pTVReg-style weights `[0.0055,0.017,0.055,0.17,0.55]`.
+  - Existing `PL1D`, `PL1B`, and `PL1A` multiplier-1 rows may be reused only
+    if protocol, schedule, loss, weights, and posthoc regularity match.
+- Stage 3 refinement plan: add `PL1A` local multipliers `[1/3,3]` on all
+  cases `01-10`, using the same PL1A protocol as Stage 2. For final
+  paper-style overlays, omit the coarse `PL1A m=100` point and compare the
+  refined PL1A curve against existing LungCT paper rows.
+- Stage 0 output:
+  `experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_revision/stage0_implementation_and_manifest_report.md`.
+- Stage 1 result: `PL1C` weight `0.055` completed `10/10` accepted records
+  and `10/10` posthoc regularity records; native snap TRE
+  `0.9909 +/- 0.1727 mm`, registration-grid subvoxel TRE
+  `1.1011 +/- 0.1303 mm`, foreground SDlogJ `0.2099 +/- 0.0599`,
+  foreground `J<=0` percentage `0.000119 +/- 0.000294`, total wall time
+  `119.0 +/- 5.9 s`.
+- Stage 1 output root:
+  `/database/inrorspline/runs/lungct_dual_inr_camera_ready_curve_stage1_pl1c_default_v1`.
+- Stage 1 review root:
+  `experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_revision/`.
+- Stage 1 report:
+  `experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_revision/stage1_pl1c_default_report.md`.
+- Stage 2 output root:
+  `/database/inrorspline/runs/lungct_dual_inr_camera_ready_curve_stage2_compact_v1`.
+- Stage 3 output root:
+  `/database/inrorspline/runs/lungct_dual_inr_camera_ready_curve_stage3_pl1a_refinement_v1`.
+- Stage 2 review outputs:
+  `experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_revision/stage2_compact_all_case_sweep_report.md`
+  and
+  `experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_revision/stage2_coarse_tre_stdlogj_curve.png`.
+- Stage 3 planned review outputs:
+  `experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_revision/stage3_pl1a_refinement_report.md`
+  and final paper-style overlays under
+  `experiments/paper_artifacts/pareto_figure/`.
+- Stage 3 result: `PL1A m=1/3` completed `10/10` accepted records with
+  native snap TRE `0.977 +/- 0.165 mm` and foreground stdLogJ
+  `0.1660 +/- 0.0431`; `PL1A m=3` completed `10/10` accepted records with
+  native snap TRE `1.006 +/- 0.182 mm` and foreground stdLogJ
+  `0.1313 +/- 0.0350`. Both had `10/10` posthoc regularity records and zero
+  process retries.
+- Final PL1A paper-style overlay candidates omit the coarse `PL1A m=100`
+  point and include Stage 3 `m=1/3` and `m=3`:
+  `experiments/paper_artifacts/pareto_figure/v006_candidate_pl1a_refined_full_context/`
+  for the full previous LungCT context, and
+  `experiments/paper_artifacts/pareto_figure/v007_candidate_pl1a_refined_mrdbscp_ptvreg_focus/`
+  for the focused MR-D-BSCP/PL1A/pTVReg comparison.
+- Stage 2 execution policy: one variant per GPU, with `PL1D`, `PL1B`,
+  `PL1A`, and `PL1C` pinned to four GPUs; every non-default independent job is
+  attempted, and default points are imported from P27/P28/P29 Stage 1 when
+  their metadata matches.
+- Stage 1 command: use
+  `scripts.experiments.lungct_dual_inr_controlled.launch_lungmask_revision`
+  with `--stage full --variants PL1C`, all four GPUs, pTV root
+  `/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm`, native raw root
+  `/database/datasets/lungCT/DIR-Lab/raw/4DCT`, native mask root
+  `/database/datasets/lungCT/DIR-Lab/processed/lungmask_R231_native`.
+- Primary metrics: all-case native snap TRE, registration-grid subvoxel TRE,
+  foreground stdlogJ, foreground nonpositive-Jacobian percentage, per-case TRE,
+  runtime, and peak memory.
+- Acceptance: technical only; require expected artifacts, finite metrics,
+  protocol `PL`, fixed T00 lung-mask sampling and metric rules, exact schedule
+  identity, exact loss/weight metadata, and completed posthoc regularity. TRE
+  and stdlogJ magnitude are selection metrics, not completion gates.
+- Known limitation: `PL1C` uses sampled pTVReg-style LCC/isoTV on a DUAL SIREN
+  displacement and original DUAL blur schedule; it is a loss-control curve
+  candidate, not a reproduced pTVReg or MR-D-BSCP architecture.
