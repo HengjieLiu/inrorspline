@@ -32,7 +32,9 @@ from scripts.experiments.lungct_dual_inr_controlled.adapter import (
     resolve_device,
     seed_everything,
     train_controlled,
+    variant_loss_branch,
     variant_protocol,
+    variant_schedule,
 )
 from scripts.experiments.lungct_dual_inr_controlled.data import (
     ControlledCase,
@@ -117,8 +119,10 @@ def source_bundle() -> dict[str, Any]:
     paths = [
         Path(__file__).resolve(),
         Path(__file__).with_name("adapter.py").resolve(),
+        Path(__file__).with_name("aggregate_lungmask_revision.py").resolve(),
         Path(__file__).with_name("data.py").resolve(),
         Path(__file__).with_name("launch_all.py").resolve(),
+        Path(__file__).with_name("launch_lungmask_revision.py").resolve(),
     ]
     bundle = hashlib.sha256()
     records: list[dict[str, Any]] = []
@@ -170,8 +174,18 @@ def validate_output_root(output_root: Path, data_roots: Sequence[Path]) -> Path:
     return output_root
 
 
-def new_output_dir(output_root: Path, variant: str, case_id: int) -> Path:
-    output_dir = output_root / variant.lower() / f"case_{case_id:02d}"
+def new_output_dir(
+    output_root: Path,
+    variant: str,
+    case_id: int,
+    *,
+    run_tag: str | None = None,
+) -> Path:
+    output_dir = (
+        output_root / str(run_tag) / variant.lower() / f"case_{case_id:02d}"
+        if run_tag
+        else output_root / variant.lower() / f"case_{case_id:02d}"
+    )
     output_dir.parent.mkdir(parents=True, exist_ok=True)
     try:
         output_dir.mkdir()
@@ -251,6 +265,7 @@ def run_case(args: argparse.Namespace) -> dict[str, Any]:
     case_started = time.perf_counter()
     variant = str(args.variant).upper()
     protocol = variant_protocol(variant)
+    loss_branch = variant_loss_branch(variant)
     native_raw_root = args.native_raw_root.resolve()
     native_mask_root = args.native_mask_root.resolve()
     ptv_root = args.ptv_root.resolve()
@@ -282,9 +297,15 @@ def run_case(args: argparse.Namespace) -> dict[str, Any]:
     seed_everything(int(args.seed))
     run_mode = "short_smoke" if args.smoke else "full_length"
     lengths = (1, 1, 1, 1) if args.smoke else LOCKED_STAGE_LENGTHS
-    config = build_controlled_config(variant, stage_lengths=lengths)
+    config = build_controlled_config(
+        variant,
+        stage_lengths=lengths,
+        regularization_multiplier=float(args.regularization_multiplier),
+        ptv_isotv_weight=args.ptv_isotv_weight,
+    )
     config["controlled_adapter"]["run_mode"] = run_mode
     config["controlled_adapter"]["seed"] = int(args.seed)
+    config["controlled_adapter"]["run_tag"] = args.run_tag or None
 
     case = load_controlled_case(
         protocol=protocol,
@@ -293,13 +314,19 @@ def run_case(args: argparse.Namespace) -> dict[str, Any]:
         native_mask_root=native_mask_root,
         ptv_root=ptv_root,
     )
-    output_dir = new_output_dir(output_root, variant, int(args.case_id))
+    output_dir = new_output_dir(
+        output_root,
+        variant,
+        int(args.case_id),
+        run_tag=args.run_tag or None,
+    )
     stdout_path = output_dir / "stdout.log"
     stderr_path = output_dir / "stderr.log"
     stderr_path.touch()
     stdout_path.write_text(
         f"START {utc_now()} variant={variant} case={args.case_id:02d} "
-        f"protocol={protocol} seed={args.seed} device={device}\n",
+        f"protocol={protocol} loss_branch={loss_branch} "
+        f"seed={args.seed} device={device}\n",
         encoding="utf-8",
     )
     partial_policy = {
@@ -312,6 +339,9 @@ def run_case(args: argparse.Namespace) -> dict[str, Any]:
         {
             "status": "running",
             "variant": variant,
+            "protocol": protocol,
+            "loss_branch_identifier": loss_branch,
+            "run_tag": args.run_tag or None,
             "case_id": int(args.case_id),
             "seed": int(args.seed),
             "run_mode": run_mode,
@@ -353,6 +383,8 @@ def run_case(args: argparse.Namespace) -> dict[str, Any]:
                 "device_resolved": str(device),
                 "variant": variant,
                 "protocol": protocol,
+                "loss_branch_identifier": loss_branch,
+                "run_tag": args.run_tag or None,
                 "case_id": int(args.case_id),
                 "seed": int(args.seed),
                 "run_mode": run_mode,
@@ -437,21 +469,47 @@ def run_case(args: argparse.Namespace) -> dict[str, Any]:
             total_peak_allocated = None
             total_peak_reserved = None
         total_wall_seconds = time.perf_counter() - case_started
+        stage_starts = [
+            int(stage["start_step"])
+            for stage in result["stages"]
+            if "start_step" in stage
+        ]
+        stage_lengths = [
+            int(stage.get("length", int(stage.get("end_step_exclusive", 0)) - int(stage["start_step"])))
+            for stage in result["stages"]
+            if "start_step" in stage
+        ]
+        image_factors = [
+            int(stage.get("image_factor", 1))
+            for stage in result["stages"]
+            if "image_factor" in stage
+        ]
+        blur_sigmas = [
+            float(stage["blur_sigma"])
+            for stage in result["stages"]
+            if "blur_sigma" in stage
+        ]
         summary = {
             "schema_version": 1,
             "status": "complete",
             "variant": variant,
             "protocol": protocol,
+            "loss_branch_identifier": loss_branch,
+            "run_tag": args.run_tag or None,
             "case_id": int(args.case_id),
             "seed": int(args.seed),
             "run_mode": run_mode,
             "shape_xyz": list(case.shape_xyz),
             "spacing_xyz_mm": [float(value) for value in case.spacing_xyz],
             "sampling_rule": case.provenance.get("optimization_mask_rule"),
+            "metric_mask_rule": case.provenance.get("metric_mask_rule"),
+            "loss_branch_identifier": loss_branch,
             "protocol_tags": case.provenance.get("protocol_tags", {}),
-            "stage_starts": config["training"]["stage_starts"],
-            "stage_lengths": config["training"]["stage_lengths"],
-            "image_factors": config["training"]["image_factors"],
+            "schedule_name": variant_schedule(variant),
+            "stage_starts": stage_starts or config["training"]["stage_starts"],
+            "stage_lengths": stage_lengths or config["training"]["stage_lengths"],
+            "image_factors": image_factors or config["training"]["image_factors"],
+            "blur_sigmas": blur_sigmas,
             "stages": result["stages"],
             "fine_activation_step": result["fine_activation_step"],
             "final_training_record": history[-1],
@@ -468,6 +526,10 @@ def run_case(args: argparse.Namespace) -> dict[str, Any]:
             },
             "optimizer_resolved": result["optimizer_settings"],
             "scheduler_resolved": result["scheduler_settings"],
+            "regularization_multiplier": float(args.regularization_multiplier),
+            "resolved_regularization_weights": config["controlled_adapter"].get(
+                "resolved_regularization_weights", {}
+            ),
             "data": _case_metadata(case),
             "artifacts": {
                 "history": "history.csv",
@@ -482,7 +544,7 @@ def run_case(args: argparse.Namespace) -> dict[str, Any]:
             },
             "claim_limits": {
                 "schedule_isolation": (
-                    "compare N0/N1 or P0/P1 only; N/P changes preprocessing protocol"
+                    "compare N0/N1 or P0/P1 only; N/P/PL changes preprocessing or mask protocol"
                 ),
                 "multiresolution": (
                     "MR-D-BSCP-shaped image pyramid, not a B-spline control schedule"
@@ -497,6 +559,8 @@ def run_case(args: argparse.Namespace) -> dict[str, Any]:
                 "status": "complete",
                 "variant": variant,
                 "protocol": protocol,
+                "loss_branch_identifier": loss_branch,
+                "run_tag": args.run_tag or None,
                 "case_id": int(args.case_id),
                 "seed": int(args.seed),
                 "run_mode": run_mode,
@@ -524,6 +588,8 @@ def run_case(args: argparse.Namespace) -> dict[str, Any]:
             "status": "failed",
             "variant": variant,
             "protocol": protocol,
+            "loss_branch_identifier": loss_branch,
+            "run_tag": args.run_tag or None,
             "case_id": int(args.case_id),
             "seed": int(args.seed),
             "run_mode": run_mode,
@@ -553,6 +619,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--native-mask-root", type=Path, required=True)
     parser.add_argument("--ptv-root", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--run-tag", default="")
+    parser.add_argument("--regularization-multiplier", type=float, default=1.0)
+    parser.add_argument("--ptv-isotv-weight", type=float, default=None)
     parser.add_argument("--eval-chunk-size", type=int, default=262144)
     parser.add_argument(
         "--smoke",
@@ -566,6 +635,10 @@ def main() -> None:
     args = build_parser().parse_args()
     if args.eval_chunk_size <= 0:
         raise ValueError("--eval-chunk-size must be positive")
+    if args.regularization_multiplier <= 0.0:
+        raise ValueError("--regularization-multiplier must be positive")
+    if args.ptv_isotv_weight is not None and args.ptv_isotv_weight <= 0.0:
+        raise ValueError("--ptv-isotv-weight must be positive when provided")
     run_case(args)
 
 

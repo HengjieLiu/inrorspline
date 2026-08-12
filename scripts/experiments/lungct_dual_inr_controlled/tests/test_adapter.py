@@ -44,7 +44,18 @@ def stub_external_config(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_locked_four_variant_schedule_and_fine_activation(
     stub_external_config: None,
 ) -> None:
-    assert adapter.VARIANTS == ("N0", "N1", "P0", "P1")
+    assert adapter.LEGACY_VARIANTS == ("N0", "N1", "P0", "P1")
+    assert adapter.LUNGMASK_REVISION_VARIANTS == ("PL1D", "PL1B", "PL1A", "PL1C")
+    assert adapter.VARIANTS == (
+        "N0",
+        "N1",
+        "P0",
+        "P1",
+        "PL1D",
+        "PL1B",
+        "PL1A",
+        "PL1C",
+    )
     assert adapter.FULL_RESOLUTION_FACTORS == (1, 1, 1, 1)
     assert adapter.MULTIRESOLUTION_FACTORS == (8, 4, 2, 1)
     assert adapter.LOCKED_STAGE_LENGTHS == (400, 400, 800, 900)
@@ -57,37 +68,126 @@ def test_locked_four_variant_schedule_and_fine_activation(
         "N1": ("N", [8, 4, 2, 1]),
         "P0": ("P", [1, 1, 1, 1]),
         "P1": ("P", [8, 4, 2, 1]),
+        "PL1D": ("PL", [8, 4, 2, 1]),
+        "PL1B": ("PL", [8, 4, 2, 1]),
+        "PL1A": ("PL", [1, 1, 1]),
+        "PL1C": ("PL", [1, 1, 1]),
     }
     for variant, (protocol, factors) in expected.items():
         config = adapter.build_controlled_config(variant)
         assert adapter.variant_protocol(variant) == protocol
         assert list(adapter.variant_factors(variant)) == factors
         assert config["training"]["image_factors"] == factors
-        assert config["training"]["stage_lengths"] == [400, 400, 800, 900]
-        assert config["training"]["stage_starts"] == [0, 400, 800, 1600]
-        assert config["training"]["total_steps"] == 2500
+        if variant in {"PL1A", "PL1C"}:
+            assert config["training"]["stage_lengths"] == [3000]
+            assert config["training"]["stage_starts"] == [0]
+            assert config["training"]["total_steps"] == 3000
+            assert config["training"]["blur_sigmas"] == [4.0, 2.0, 0.0]
+            assert adapter.variant_schedule(variant) == adapter.SCHEDULE_AUTHOR_BLUR
+        else:
+            assert config["training"]["stage_lengths"] == [400, 400, 800, 900]
+            assert config["training"]["stage_starts"] == [0, 400, 800, 1600]
+            assert config["training"]["total_steps"] == 2500
+            assert adapter.variant_schedule(variant) == adapter.SCHEDULE_IMAGE_PYRAMID
         assert config["training"]["fine_start_stage"] == 1
-        assert config["training"]["stage_starts"][
-            config["training"]["fine_start_stage"]
-        ] == 400
+        if variant not in {"PL1A", "PL1C"}:
+            assert config["training"]["stage_starts"][
+                config["training"]["fine_start_stage"]
+            ] == 400
 
 
 def test_controlled_objective_and_stage_reset_contract(
     stub_external_config: None,
 ) -> None:
-    for variant in adapter.VARIANTS:
+    for variant in adapter.LEGACY_VARIANTS + ("PL1D", "PL1A"):
         config = adapter.build_controlled_config(variant)
         assert config["loss"]["mask_weight"] == pytest.approx(0.0)
         assert config["loss"]["laplace_weight"] == pytest.approx(0.01)
         assert config["loss"]["jacobian_weight"] == pytest.approx(0.01)
         assert config["loss"]["fine_reg_scale"] == pytest.approx(0.1)
-        assert config["optimizer"]["reset_each_stage"] is True
-        assert config["scheduler"]["reset_each_stage"] is True
-        assert (
-            config["controlled_adapter"]["optimizer_state_policy"]
-            == "fresh_adamw_each_stage"
-        )
+        if variant == "PL1A":
+            assert config["optimizer"]["reset_each_stage"] is False
+            assert config["scheduler"]["reset_each_stage"] is False
+            assert config["scheduler"]["reset_on_blur_change"] is True
+            assert (
+                config["controlled_adapter"]["optimizer_state_policy"]
+                == "single_adamw_persistent_moments"
+            )
+            assert (
+                config["controlled_adapter"]["stage_policy"]
+                == "author_dynamic_convergence"
+            )
+        else:
+            assert config["optimizer"]["reset_each_stage"] is True
+            assert config["scheduler"]["reset_each_stage"] is True
+            assert (
+                config["controlled_adapter"]["optimizer_state_policy"]
+                == "fresh_adamw_each_stage"
+            )
         assert config["controlled_adapter"]["semantic_mask_loss_present"] is False
+        assert (
+            config["controlled_adapter"]["loss_branch_identifier"]
+            == adapter.LOSS_BRANCH_DUAL_NATIVE
+        )
+
+
+def test_lungmask_revision_idir_be_branch_disables_dual_native_regularizers(
+    stub_external_config: None,
+) -> None:
+    config = adapter.build_controlled_config("PL1B")
+
+    assert adapter.variant_protocol("PL1B") == "PL"
+    assert adapter.variant_loss_branch("PL1B") == adapter.LOSS_BRANCH_IDIR_BE
+    assert config["loss"]["mask_weight"] == pytest.approx(0.0)
+    assert config["loss"]["laplace_weight"] == pytest.approx(0.0)
+    assert config["loss"]["jacobian_weight"] == pytest.approx(0.0)
+    assert config["loss"]["fine_reg_scale"] == pytest.approx(0.0)
+    assert config["loss"]["idir_bending_weight"] == pytest.approx(10.0)
+    assert (
+        config["controlled_adapter"]["loss_scope"]
+        == "sampled_global_ncc_plus_idir_coordinate_autograd_bending_energy"
+    )
+
+
+def test_lungmask_revision_ptv_lcc_tv_branch_uses_author_blur(
+    stub_external_config: None,
+) -> None:
+    config = adapter.build_controlled_config("PL1C")
+
+    assert adapter.variant_protocol("PL1C") == "PL"
+    assert adapter.variant_loss_branch("PL1C") == adapter.LOSS_BRANCH_PTV_LCC_TV
+    assert adapter.variant_schedule("PL1C") == adapter.SCHEDULE_AUTHOR_BLUR
+    assert config["loss"]["mask_weight"] == pytest.approx(0.0)
+    assert config["loss"]["laplace_weight"] == pytest.approx(0.0)
+    assert config["loss"]["jacobian_weight"] == pytest.approx(0.0)
+    assert config["loss"]["fine_reg_scale"] == pytest.approx(0.0)
+    assert config["loss"]["ptv_isotv_weight"] == pytest.approx(0.055)
+    assert config["loss"]["ptv_lcc_sigma_mm"] == pytest.approx(2.1)
+    assert config["loss"]["sampled_lcc_centers"] == 512
+    assert config["loss"]["sampled_lcc_offsets"] == 64
+    assert (
+        config["controlled_adapter"]["loss_scope"]
+        == "sampled_ptv_lcc_plus_sampled_physical_isotv"
+    )
+
+
+def test_regularization_multiplier_scales_variant_specific_weights(
+    stub_external_config: None,
+) -> None:
+    native = adapter.build_controlled_config("PL1D", regularization_multiplier=10.0)
+    be = adapter.build_controlled_config("PL1B", regularization_multiplier=0.1)
+    ptv = adapter.build_controlled_config("PL1C", ptv_isotv_weight=0.17)
+
+    assert native["loss"]["jacobian_weight"] == pytest.approx(0.1)
+    assert native["loss"]["laplace_weight"] == pytest.approx(0.1)
+    assert native["controlled_adapter"]["resolved_regularization_weights"][
+        "fine_jacobian_weight"
+    ] == pytest.approx(0.01)
+    assert be["loss"]["idir_bending_weight"] == pytest.approx(1.0)
+    assert ptv["loss"]["ptv_isotv_weight"] == pytest.approx(0.17)
+    assert ptv["controlled_adapter"]["resolved_regularization_weights"][
+        "ptv_isotv_weight"
+    ] == pytest.approx(0.17)
 
 
 def test_factor_one_loss_volume_is_exact_identity() -> None:

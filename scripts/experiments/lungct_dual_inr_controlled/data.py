@@ -22,7 +22,7 @@ from scripts.data.common import lungct as lungct_io
 from scripts.experiments.lungct_no_sweep_repro import common
 
 
-PROTOCOLS = ("N", "P")
+PROTOCOLS = ("N", "P", "PL")
 PTV_BORDER_VOXELS = 5
 
 
@@ -31,9 +31,10 @@ class ControlledCase:
     """One fixed-T00/moving-T50 case in DUAL's xyz array convention.
 
     ``sampling_mask_xyz`` defines the optimization domain.  It is the fixed
-    T00 R231 lung mask for protocol N and the exact five-voxel pTV interior for
-    protocol P.  ``metric_mask_xyz`` is always the fixed T00 lung mask and is
-    deliberately separate because protocol P must not use it for optimization.
+    T00 R231 lung mask for protocol N, the exact five-voxel pTV interior for
+    protocol P, and the fixed T00 pTV 1 mm lung mask for protocol PL.
+    ``metric_mask_xyz`` is always the fixed T00 lung mask and is deliberately
+    separate because protocol P must not use it for optimization.
     """
 
     protocol: str
@@ -355,6 +356,13 @@ def _validate_controlled_case(case: ControlledCase) -> None:
             )
         if case.ptv_case is None:
             raise ValueError("Protocol P must retain its shared pTV case object")
+    elif case.protocol == "PL":
+        if not np.array_equal(case.sampling_mask_xyz, case.metric_mask_xyz):
+            raise ValueError(
+                "Protocol PL sampling and metric masks must both be fixed T00 lung mask"
+            )
+        if case.ptv_case is None:
+            raise ValueError("Protocol PL must retain its shared pTV case object")
 
 
 def _load_native_case(
@@ -436,13 +444,23 @@ def _load_native_case(
     return result
 
 
-def _load_ptv_case(case_id: int, ptv_root: Path) -> ControlledCase:
+def _load_ptv_case(
+    case_id: int,
+    ptv_root: Path,
+    *,
+    use_fixed_lung_mask_for_sampling: bool = False,
+) -> ControlledCase:
     common_root = _resolve_ptv_common_root(ptv_root, case_id)
     ptv_case = common.load_case(common_root, case_id, dataset="4dct")
     fixed = _zyx_to_xyz_array(ptv_case.fixed.astype(np.float32, copy=False))
     moving = _zyx_to_xyz_array(ptv_case.moving.astype(np.float32, copy=False))
     metric_mask = _zyx_to_xyz_array(ptv_case.fixed_mask.astype(np.uint8, copy=False))
-    sampling_mask = make_border_five_mask_xyz(fixed.shape)
+    protocol = "PL" if use_fixed_lung_mask_for_sampling else "P"
+    sampling_mask = (
+        metric_mask.copy()
+        if use_fixed_lung_mask_for_sampling
+        else make_border_five_mask_xyz(fixed.shape)
+    )
     fixed_landmarks = np.ascontiguousarray(
         ptv_case.landmarks_fixed[:, ::-1], dtype=np.float64
     )
@@ -464,15 +482,27 @@ def _load_ptv_case(case_id: int, ptv_root: Path) -> ControlledCase:
         ),
     }
     provenance: dict[str, Any] = {
-        "protocol_handle": "ptv_landmark_crop_1mm_no_lungmask",
+        "protocol_handle": (
+            "ptv_landmark_crop_1mm_with_fixed_t00_lungmask"
+            if use_fixed_lung_mask_for_sampling
+            else "ptv_landmark_crop_1mm_no_lungmask"
+        ),
         "protocol_tags": {
             "dataset": "4dct",
             "image_domain": "landmark_crop",
             "spacing": "isotropic_1mm",
             "crop_rule": "landmark_bbox_margin_xyz_10_10_5",
             "intensity_rule": "ct_clip_80_900_scale_0_1",
-            "mask_rule": "none",
-            "loss_domain": "border_masked",
+            "mask_rule": (
+                "fixed_t00_lung_mask"
+                if use_fixed_lung_mask_for_sampling
+                else "none"
+            ),
+            "loss_domain": (
+                "mask_sampled"
+                if use_fixed_lung_mask_for_sampling
+                else "border_masked"
+            ),
             "metric_domain": "native_landmarks_after_crop_conversion",
             "metric_resolution": "native_full_or_crop_and_cropped_1mm_reg",
             "tre_mode": "both",
@@ -490,8 +520,16 @@ def _load_ptv_case(case_id: int, ptv_root: Path) -> ControlledCase:
         "intensity_rule": "ct_clip_80_900_scale_0_1",
         "crop_rule": "landmark_bbox_margin_xyz_10_10_5",
         "spacing_rule": "approximately_isotropic_1mm",
-        "optimization_mask_rule": "exact_border_five_interior_no_lung_mask",
-        "metric_mask_rule": "fixed_t00_lung_mask_metric_only",
+        "optimization_mask_rule": (
+            "fixed_t00_lung_mask"
+            if use_fixed_lung_mask_for_sampling
+            else "exact_border_five_interior_no_lung_mask"
+        ),
+        "metric_mask_rule": (
+            "fixed_t00_lung_mask"
+            if use_fixed_lung_mask_for_sampling
+            else "fixed_t00_lung_mask_metric_only"
+        ),
         "landmark_rule": "canonical_ptv_reg1mm_zyx_transposed_to_xyz",
         "shape_zyx": [int(value) for value in ptv_case.shape_zyx],
         "shape_xyz": [int(value) for value in fixed.shape],
@@ -519,7 +557,7 @@ def _load_ptv_case(case_id: int, ptv_root: Path) -> ControlledCase:
             f"range=({float(np.min(moving))}, {float(np.max(moving))})"
         )
     result = ControlledCase(
-        protocol="P",
+        protocol=protocol,
         case_id=case_id,
         fixed=fixed,
         moving=moving,
@@ -554,7 +592,11 @@ def load_controlled_case(
     case_id = _validate_case_id(case_id)
     if protocol == "N":
         return _load_native_case(case_id, Path(native_raw_root), Path(native_mask_root))
-    return _load_ptv_case(case_id, Path(ptv_root))
+    return _load_ptv_case(
+        case_id,
+        Path(ptv_root),
+        use_fixed_lung_mask_for_sampling=protocol == "PL",
+    )
 
 
 def normalized_field_xyz_to_voxel_xyz(
@@ -841,9 +883,9 @@ def evaluate_ptv_metrics(
 ) -> dict[str, object]:
     """Evaluate P on its 1mm grid and in the converted native-crop headline domain."""
 
-    if case.protocol != "P" or case.ptv_case is None:
+    if case.protocol not in {"P", "PL"} or case.ptv_case is None:
         raise ValueError(
-            f"evaluate_ptv_metrics requires protocol P, got {case.protocol}"
+            f"evaluate_ptv_metrics requires protocol P/PL, got {case.protocol}"
         )
     field = np.asarray(dense_disp_voxel_xyz)
     if field.shape != case.shape_xyz + (3,):
@@ -913,7 +955,7 @@ def evaluate_ptv_metrics(
         else None
     )
     return {
-        "protocol": "P",
+        "protocol": case.protocol,
         "coordinate_frame": "ptv_reg1mm_voxel_xyz",
         "spacing_order": "xyz",
         "identity_tre": reg_identity,
