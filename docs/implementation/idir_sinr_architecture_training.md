@@ -98,6 +98,32 @@ derivatives sampled at voxel centers:
 - diffusion from first derivatives
 - BE from second and mixed derivatives
 
+## MR-SINR 8/4/2 Revision Variants
+
+The OASIS MR-SINR revision adds two multiresolution SINR variants in
+`scripts/experiments/oasis_alpha_sweep/run_one.py`.
+
+`mr_sinr842_composed` uses three independent residual SINR stages at BSCP
+`8,4,2`. Stage 8 registers the original moving image. Stage 4 registers the
+moving image already warped by the frozen stage-8 pull field. Stage 2 registers
+the moving image already warped by the frozen composed stage-8/stage-4 field.
+The final deformation is evaluated by pull-field composition:
+
+```text
+phi842(x) = phi8(phi4(phi2(x)))
+```
+
+The composed final deformation is not a single cubic B-spline field, so final
+regularity is reported with dense posthoc metrics. Per-stage training still
+uses full-image global NCC plus analytic cubic B-spline BE on the residual
+stage controls.
+
+`mr_sinr842_requery` uses one continued SINR generator across BSCP `8,4,2`.
+At each stage, the same generator is re-queried at the current control lattice
+and optimized as an absolute field. It does not compose fields between stages
+and is not exact knot insertion; transition-jump diagnostics record the field
+change caused by re-querying at the next lattice.
+
 ## OASIS Brain
 
 Primary OASIS protocol:
@@ -168,6 +194,24 @@ Current pTV-prep SINR cps4 setup:
   `1`.
 - Border-mask loss weighting is used for pTV loss methods; lung masks are used
   for foreground metrics, not as the pTV loss mask.
+
+Controlled DUAL-INR pTV 1 mm fixed-lung-mask revision:
+
+- Implementation path:
+  `scripts/experiments/lungct_dual_inr_controlled/`.
+- Protocol `PL` uses the canonical pTVReg-style 1 mm fixed/moving images and
+  fixed T00 lung mask, but unlike protocol `P`, it uses that fixed T00 mask as
+  the optimization sampling domain as well as the metric mask.
+- Pilot variants `PL1D` and `PL1B` keep the released DUAL architecture and
+  multiresolution image factors `8,4,2,1` with stage lengths
+  `400,400,800,900`.
+- `PL1D` uses the released DUAL native spatial regularization branch:
+  sampled global NCC plus weighted Laplacian and negative-Jacobian penalties,
+  with semantic/lobe/segmentation loss disabled.
+- `PL1B` replaces the DUAL native spatial regularizers with IDIR-style
+  coordinate-autograd bending energy on the total DUAL displacement. It
+  preserves the historical IDIR batch-size scaling and uses default pilot
+  weight `10.0`.
 
 LungCT metrics include landmark TRE and deformation regularity. The headline
 pTVReg-comparable TRE convention is original/native-crop snap TRE when those
