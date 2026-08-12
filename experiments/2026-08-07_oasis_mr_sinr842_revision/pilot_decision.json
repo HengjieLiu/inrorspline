@@ -1,0 +1,18 @@
+{
+  "completed_methods": [
+    "mr_sinr842_composed",
+    "mr_sinr842_requery"
+  ],
+  "expected_methods": [
+    "mr_sinr842_composed",
+    "mr_sinr842_requery"
+  ],
+  "complete": true,
+  "technical_pass": true,
+  "composed_minus_requery_dice": -0.027659659964811456,
+  "composed_minus_requery_hd95": 52.88728220691234,
+  "composed_minus_requery_log_jdet_std_fg": -0.05693253981828805,
+  "composed_minus_requery_jdet_le0_pct_fg": -4.635237881065972,
+  "promote_composed_candidate": false,
+  "decision_rule": "Promote only if both runs pass diagnostics and composed is not clearly worse: Dice >= requery-0.005, HD95 <= requery+0.10, logJ std <= requery+0.05, and J<=0 pct <= requery+0.5."
+}
