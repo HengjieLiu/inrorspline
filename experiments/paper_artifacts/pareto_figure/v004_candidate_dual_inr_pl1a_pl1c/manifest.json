@@ -1,0 +1,34 @@
+{
+  "artifact": "lungct_dual_inr_pl1a_pl1c_tre_sdlogj_overlay",
+  "base_rows": "experiments/paper_artifacts/pareto_figure/v002_candidate/lungct10_pareto_source_rows.csv",
+  "dual_methods": {
+    "PL1A": {
+      "display_method": "DUAL-INR (original DUAL loss)",
+      "method": "dual_inr_pl1a_author_blur_native_loss",
+      "method_family": "dual_inr",
+      "method_label": "DUAL-INR PL1A original blur native loss"
+    },
+    "PL1C": {
+      "display_method": "DUAL-INR (pTVReg loss)",
+      "method": "dual_inr_pl1c_author_blur_ptv_loss",
+      "method_family": "dual_inr",
+      "method_label": "DUAL-INR PL1C original blur pTVReg loss"
+    }
+  },
+  "ellipse_definition": "width = 2 * sample SD of foreground stdLogJ across cases; height = 2 * sample SD of native snap TRE across cases",
+  "generated_utc": "2026-08-11T23:34:26+00:00",
+  "outputs": [
+    "experiments/paper_artifacts/pareto_figure/v004_candidate_dual_inr_pl1a_pl1c/lungct10_dual_overlay/default_exclusions/original_snap_tre_mean_mm_vs_fg_logj_std.png",
+    "experiments/paper_artifacts/pareto_figure/v004_candidate_dual_inr_pl1a_pl1c/lungct10_dual_overlay_paper_no_annotations/default_exclusions/original_snap_tre_mean_mm_vs_fg_logj_std.png"
+  ],
+  "plotted_methods": [
+    "idir_be_default_lungmask",
+    "direct_cp_32_16_8_4_global_ncc_fd_be",
+    "direct_cp_32_16_8_4_ptv_lcc_isotv",
+    "dual_inr_pl1a_author_blur_native_loss",
+    "dual_inr_pl1c_author_blur_ptv_loss",
+    "ptvreg_reference"
+  ],
+  "source_rows": "experiments/paper_artifacts/pareto_figure/v004_candidate_dual_inr_pl1a_pl1c/lungct10_dual_overlay_source_rows.csv",
+  "stage2_points": "experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_revision/stage2_curve_points.csv"
+}
