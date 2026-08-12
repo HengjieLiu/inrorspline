@@ -1,0 +1,15 @@
+{
+  "accepted_count": 160,
+  "all_complete": true,
+  "attempt_count": 160,
+  "expected_count": 160,
+  "gpu_by_variant": {
+    "PL1A": 2,
+    "PL1B": 1,
+    "PL1C": 3,
+    "PL1D": 0
+  },
+  "missing": [],
+  "one_variant_per_gpu": true,
+  "updated_utc": "2026-08-11T23:25:26.257536+00:00"
+}
