@@ -35,6 +35,8 @@ METHODS = [
     "direct_cp_cps4_be_bspline_analytic",
     "direct_cp_cps2_be_bspline_analytic",
     "direct_cp_8_4_2_be_bspline_analytic_multistage",
+    "mr_sinr842_composed",
+    "mr_sinr842_requery",
 ]
 
 
@@ -546,6 +548,8 @@ def method_key(args: argparse.Namespace) -> str:
 
 
 def method_cps(method: str) -> Optional[int]:
+    if method in {"mr_sinr842_composed", "mr_sinr842_requery"}:
+        return 2
     if method == "direct_cp_8_4_2_be_bspline_analytic_multistage":
         return 2
     if method in {"sinr_cps2_be_bspline_analytic", "direct_cp_cps2_be_bspline_analytic"}:
@@ -565,7 +569,11 @@ def build_run_name(args: argparse.Namespace, lr: float) -> str:
     key = method_key(args)
     if args.run_name:
         return args.run_name
-    if args.method == "direct_cp_8_4_2_be_bspline_analytic_multistage":
+    if args.method in {
+        "direct_cp_8_4_2_be_bspline_analytic_multistage",
+        "mr_sinr842_composed",
+        "mr_sinr842_requery",
+    }:
         early_stop_suffix = ""
         if str(args.stage_early_stop_mode) != "none":
             early_stop_suffix = (
@@ -1049,6 +1057,492 @@ def build_spline_generator(
     if args.method.startswith("direct_cp_"):
         return c.DirectCPGenerator(control_shape)
     return c.NetworkGenerator(c.build_siren(args.hidden_dim, args.hidden_layers, args.spline_omega))
+
+
+def sample_dense_vector_field(field_dhw3: torch.Tensor, coords_dhw3: torch.Tensor) -> torch.Tensor:
+    return torch.stack(
+        [c.warp_full(field_dhw3[..., component], coords_dhw3, mode="bilinear") for component in range(3)],
+        dim=-1,
+    )
+
+
+def compose_pull_coords(
+    outer_coords: torch.Tensor,
+    inner_disp: torch.Tensor,
+    id_dense: torch.Tensor,
+) -> torch.Tensor:
+    inner_coords = id_dense + inner_disp
+    return sample_dense_vector_field(outer_coords, inner_coords)
+
+
+def scalar_difference_metrics(diff: torch.Tensor, prefix: str) -> Dict[str, float]:
+    flat = diff.detach().reshape(-1)
+    abs_flat = flat.abs()
+    return {
+        f"{prefix}mean_abs": float(abs_flat.mean().detach().cpu()),
+        f"{prefix}max_abs": float(abs_flat.max().detach().cpu()),
+        f"{prefix}rmse": float(torch.sqrt(torch.mean(flat.square())).detach().cpu()),
+        f"{prefix}p95_abs": float(torch.quantile(abs_flat, 0.95).detach().cpu()),
+    }
+
+
+def train_mr_sinr_stage(
+    args: argparse.Namespace,
+    *,
+    fixed_image: torch.Tensor,
+    moving_for_stage: torch.Tensor,
+    generator: torch.nn.Module,
+    control_coords: torch.Tensor,
+    control_shape: Tuple[int, int, int],
+    full_cps: int,
+    downsample: int,
+    epochs: int,
+    lr: float,
+    stage_idx: int,
+    global_epoch_offset: int,
+    total_epochs: int,
+    stage_role: str,
+) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, object], List[Dict[str, object]]]:
+    fixed_l, blur_sigma, blur_kernel = c.make_loss_volume(
+        fixed_image,
+        int(downsample),
+        float(args.antialias_sigma_scale),
+        float(args.antialias_radius_sigma),
+    )
+    moving_l, _sigma_m, _kernel_m = c.make_loss_volume(
+        moving_for_stage,
+        int(downsample),
+        float(args.antialias_sigma_scale),
+        float(args.antialias_radius_sigma),
+    )
+    eval_shape = tuple(int(v) for v in fixed_l.shape)
+    domain_cps = c.domain_cps_from_full(int(full_cps), int(downsample))
+    id_grid = c.make_coordinate_grid(eval_shape, fixed_image.device).detach()
+    optimizer = torch.optim.Adam(generator.parameters(), lr=float(lr))
+    rows: List[Dict[str, object]] = []
+    best_loss = float("inf")
+    best_data_loss = float("nan")
+    best_reg_loss = float("nan")
+    best_epoch = 0
+    stage_start = time.time()
+    print(
+        json.dumps(
+            {
+                "stage_start": int(stage_idx),
+                "stage_role": str(stage_role),
+                "full_cps": int(full_cps),
+                "downsample": int(downsample),
+                "domain_cps": int(domain_cps),
+                "control_shape_zyx": list(control_shape),
+                "eval_shape_zyx": list(eval_shape),
+                "epochs": int(epochs),
+                "lr": float(lr),
+                "alpha": float(args.alpha),
+                "image_loss": "sinr_ncc",
+                "regularizer": "analytic_cubic_bspline_be",
+            }
+        ),
+        flush=True,
+    )
+    for epoch in range(1, int(epochs) + 1):
+        generator.train()
+        output = generator(control_coords, control_shape)
+        control_grid = output.reshape(*control_shape, 3)
+        dense_disp = c.expand_on_shape(output, control_shape, int(full_cps), eval_shape, int(downsample))
+        warped = c.warp_full(moving_l, id_grid + dense_disp, mode="bilinear")
+        data_loss = c.ncc_loss(fixed_l[None, None], warped[None, None])
+        reg_loss = c.analytic_bspline_sampled_be(
+            control_grid,
+            eval_shape,
+            int(domain_cps),
+            component_reduction="mean",
+        )
+        loss = data_loss + float(args.alpha) * reg_loss
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
+        row = {
+            "stage_idx": float(stage_idx),
+            "epoch": float(epoch),
+            "global_epoch": float(int(global_epoch_offset) + int(epoch)),
+            "full_cps": float(full_cps),
+            "downsample": float(downsample),
+            "domain_cps": float(domain_cps),
+            "loss": float(loss.detach().cpu()),
+            "data_loss": float(data_loss.detach().cpu()),
+            "reg_loss": float(reg_loss.detach().cpu()),
+            "alpha": float(args.alpha),
+            "lr": float(lr),
+            "stage_role": str(stage_role),
+        }
+        rows.append(row)
+        current_loss = float(row["loss"])
+        if best_epoch == 0 or current_loss < best_loss:
+            best_loss = current_loss
+            best_data_loss = float(row["data_loss"])
+            best_reg_loss = float(row["reg_loss"])
+            best_epoch = int(epoch)
+        if epoch == 1 or epoch % int(args.eval_interval) == 0 or epoch == int(epochs):
+            print(json.dumps(row), flush=True)
+    actual_epochs = int(rows[-1]["epoch"]) if rows else 0
+    generator.eval()
+    with torch.no_grad():
+        final_output = generator(control_coords, control_shape)
+        final_control = final_output.reshape(*control_shape, 3).detach()
+        final_dense = c.expand_bspline_controls(
+            final_output,
+            control_shape,
+            c.IMAGE_SHAPE,
+            int(full_cps),
+        ).detach()
+    summary = {
+        "stage_idx": int(stage_idx),
+        "stage_role": str(stage_role),
+        "full_cps": int(full_cps),
+        "downsample": int(downsample),
+        "domain_cps": int(domain_cps),
+        "control_shape_zyx": list(int(v) for v in control_shape),
+        "eval_shape_zyx": list(eval_shape),
+        "n_control": int(np.prod(control_shape)),
+        "epochs": int(actual_epochs),
+        "requested_epochs": int(epochs),
+        "actual_epochs": int(actual_epochs),
+        "lr": float(lr),
+        "alpha": float(args.alpha),
+        "early_stop_mode": "none",
+        "min_epochs": int(epochs),
+        "patience": 0,
+        "check_interval": 0,
+        "rel_delta_total": 0.0,
+        "rel_delta_data": 0.0,
+        "stop_reason": "requested_epochs_complete",
+        "loss_mode": "sinr_ncc_bspline_be",
+        "antialias_sigma": float(blur_sigma),
+        "antialias_kernel_size": int(blur_kernel),
+        "elapsed_sec": float(time.time() - stage_start),
+        "control_abs_max_norm": float(final_control.abs().max().detach().cpu()),
+        "control_abs_p95_norm": float(torch.quantile(final_control.abs().reshape(-1), 0.95).detach().cpu()),
+        "best_loss": float(best_loss),
+        "best_loss_epoch": int(best_epoch),
+        "best_data_loss": float(best_data_loss),
+        "best_reg_loss": float(best_reg_loss),
+    }
+    return final_dense, final_control, summary, rows
+
+
+def train_mr_sinr842_composed(
+    args: argparse.Namespace,
+    batch: Dict[str, torch.Tensor | str | int | Dict[str, object]],
+    device: torch.device,
+    lr: float,
+    sampler: Optional[CheckpointSampler] = None,
+) -> Dict[str, object]:
+    stage_cps = c.parse_int_list(str(args.stage_full_cps))
+    stage_downsample = c.parse_stage_ints(str(args.stage_downsample), len(stage_cps))
+    stage_epochs = c.parse_stage_ints(str(args.stage_epochs), len(stage_cps))
+    stage_lr = c.parse_float_list(str(args.stage_lr), len(stage_cps), float(lr))
+    if int(sum(stage_epochs)) != int(args.epochs):
+        raise ValueError(f"stage_epochs sum {sum(stage_epochs)} != --epochs {args.epochs}")
+    if stage_cps != [8, 4, 2]:
+        raise ValueError(f"mr_sinr842_composed expects stage_full_cps [8, 4, 2], got {stage_cps}")
+
+    moving = batch["moving"]
+    fixed_image = batch["fixed"]
+    assert isinstance(moving, torch.Tensor)
+    assert isinstance(fixed_image, torch.Tensor)
+    id_dense = c.make_coordinate_grid(c.IMAGE_SHAPE, device).detach()
+    if sampler is not None and sampler.enabled:
+        sampler.record_dense(
+            epoch=0,
+            dense_disp_norm_xyz=torch.zeros((*c.IMAGE_SHAPE, 3), dtype=torch.float32, device=device),
+            row_extra={"method": args.method, "checkpoint_source": "composed_identity_init"},
+        )
+
+    torch.cuda.synchronize()
+    torch.cuda.reset_peak_memory_stats()
+    train_start = time.time()
+    stage_summaries: List[Dict[str, object]] = []
+    history: List[Dict[str, object]] = []
+    stage_controls: List[torch.Tensor] = []
+    stage_control_shapes: List[Tuple[int, int, int]] = []
+    stage_state_dicts: List[Dict[str, torch.Tensor]] = []
+    stage_dense_disps: List[torch.Tensor] = []
+    stage_coords: List[torch.Tensor] = []
+    composed_coords_by_stage: List[torch.Tensor] = []
+    composition_rows: List[Dict[str, object]] = []
+    prev_composed_coords = id_dense
+    global_epoch_offset = 0
+    moving_for_stage = moving
+
+    for stage_idx, (full_cps, downsample, epochs, stage_lr_value) in enumerate(
+        zip(stage_cps, stage_downsample, stage_epochs, stage_lr)
+    ):
+        control_coords, control_shape = c.bspline_control_coords(c.IMAGE_SHAPE, int(full_cps), device)
+        generator = c.NetworkGenerator(c.build_siren(args.hidden_dim, args.hidden_layers, args.spline_omega)).to(device)
+        dense_stage, control_stage, summary, rows = train_mr_sinr_stage(
+            args,
+            fixed_image=fixed_image,
+            moving_for_stage=moving_for_stage.detach(),
+            generator=generator,
+            control_coords=control_coords,
+            control_shape=control_shape,
+            full_cps=int(full_cps),
+            downsample=int(downsample),
+            epochs=int(epochs),
+            lr=float(stage_lr_value),
+            stage_idx=int(stage_idx),
+            global_epoch_offset=int(global_epoch_offset),
+            total_epochs=int(args.epochs),
+            stage_role="composed_residual",
+        )
+        with torch.no_grad():
+            if stage_idx == 0:
+                composed_coords = id_dense + dense_stage
+            else:
+                composed_coords = compose_pull_coords(prev_composed_coords, dense_stage, id_dense).detach()
+            moving_for_stage = c.warp_full(moving, composed_coords, mode="bilinear").detach()
+        if sampler is not None and sampler.should_record(global_epoch_offset + int(summary["actual_epochs"])):
+            sampler.record_dense(
+                epoch=global_epoch_offset + int(summary["actual_epochs"]),
+                dense_disp_norm_xyz=(composed_coords - id_dense).detach(),
+                row_extra={
+                    "method": args.method,
+                    "checkpoint_source": "stage_end_composed_field",
+                    "stage_idx": int(stage_idx),
+                    "stage_epoch": int(summary["actual_epochs"]),
+                    "full_cps": int(full_cps),
+                    "downsample": int(downsample),
+                },
+            )
+        stage_dense_disps.append(dense_stage.detach())
+        stage_coords.append((id_dense + dense_stage).detach())
+        composed_coords_by_stage.append(composed_coords.detach())
+        stage_controls.append(control_stage.detach().cpu())
+        stage_control_shapes.append(control_shape)
+        stage_state_dicts.append({k: v.detach().cpu() for k, v in generator.state_dict().items()})
+        stage_summaries.append(summary)
+        history.extend(rows)
+        global_epoch_offset += int(summary["actual_epochs"])
+        prev_composed_coords = composed_coords.detach()
+
+    with torch.no_grad():
+        seq_warped = moving
+        for stage_idx, coords in enumerate(stage_coords):
+            seq_warped = c.warp_full(seq_warped, coords, mode="bilinear")
+            composed_warped = c.warp_full(moving, composed_coords_by_stage[stage_idx], mode="bilinear")
+            row: Dict[str, object] = {
+                "diagnostic": "composed_vs_sequential_warp",
+                "stage_idx": int(stage_idx),
+                "stage_count": int(stage_idx + 1),
+            }
+            row.update(scalar_difference_metrics(composed_warped - seq_warped, "image_"))
+            composition_rows.append(row)
+    final_coords = composed_coords_by_stage[-1].detach()
+    torch.cuda.synchronize()
+    training_elapsed_sec = time.time() - train_start
+    training_peak_mem_gb = torch.cuda.max_memory_allocated() / (1024**3)
+    metrics = timed_evaluate_from_dense_coords(final_coords, batch)
+    metrics["history"] = [
+        {
+            **row,
+            "epoch": float(row["global_epoch"]),
+            "stage_epoch": float(row["epoch"]),
+        }
+        for row in history
+    ]
+    metrics["stage_history"] = history
+    metrics["stage_summaries"] = stage_summaries
+    metrics["composition_diagnostics"] = composition_rows
+    metrics["prolongation_diagnostics"] = []
+    metrics["stage_generator_state_dicts"] = stage_state_dicts
+    metrics["stage_control_disps"] = stage_controls
+    metrics["stage_control_shapes"] = [list(shape) for shape in stage_control_shapes]
+    metrics["dense_disp"] = (final_coords - id_dense).detach()
+    metrics["training_elapsed_sec"] = training_elapsed_sec
+    metrics["training_peak_mem_gb"] = training_peak_mem_gb
+    metrics["param_count"] = int(sum(sum(t.numel() for t in state.values()) for state in stage_state_dicts))
+    metrics["cps"] = 2
+    metrics["stage_full_cps"] = stage_cps
+    metrics["stage_downsample"] = stage_downsample
+    metrics["stage_epochs"] = stage_epochs
+    metrics["stage_requested_epochs"] = stage_epochs
+    metrics["stage_actual_epochs"] = [int(row["actual_epochs"]) for row in stage_summaries]
+    metrics["stage_lr"] = stage_lr
+    metrics["stage_early_stop_mode"] = "none"
+    metrics["stage_min_epochs"] = stage_epochs
+    metrics["stage_patience"] = [0 for _ in stage_cps]
+    metrics["stage_check_interval"] = [0 for _ in stage_cps]
+    metrics["stage_rel_delta_total"] = [0.0 for _ in stage_cps]
+    metrics["stage_rel_delta_data"] = [0.0 for _ in stage_cps]
+    metrics["stage_stop_reasons"] = [str(row.get("stop_reason")) for row in stage_summaries]
+    metrics["requested_epochs"] = int(args.epochs)
+    metrics["actual_epochs"] = int(sum(metrics["stage_actual_epochs"]))
+    metrics["prolongation_preserve_check"] = False
+    metrics["save_intermediate_dense"] = False
+    metrics["nested_control_shapes_zyx"] = {
+        str(cps): shape for cps, shape in zip(stage_cps, metrics["stage_control_shapes"])
+    }
+    metrics["prolongation"] = "none_independent_residual_sinr_stages"
+    metrics["multistage_strategy"] = "independent_residual_sinr_stages_with_pull_field_composition"
+    metrics["field_composition"] = "phi842(x)=phi8(phi4(phi2(x))) using grid_sample align_corners=True"
+    metrics["final_field_is_single_bspline"] = False
+    return metrics
+
+
+def train_mr_sinr842_requery(
+    args: argparse.Namespace,
+    batch: Dict[str, torch.Tensor | str | int | Dict[str, object]],
+    device: torch.device,
+    lr: float,
+    sampler: Optional[CheckpointSampler] = None,
+) -> Dict[str, object]:
+    stage_cps = c.parse_int_list(str(args.stage_full_cps))
+    stage_downsample = c.parse_stage_ints(str(args.stage_downsample), len(stage_cps))
+    stage_epochs = c.parse_stage_ints(str(args.stage_epochs), len(stage_cps))
+    stage_lr = c.parse_float_list(str(args.stage_lr), len(stage_cps), float(lr))
+    if int(sum(stage_epochs)) != int(args.epochs):
+        raise ValueError(f"stage_epochs sum {sum(stage_epochs)} != --epochs {args.epochs}")
+    if stage_cps != [8, 4, 2]:
+        raise ValueError(f"mr_sinr842_requery expects stage_full_cps [8, 4, 2], got {stage_cps}")
+
+    moving = batch["moving"]
+    fixed_image = batch["fixed"]
+    assert isinstance(moving, torch.Tensor)
+    assert isinstance(fixed_image, torch.Tensor)
+    id_dense = c.make_coordinate_grid(c.IMAGE_SHAPE, device).detach()
+    generator = c.NetworkGenerator(c.build_siren(args.hidden_dim, args.hidden_layers, args.spline_omega)).to(device)
+    if sampler is not None and sampler.enabled:
+        sampler.record_dense(
+            epoch=0,
+            dense_disp_norm_xyz=torch.zeros((*c.IMAGE_SHAPE, 3), dtype=torch.float32, device=device),
+            row_extra={"method": args.method, "checkpoint_source": "requery_identity_init"},
+        )
+
+    torch.cuda.synchronize()
+    torch.cuda.reset_peak_memory_stats()
+    train_start = time.time()
+    stage_summaries: List[Dict[str, object]] = []
+    transition_rows: List[Dict[str, object]] = []
+    history: List[Dict[str, object]] = []
+    final_dense: Optional[torch.Tensor] = None
+    final_control: Optional[torch.Tensor] = None
+    final_control_shape: Optional[Tuple[int, int, int]] = None
+    global_epoch_offset = 0
+    prev_dense: Optional[torch.Tensor] = None
+
+    for stage_idx, (full_cps, downsample, epochs, stage_lr_value) in enumerate(
+        zip(stage_cps, stage_downsample, stage_epochs, stage_lr)
+    ):
+        control_coords, control_shape = c.bspline_control_coords(c.IMAGE_SHAPE, int(full_cps), device)
+        if prev_dense is not None:
+            generator.eval()
+            with torch.no_grad():
+                start_output = generator(control_coords, control_shape)
+                start_dense = c.expand_bspline_controls(
+                    start_output,
+                    control_shape,
+                    c.IMAGE_SHAPE,
+                    int(full_cps),
+                ).detach()
+            row: Dict[str, object] = {
+                "diagnostic": "requery_stage_transition_jump",
+                "stage_idx": int(stage_idx),
+                "from_full_cps": int(stage_cps[stage_idx - 1]),
+                "to_full_cps": int(full_cps),
+            }
+            row.update(c.field_difference_metrics(start_dense - prev_dense, prefix="jump_"))
+            transition_rows.append(row)
+            print(json.dumps({"stage_transition_jump": row}, allow_nan=True), flush=True)
+        dense_stage, control_stage, summary, rows = train_mr_sinr_stage(
+            args,
+            fixed_image=fixed_image,
+            moving_for_stage=moving,
+            generator=generator,
+            control_coords=control_coords,
+            control_shape=control_shape,
+            full_cps=int(full_cps),
+            downsample=int(downsample),
+            epochs=int(epochs),
+            lr=float(stage_lr_value),
+            stage_idx=int(stage_idx),
+            global_epoch_offset=int(global_epoch_offset),
+            total_epochs=int(args.epochs),
+            stage_role="continued_requery_absolute",
+        )
+        if sampler is not None and sampler.should_record(global_epoch_offset + int(summary["actual_epochs"])):
+            sampler.record_dense(
+                epoch=global_epoch_offset + int(summary["actual_epochs"]),
+                dense_disp_norm_xyz=dense_stage.detach(),
+                row_extra={
+                    "method": args.method,
+                    "checkpoint_source": "stage_end_absolute_field",
+                    "stage_idx": int(stage_idx),
+                    "stage_epoch": int(summary["actual_epochs"]),
+                    "full_cps": int(full_cps),
+                    "downsample": int(downsample),
+                },
+            )
+        final_dense = dense_stage.detach()
+        final_control = control_stage.detach()
+        final_control_shape = control_shape
+        prev_dense = dense_stage.detach()
+        stage_summaries.append(summary)
+        history.extend(rows)
+        global_epoch_offset += int(summary["actual_epochs"])
+
+    if final_dense is None or final_control is None or final_control_shape is None:
+        raise RuntimeError("MR-SINR requery produced no final field.")
+    final_coords = id_dense + final_dense
+    torch.cuda.synchronize()
+    training_elapsed_sec = time.time() - train_start
+    training_peak_mem_gb = torch.cuda.max_memory_allocated() / (1024**3)
+    metrics = timed_evaluate_from_dense_coords(final_coords, batch)
+    metrics["history"] = [
+        {
+            **row,
+            "epoch": float(row["global_epoch"]),
+            "stage_epoch": float(row["epoch"]),
+        }
+        for row in history
+    ]
+    metrics["stage_history"] = history
+    metrics["stage_summaries"] = stage_summaries
+    metrics["stage_transition_diagnostics"] = transition_rows
+    metrics["prolongation_diagnostics"] = []
+    metrics["generator"] = generator
+    metrics["control_shape"] = final_control_shape
+    metrics["control_coords"] = torch.empty(0, 3, dtype=torch.float32, device=device)
+    metrics["control_disp"] = final_control
+    metrics["dense_disp"] = final_dense.detach()
+    metrics["training_elapsed_sec"] = training_elapsed_sec
+    metrics["training_peak_mem_gb"] = training_peak_mem_gb
+    metrics["param_count"] = c.count_trainable_params(generator)
+    metrics["cps"] = 2
+    metrics["stage_full_cps"] = stage_cps
+    metrics["stage_downsample"] = stage_downsample
+    metrics["stage_epochs"] = stage_epochs
+    metrics["stage_requested_epochs"] = stage_epochs
+    metrics["stage_actual_epochs"] = [int(row["actual_epochs"]) for row in stage_summaries]
+    metrics["stage_lr"] = stage_lr
+    metrics["stage_early_stop_mode"] = "none"
+    metrics["stage_min_epochs"] = stage_epochs
+    metrics["stage_patience"] = [0 for _ in stage_cps]
+    metrics["stage_check_interval"] = [0 for _ in stage_cps]
+    metrics["stage_rel_delta_total"] = [0.0 for _ in stage_cps]
+    metrics["stage_rel_delta_data"] = [0.0 for _ in stage_cps]
+    metrics["stage_stop_reasons"] = [str(row.get("stop_reason")) for row in stage_summaries]
+    metrics["requested_epochs"] = int(args.epochs)
+    metrics["actual_epochs"] = int(sum(metrics["stage_actual_epochs"]))
+    metrics["prolongation_preserve_check"] = False
+    metrics["save_intermediate_dense"] = False
+    metrics["nested_control_shapes_zyx"] = {
+        str(cps): list(c.bspline_control_shape(c.IMAGE_SHAPE, int(cps))) for cps in stage_cps
+    }
+    metrics["prolongation"] = "none_continued_sinr_requery"
+    metrics["multistage_strategy"] = "single_continued_sinr_generator_requeried_at_8_4_2_absolute_fields"
+    metrics["field_composition"] = "none_absolute_final_stage_field"
+    metrics["final_field_is_single_bspline"] = True
+    return metrics
 
 
 def train_spline(
@@ -2203,6 +2697,8 @@ def write_outputs(
         state["control_shape"] = metrics["control_shape"]
     for key in (
         "stage_summaries",
+        "composition_diagnostics",
+        "stage_transition_diagnostics",
         "prolongation_diagnostics",
         "stage_full_cps",
         "stage_downsample",
@@ -2226,9 +2722,16 @@ def write_outputs(
         "best_loss_epoch",
         "best_data_loss",
         "best_reg_loss",
+        "multistage_strategy",
+        "field_composition",
+        "final_field_is_single_bspline",
     ):
         if key in metrics:
             state[key] = metrics[key]
+    if "stage_generator_state_dicts" in metrics:
+        state["stage_generator_state_dicts"] = metrics["stage_generator_state_dicts"]
+        state["stage_control_disps"] = metrics.get("stage_control_disps")
+        state["stage_control_shapes"] = metrics.get("stage_control_shapes")
     torch.save(state, run_dir / "model_state.pt")
     if "control_disp" in metrics:
         torch.save(
@@ -2260,6 +2763,12 @@ def write_outputs(
         c.write_csv(run_dir / "stage_history.csv", metrics["stage_history"])  # type: ignore[arg-type]
     if "stage_summaries" in metrics:
         c.write_csv(run_dir / "stage_summaries.csv", metrics["stage_summaries"])  # type: ignore[arg-type]
+    if "composition_diagnostics" in metrics:
+        c.write_csv(run_dir / "composition_diagnostics.csv", metrics["composition_diagnostics"])  # type: ignore[arg-type]
+        c.write_json(run_dir / "composition_diagnostics.json", metrics["composition_diagnostics"])
+    if "stage_transition_diagnostics" in metrics:
+        c.write_csv(run_dir / "stage_transition_diagnostics.csv", metrics["stage_transition_diagnostics"])  # type: ignore[arg-type]
+        c.write_json(run_dir / "stage_transition_diagnostics.json", metrics["stage_transition_diagnostics"])
     if "prolongation_diagnostics" in metrics:
         c.write_csv(run_dir / "prolongation_metrics.csv", metrics["prolongation_diagnostics"])  # type: ignore[arg-type]
     c.write_csv(run_dir / "case_metrics.csv", [c.accuracy_row(metrics, fixed_id, moving_id)])
@@ -2275,6 +2784,8 @@ def write_outputs(
     is_idir = args.method == "idir_original"
     is_direct_dvf = args.method == "direct_dvf_sampled_ncc_fd_be"
     is_dctfield = args.method == "dctfield_sampled_ncc_fd_be"
+    is_mr_sinr_composed = args.method == "mr_sinr842_composed"
+    is_mr_sinr_requery = args.method == "mr_sinr842_requery"
     is_bspline = not is_idir and not is_direct_dvf and not is_dctfield
     activation = (
         "dctfield_coefficients"
@@ -2292,7 +2803,7 @@ def write_outputs(
         else "dct_decoded_dense_forward_difference_be"
         if is_dctfield
         else "dense_forward_difference_be"
-        if is_direct_dvf
+        if (is_direct_dvf or is_mr_sinr_composed)
         else "be_bspline_analytic"
     )
     diffusion_type = (
@@ -2301,7 +2812,7 @@ def write_outputs(
         else "dct_decoded_dense_forward_difference"
         if is_dctfield
         else "dense_forward_difference"
-        if is_direct_dvf
+        if (is_direct_dvf or is_mr_sinr_composed)
         else "diffusion_bspline_analytic"
     )
     native_be_formula = (
@@ -2311,6 +2822,8 @@ def write_outputs(
         if is_dctfield
         else "not_available_dense_grid_dvf"
         if is_direct_dvf
+        else "not_single_bspline_final_field; residual_stage_training_uses_bspline_analytic"
+        if is_mr_sinr_composed
         else "bspline_analytic"
     )
     native_diffusion_formula = (
@@ -2320,6 +2833,8 @@ def write_outputs(
         if is_dctfield
         else "not_available_dense_grid_dvf"
         if is_direct_dvf
+        else "not_single_bspline_final_field; residual_stage_controls_have_bspline_analytic_derivatives"
+        if is_mr_sinr_composed
         else "bspline_analytic"
     )
     be_training_reduction = (
@@ -2329,6 +2844,8 @@ def write_outputs(
         if is_dctfield
         else "dense valid-stencil finite-difference BE over fixed image-positive mask; spatial mean plus component mean"
         if is_direct_dvf
+        else "final composed dense field uses posthoc dense finite-difference BE; each residual SINR stage trains with analytic cubic B-spline BE"
+        if is_mr_sinr_composed
         else "analytic cubic B-spline BE sampled at voxel centers; spatial mean plus component mean"
     )
     image_loss = "idir_global_ncc_sampled" if (is_idir or is_direct_dvf or is_dctfield) else "sinr_ncc"
@@ -2422,11 +2939,19 @@ def write_outputs(
         "best_data_loss": metrics.get("best_data_loss"),
         "best_reg_loss": metrics.get("best_reg_loss"),
         "stage_summaries": metrics.get("stage_summaries"),
+        "composition_diagnostics": metrics.get("composition_diagnostics"),
+        "stage_transition_diagnostics": metrics.get("stage_transition_diagnostics"),
         "prolongation_diagnostics": metrics.get("prolongation_diagnostics"),
         "prolongation_preserve_check": metrics.get("prolongation_preserve_check"),
         "save_intermediate_dense": metrics.get("save_intermediate_dense"),
         "nested_control_shapes_zyx": metrics.get("nested_control_shapes_zyx"),
         "prolongation": metrics.get("prolongation"),
+        "multistage_strategy": metrics.get("multistage_strategy"),
+        "field_composition": metrics.get("field_composition"),
+        "final_field_is_single_bspline": metrics.get("final_field_is_single_bspline"),
+        "mr_sinr_variant": (
+            "composed_residual" if is_mr_sinr_composed else "continued_requery_absolute" if is_mr_sinr_requery else None
+        ),
         "started_at": metrics.get("started_at"),
         "completed_at": c.now_text(),
         "training_elapsed_sec": float(metrics["training_elapsed_sec"]),
@@ -2621,13 +3146,14 @@ def main() -> None:
         supported_dvf_only = {
             "direct_cp_8_4_2_be_bspline_analytic_multistage",
             "direct_cp_cps4_be_bspline_analytic",
+            "direct_cp_cps2_be_bspline_analytic",
             "sinr_cps4_be_bspline_analytic",
             "sinr_cps2_be_bspline_analytic",
         }
         if args.method not in supported_dvf_only:
             raise ValueError(
                 "--output-mode dvf_only is only implemented for DirectCP 8-4-2 multistage, "
-                "DirectCP cps4, and SINR cps4/cps2."
+                "DirectCP cps4/cps2, and SINR cps4/cps2."
             )
         if not bool(args.save_final_dense):
             raise ValueError("--output-mode dvf_only requires --save-final-dense.")
@@ -2732,6 +3258,10 @@ def main() -> None:
             timer=active_timer,
             run_dir=run_dir,
         )
+    elif args.method == "mr_sinr842_composed":
+        metrics = train_mr_sinr842_composed(args, batch, device, lr, sampler=sampler)
+    elif args.method == "mr_sinr842_requery":
+        metrics = train_mr_sinr842_requery(args, batch, device, lr, sampler=sampler)
     else:
         metrics = train_spline(args, batch, device, lr, sampler=sampler, timer=active_timer)
     metrics["started_at"] = started_at
