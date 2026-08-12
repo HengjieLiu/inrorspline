@@ -167,6 +167,52 @@ experiments/2026-06-29_sinr_cp_kernel_followup/exploration/tables/standard_pyram
 *.7z
 docker/*.tar*
 
+# OASIS cps2 runtime sweep transient launcher/timing metadata. These files carry
+# run-local process/GPU details; tracked reports and aggregate timing tables
+# preserve the reviewable evidence.
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/command_timing_*.csv
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/gpu_state_*.csv
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/job_manifest*.csv
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/job_manifest*.json
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/launch_summary*.json
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/launcher_state.json
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/persistent_worker_summary_*.json
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/persistent_worker_timing_*.csv
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/case_metrics_combined.csv
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/dvf_only_direct_savings.csv
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/prolongation_metrics_combined.csv
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/regularity_metrics_combined.csv
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/stage_summaries_combined.csv
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/smoke/job_manifest*.csv
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/smoke/job_manifest*.json
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/smoke/launch_summary*.json
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/smoke/launcher_state.json
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/smoke/case_metrics_combined.csv
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/smoke/prolongation_metrics_combined.csv
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/smoke/promising_candidates.csv
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/smoke/promising_candidates.json
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/smoke/promising_candidates.txt
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/smoke/regularity_metrics_combined.csv
+experiments/2026-08-06_oasis_cps2_single_stage_runtime_sweep/smoke/stage_summaries_combined.csv
+
+# LungCT DUAL-INR transient trackers and per-case generated rows. Compact
+# reports, curve points, and acceptance summaries are the tracked artifacts.
+experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_author_schedule/*_tracker.csv
+experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_author_schedule/*_tracker.json
+experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_author_schedule/*resolved_job_manifest.json
+experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_revision/*_tracker.csv
+experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_revision/*_tracker.json
+experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_revision/*resolved_job_manifest.json
+experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_revision/stage2_curve_case_rows.csv
+experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_revision/stage2_curve_case_rows.json
+experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_revision/stage3_pl1a_refinement_case_rows.csv
+experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_revision/stage3_pl1a_refinement_case_rows.json
+
+# OASIS MR-SINR pilot run-local launcher metadata. The tracked pilot report,
+# decision file, and combined metric tables carry the review evidence.
+experiments/2026-08-07_oasis_mr_sinr842_revision/job_manifest.json
+experiments/2026-08-07_oasis_mr_sinr842_revision/launch_summary.json
+
 # OS/editor
 .DS_Store
 Thumbs.db
