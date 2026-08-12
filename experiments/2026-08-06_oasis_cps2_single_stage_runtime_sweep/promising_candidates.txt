@@ -1,0 +1,1 @@
+D2_A_lr3e-2,D2_A_lr1e-2,D2_F400_lr3e-2,D2_F600_lr1e-2,S2_F1000_lr1e-3,S2_A_lr1e-3,S2_F1500_lr3e-4
