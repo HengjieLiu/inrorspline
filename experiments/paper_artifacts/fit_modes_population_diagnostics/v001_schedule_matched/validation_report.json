@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-08-14 04:55:07 +0000",
+  "accepted": true,
+  "source_records": 160,
+  "validated_curves": 160,
+  "validated_endpoints": 160,
+  "replacement_records": 10,
+  "unchanged_records": 150,
+  "unchanged_hash_before": "c4be5446d1e114e2becbf2985ebe3c15494bdc7fca5e65066af51cd6231c1698",
+  "unchanged_hash_after": "c4be5446d1e114e2becbf2985ebe3c15494bdc7fca5e65066af51cd6231c1698",
+  "refresh_curves_valid": 10,
+  "refresh_points_per_curve": 251,
+  "generated_case_figures": 20,
+  "generated_composites": 2,
+  "problems": []
+}

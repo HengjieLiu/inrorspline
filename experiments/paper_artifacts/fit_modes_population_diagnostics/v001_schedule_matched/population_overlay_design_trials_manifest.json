@@ -1,0 +1,179 @@
+{
+  "generated_at": "2026-08-14 07:29:16 +0000",
+  "artifact_role": "exploratory supplementary/reviewer design candidates; not compact main-paper figure",
+  "generator": "scripts/experiments/fit_modes_population/render_population_overlay_mean_std.py",
+  "generator_sha256": "23e418df007694d7d787d096eae3f931656c9b49fd473a5b35d0f97d2c59d9c1",
+  "source_index": "experiments/paper_artifacts/fit_modes_population_diagnostics/v001_schedule_matched/camera_ready_source_index.csv",
+  "source_index_sha256": "a488dada12fe38a687c533ef6f3742cc769c16ff6524c79f28bafeacbc1de069",
+  "inputs": {
+    "population_run_root": "${POPULATION_RUN_ROOT}",
+    "refresh_run_root": "${DIRLAB_REFRESH_RUN_ROOT}",
+    "data_root": "${DATA_ROOT}"
+  },
+  "source_records_loaded": 160,
+  "endpoint_matched_curves": 160,
+  "groups_total": 16,
+  "groups_with_ten_cases": 16,
+  "dirlab_panelA_mrdbscp_refresh_curves": 10,
+  "design_case_curve_counts": {
+    "case01": 8,
+    "case08": 8
+  },
+  "designs": {
+    "2x4": {
+      "role": "wider readability candidate",
+      "layout": [
+        "OASIS N=10 population",
+        "DIR-LAB/LungCT N=10 population",
+        "DIR-LAB case01",
+        "DIR-LAB case08"
+      ],
+      "figure": {
+        "path": "population_overlay_plus_lungct_cases_2x4.png",
+        "bytes": 1055187,
+        "width_px": 4600,
+        "height_px": 1760,
+        "sha256": "769253085da38898332ad8e4132ceaa7f1745883d71b6c03a8a31f01c8c4231e"
+      }
+    },
+    "2x3": {
+      "role": "compact candidate",
+      "layout": [
+        "OASIS N=10 population",
+        "DIR-LAB/LungCT N=10 population",
+        "DIR-LAB case01 vs case08"
+      ],
+      "case_line_styles": {
+        "case01": "solid",
+        "case08": "dashed"
+      },
+      "figure": {
+        "path": "population_overlay_plus_lungct_cases_2x3.png",
+        "bytes": 1032570,
+        "width_px": 3600,
+        "height_px": 1760,
+        "sha256": "25af0d52e559cc136590cd04bbd92387fcd82c6af54cd7b1a3fa46515560be6b"
+      }
+    },
+    "2x4_tre_labels": {
+      "role": "wider readability candidate with final TRE labels on case registration panels",
+      "layout": [
+        "OASIS N=10 population",
+        "DIR-LAB/LungCT N=10 population",
+        "DIR-LAB case01 with Panel A TRE labels",
+        "DIR-LAB case08 with Panel A TRE labels"
+      ],
+      "tre_label_metric": "tre_snap_to_voxel.tre_mean_mm",
+      "tre_label_display_format": "TRE {value:.2f} mm",
+      "tre_label_positions_data_coordinates": {
+        "case01": {
+          "idir": [
+            1740,
+            0.07
+          ],
+          "inr_bscp": [
+            1740,
+            0.0105
+          ],
+          "d_bscp": [
+            1740,
+            0.0061
+          ],
+          "mr_d_bscp": [
+            1740,
+            0.0035
+          ]
+        },
+        "case08": {
+          "idir": [
+            1740,
+            0.115
+          ],
+          "inr_bscp": [
+            1740,
+            0.0125
+          ],
+          "d_bscp": [
+            1740,
+            0.019
+          ],
+          "mr_d_bscp": [
+            1740,
+            0.0043
+          ]
+        }
+      },
+      "tre_labels_mm": {
+        "case01": {
+          "idir": 1.0754520795053126,
+          "inr_bscp": 1.0983911151414527,
+          "d_bscp": 1.0728538832745556,
+          "mr_d_bscp": 1.06797107163965
+        },
+        "case08": {
+          "idir": 1.3386499517417485,
+          "inr_bscp": 7.046392156406509,
+          "d_bscp": 11.732902808304104,
+          "mr_d_bscp": 1.2754269177793642
+        }
+      },
+      "tre_label_count": 8,
+      "figure": {
+        "path": "population_overlay_plus_lungct_cases_2x4_tre_labels.png",
+        "bytes": 1090319,
+        "width_px": 4600,
+        "height_px": 1760,
+        "sha256": "ae7aca04c29a76ac31e2712dd1dbefc4538972ac63a66a31368bf6e867e9cebc"
+      }
+    }
+  },
+  "tre_label_metric_note": "Final TRE labels use common tre_snap_to_voxel.tre_mean_mm for all four methods, limited to DIR-LAB case01 and case08 Panel A.",
+  "tre_label_count": 8,
+  "axis_limits": {
+    "x_epoch": [
+      0,
+      2500
+    ],
+    "x_ticks": [
+      0,
+      500,
+      1000,
+      1500,
+      2000,
+      2500
+    ],
+    "A": [
+      0.001,
+      0.5
+    ],
+    "B": [
+      0.1,
+      1000.0
+    ]
+  },
+  "stage_boundaries": {
+    "oasis": {
+      "A": [
+        400,
+        1200
+      ],
+      "B": [
+        400,
+        1200
+      ]
+    },
+    "dirlab": {
+      "A": [
+        400,
+        800,
+        1600
+      ],
+      "B": [
+        400,
+        800,
+        1600
+      ]
+    }
+  },
+  "report_md": "population_overlay_design_trials.md"
+}
