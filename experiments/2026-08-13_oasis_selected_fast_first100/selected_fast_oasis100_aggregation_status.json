@@ -1,0 +1,7 @@
+{
+  "created_at": "2026-08-13 20:03:55 +0000",
+  "combined_rows": 500,
+  "missing_count": 0,
+  "first10_source_root": "${DATA_ROOT}/runs/oasis_unified_acceleration_sweep_alpha1000_v1",
+  "out_root": "${DATA_ROOT}/runs/oasis_selected_fast_first100_alpha1000_v1"
+}
