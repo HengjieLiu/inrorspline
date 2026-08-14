@@ -1,0 +1,9 @@
+{
+  "pilots": [
+    "ptvreg_w0p11",
+    "masked_alpha33333"
+  ],
+  "ptv_validation_errors": [],
+  "masked_validation_errors": [],
+  "stage_epochs": "400,400,800,900"
+}
