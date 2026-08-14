@@ -1545,6 +1545,75 @@ def train_mr_sinr842_requery(
     return metrics
 
 
+def save_full_mode_dvf_endpoint(
+    args: argparse.Namespace,
+    batch: Dict[str, torch.Tensor | str | int | Dict[str, object]],
+    dense_disp_norm: torch.Tensor,
+    run_dir: Path,
+    *,
+    timer: Optional[TimingRecorder] = None,
+    total_start: Optional[float] = None,
+    case_load_complete_sec: Optional[float] = None,
+) -> Dict[str, object]:
+    """Save the final DVF before full evaluation so the input-to-DVF endpoint is timed."""
+    fixed_id = str(batch["fixed_id"])
+    moving_id = str(batch["moving_id"])
+    path = Path(run_dir) / f"disp_norm_{fixed_id}_{moving_id}.npy"
+    if timer is not None:
+        timer.mark(
+            "dvf_in_memory_ready",
+            metadata={
+                "definition": "full-mode endpoint immediately after final dense displacement exists, before evaluation",
+                "output_mode": "full",
+            },
+            sync=True,
+        )
+    prep_token = timer.start(
+        "method_execution.full_mode_dvf_file_prep",
+        category="dvf_file_output",
+        metadata={"definition": "detach final dense displacement and move to CPU float32 numpy before evaluation"},
+    ) if timer is not None else None
+    dense_np = dense_disp_norm.detach().cpu().numpy().astype(np.float32, copy=False)
+    if timer is not None:
+        timer.stop(prep_token)
+    write_token = timer.start(
+        "method_execution.full_mode_dvf_file_write",
+        category="dvf_file_output",
+        metadata={"path": str(path), "definition": "pre-evaluation dense DVF .npy write in full output mode"},
+    ) if timer is not None else None
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.save(path, dense_np)
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+    full_script_to_dvf_file_sec = float(time.time() - float(total_start)) if total_start is not None else float("nan")
+    loaded_images_to_dvf_file_sec = (
+        full_script_to_dvf_file_sec - float(case_load_complete_sec)
+        if case_load_complete_sec is not None and math.isfinite(full_script_to_dvf_file_sec)
+        else float("nan")
+    )
+    if timer is not None:
+        timer.stop(write_token)
+        timer.mark(
+            "dvf_file_ready",
+            metadata={
+                "path": str(path),
+                "definition": "full-mode endpoint immediately after dense DVF .npy write, before evaluation",
+                "output_mode": "full",
+            },
+            sync=False,
+        )
+    return {
+        "pre_evaluation_dvf_file_saved": True,
+        "dvf_file_path": str(path),
+        "dense_output_units": "normalized_grid_xyz_displacement",
+        "dense_output_shape_zyx3": list(dense_np.shape),
+        "dense_output_dtype": str(dense_np.dtype),
+        "dense_output_file_format": "numpy_npy",
+        "full_script_to_dvf_file_sec": full_script_to_dvf_file_sec,
+        "loaded_images_to_dvf_file_sec": loaded_images_to_dvf_file_sec,
+    }
+
+
 def train_spline(
     args: argparse.Namespace,
     batch: Dict[str, torch.Tensor | str | int | Dict[str, object]],
@@ -1552,6 +1621,9 @@ def train_spline(
     lr: float,
     sampler: Optional[CheckpointSampler] = None,
     timer: Optional[TimingRecorder] = None,
+    run_dir: Optional[Path] = None,
+    total_start: Optional[float] = None,
+    case_load_complete_sec: Optional[float] = None,
 ) -> Dict[str, object]:
     cps = method_cps(args.method)
     if cps is None:
@@ -1856,6 +1928,18 @@ def train_spline(
         stage_timing["stage_total_sec"] = timer.stop(stage_token)
         timer.stop(train_token)
 
+    dvf_endpoint_info: Dict[str, object] = {}
+    if str(getattr(args, "output_mode", "full")) == "full" and run_dir is not None:
+        dvf_endpoint_info = save_full_mode_dvf_endpoint(
+            args,
+            batch,
+            final_dense_disp,
+            run_dir,
+            timer=timer,
+            total_start=total_start,
+            case_load_complete_sec=case_load_complete_sec,
+        )
+
     if str(getattr(args, "output_mode", "full")) == "dvf_only":
         metrics: Dict[str, object] = {
             "output_mode": "dvf_only",
@@ -1872,7 +1956,12 @@ def train_spline(
             ],
         }
     else:
+        eval_start = time.time()
         metrics = timed_evaluate_from_dense_coords(id_dense + final_dense_disp, batch, timer=timer)
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        metrics["post_dvf_evaluation_sec"] = float(time.time() - eval_start)
+    metrics.update(dvf_endpoint_info)
     stage_summary = {
         "stage_idx": 0,
         "full_cps": int(cps),
@@ -2370,6 +2459,8 @@ def train_multistage_direct_cp(
     sampler: Optional[CheckpointSampler] = None,
     timer: Optional[TimingRecorder] = None,
     run_dir: Optional[Path] = None,
+    total_start: Optional[float] = None,
+    case_load_complete_sec: Optional[float] = None,
 ) -> Dict[str, object]:
     stage_cps = c.parse_int_list(str(args.stage_full_cps))
     stage_downsample = c.parse_stage_ints(str(args.stage_downsample), len(stage_cps))
@@ -2539,6 +2630,17 @@ def train_multistage_direct_cp(
     if final_dense is None or final_control is None or final_control_shape is None or final_cps is None:
         raise RuntimeError("Multistage training produced no final control field.")
     is_dvf_only = str(getattr(args, "output_mode", "full")) == "dvf_only"
+    dvf_endpoint_info: Dict[str, object] = {}
+    if not is_dvf_only and run_dir is not None:
+        dvf_endpoint_info = save_full_mode_dvf_endpoint(
+            args,
+            batch,
+            final_dense.detach(),
+            run_dir,
+            timer=timer,
+            total_start=total_start,
+            case_load_complete_sec=case_load_complete_sec,
+        )
     if is_dvf_only:
         metrics: Dict[str, object] = {
             "output_mode": "dvf_only",
@@ -2559,12 +2661,17 @@ def train_multistage_direct_cp(
             category="fixed_post_training",
             metadata={"stage_count": len(stage_summaries)},
         ) if timer is not None else None
+        eval_start = time.time()
         metrics = timed_evaluate_from_dense_coords(id_dense + final_dense.detach(), batch, timer=timer)
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        metrics["post_dvf_evaluation_sec"] = float(time.time() - eval_start)
         if timer is not None:
             timer.stop(eval_token)
         final_control_grid = c.flat_to_grid(final_control, final_control_shape).detach()
         metrics["control_coords"] = torch.empty(0, 3, dtype=torch.float32)
         metrics["control_disp"] = final_control_grid
+    metrics.update(dvf_endpoint_info)
     metrics["history"] = [
         {
             **row,
@@ -2614,6 +2721,7 @@ def write_outputs(
     lr: float,
     total_elapsed_sec: float,
     timer: Optional[TimingRecorder] = None,
+    total_start: Optional[float] = None,
 ) -> None:
     write_token = timer.start(
         "write_outputs",
@@ -2668,7 +2776,7 @@ def write_outputs(
     if timer is not None:
         timer.stop(reg_token)
 
-    if args.save_final_dense:
+    if args.save_final_dense and not bool(metrics.get("pre_evaluation_dvf_file_saved")):
         with timer.section("write_outputs.save_final_dense", category="output_writing") if timer is not None else _null_section():
             c.save_dense_disp(run_dir / f"disp_norm_{fixed_id}_{moving_id}.npy", dense_coords)
 
@@ -2957,6 +3065,14 @@ def write_outputs(
         "training_elapsed_sec": float(metrics["training_elapsed_sec"]),
         "training_peak_mem_gb": float(metrics["training_peak_mem_gb"]),
         "total_elapsed_sec": float(total_elapsed_sec),
+        "full_registration_time_sec": (
+            float(time.time() - float(total_start)) if total_start is not None else float(total_elapsed_sec)
+        ),
+        "full_script_to_dvf_file_sec": metrics.get("full_script_to_dvf_file_sec"),
+        "loaded_images_to_dvf_file_sec": metrics.get("loaded_images_to_dvf_file_sec"),
+        "post_dvf_evaluation_sec": metrics.get("post_dvf_evaluation_sec"),
+        "pre_evaluation_dvf_file_saved": metrics.get("pre_evaluation_dvf_file_saved"),
+        "dvf_file_path": metrics.get("dvf_file_path"),
         "final_loss": last["loss"],
         "final_data_loss": last["data_loss"],
         "final_reg_loss": last["reg_loss"],
@@ -3193,6 +3309,7 @@ def main() -> None:
             oasis_root=Path(args.oasis_root),
             pair_file=Path(args.pair_file),
         )
+    case_load_complete_sec = float(time.time() - total_start)
     timer.mark(
         "case_load_complete",
         metadata={
@@ -3257,13 +3374,25 @@ def main() -> None:
             sampler=sampler,
             timer=active_timer,
             run_dir=run_dir,
+            total_start=total_start,
+            case_load_complete_sec=case_load_complete_sec,
         )
     elif args.method == "mr_sinr842_composed":
         metrics = train_mr_sinr842_composed(args, batch, device, lr, sampler=sampler)
     elif args.method == "mr_sinr842_requery":
         metrics = train_mr_sinr842_requery(args, batch, device, lr, sampler=sampler)
     else:
-        metrics = train_spline(args, batch, device, lr, sampler=sampler, timer=active_timer)
+        metrics = train_spline(
+            args,
+            batch,
+            device,
+            lr,
+            sampler=sampler,
+            timer=active_timer,
+            run_dir=run_dir,
+            total_start=total_start,
+            case_load_complete_sec=case_load_complete_sec,
+        )
     metrics["started_at"] = started_at
     metrics["timing_detail"] = str(args.timing_detail)
     if str(args.output_mode) == "dvf_only":
@@ -3287,7 +3416,17 @@ def main() -> None:
         with timer.section("sampler_save", category="output_writing"):
             sampler.save()
         total_elapsed_sec = time.time() - total_start
-        write_outputs(args, batch, metrics, run_dir, run_name, lr, total_elapsed_sec, timer=active_timer)
+        write_outputs(
+            args,
+            batch,
+            metrics,
+            run_dir,
+            run_name,
+            lr,
+            total_elapsed_sec,
+            timer=active_timer,
+            total_start=total_start,
+        )
     if timer.enabled:
         timer.finalize()
         c.write_json(run_dir / "timing.json", timer.payload(args=args, run_dir=run_dir, run_name=run_name))
