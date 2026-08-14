@@ -1,0 +1,45 @@
+{
+  "artifact": "lungct_tre_stdlogj_existing_run_design_review",
+  "axis_rule": "A2, B1, and B2 share A1's y-axis limits; B1 and B2 also share x-axis limits within each annotated/unannotated figure.",
+  "base_default_excluded_ratios": {
+    "direct_cp_32_16_8_4_global_ncc_fd_be": [
+      0.0,
+      0.001,
+      0.01
+    ],
+    "direct_cp_32_16_8_4_ptv_lcc_isotv": [
+      0.01,
+      10.0,
+      100.0
+    ]
+  },
+  "dual_excluded_weight_labels": [
+    "m100"
+  ],
+  "ellipse_definition": "width = 2 * sample SD of foreground stdLogJ; height = 2 * sample SD of original snap TRE",
+  "generated_utc": "2026-08-12T21:54:10+00:00",
+  "idir_ptv_pilot_policy": "Annotated-only pilot marker; excluded from unannotated camera-style preview.",
+  "no_new_runs": true,
+  "outputs": [
+    "experiments/paper_artifacts/pareto_figure/v008_lungct_existing_run_design_review/lungct_tre_stdlogj_2x2_annotated.png",
+    "experiments/paper_artifacts/pareto_figure/v008_lungct_existing_run_design_review/lungct_tre_stdlogj_2x2_unannotated.png"
+  ],
+  "panel_layout": {
+    "A1": "Original clean baseline plot",
+    "A2": "All existing candidate curves, no ellipses",
+    "B1": "Split ellipse, IDIR/native-loss family",
+    "B2": "Split ellipse, pTVReg-loss family"
+  },
+  "row_counts": {
+    "annotated_rows": 29,
+    "source_rows": 35,
+    "unannotated_rows": 28
+  },
+  "source_inputs": {
+    "base_rows": "experiments/paper_artifacts/pareto_figure/v002_candidate/lungct10_pareto_source_rows.csv",
+    "idir_ptv_pilot": "experiments/2026-06-26_lungct_idir_sampled_ptvlcc_tv_w0p11_all10/mean_rows.csv",
+    "stage2_points": "experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_revision/stage2_curve_points.csv",
+    "stage3_points": "experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_revision/stage3_pl1a_refinement_curve_points.csv"
+  },
+  "source_rows": "experiments/paper_artifacts/pareto_figure/v008_lungct_existing_run_design_review/source_rows.csv"
+}
