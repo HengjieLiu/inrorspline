@@ -218,3 +218,43 @@ experiments/2026-08-07_oasis_mr_sinr842_revision/launch_summary.json
 Thumbs.db
 *.swp
 *~
+
+# August 2026 OASIS acceleration transient launcher metadata. Curated reports,
+# aggregate case tables, timing summaries, and selection summaries are tracked.
+experiments/2026-08-13_oasis_unified_acceleration_sweep/job_manifest_*.csv
+experiments/2026-08-13_oasis_unified_acceleration_sweep/job_manifest_*.json
+experiments/2026-08-13_oasis_unified_acceleration_sweep/launch_summary_*.json
+experiments/2026-08-13_oasis_selected_fast_first100/selected_first100_job_manifest_*.csv
+experiments/2026-08-13_oasis_selected_fast_first100/selected_first100_job_manifest_*.json
+experiments/2026-08-13_oasis_selected_fast_first100/selected_first100_worker_manifest_*.csv
+experiments/2026-08-13_oasis_selected_fast_first100/selected_first100_worker_manifest_*.json
+experiments/2026-08-13_oasis_selected_fast_first100/launch_summary_*.json
+
+# August 2026 DIR-Lab Panel A schedule-refresh launcher state. The tracked
+# protocol, acceptance report, replacement index, and comparison tables preserve
+# the reviewable evidence.
+experiments/2026-08-13_fit_modes_dirlab_panelA_schedule_refresh/execution_assignments.csv
+experiments/2026-08-13_fit_modes_dirlab_panelA_schedule_refresh/job_manifest.csv
+experiments/2026-08-13_fit_modes_dirlab_panelA_schedule_refresh/job_manifest.json
+experiments/2026-08-13_fit_modes_dirlab_panelA_schedule_refresh/launcher_state.json
+experiments/2026-08-13_fit_modes_dirlab_panelA_schedule_refresh/monitor_status.json
+experiments/2026-08-13_fit_modes_dirlab_panelA_schedule_refresh/monitor_status.md
+experiments/2026-08-13_fit_modes_dirlab_panelA_schedule_refresh/provenance.json
+experiments/2026-08-13_fit_modes_dirlab_panelA_schedule_refresh/smoke/
+
+# Large schedule-matched case visual diagnostic dump (~200M+ generated PNG
+# slices/contact sheets). Tracked compact population figures and reports replace
+# this review scratch output.
+experiments/paper_artifacts/fit_modes_population_diagnostics/v001_schedule_matched/case_visual_diagnostics/
+
+# Lung-mask Panel A diagnostic launcher state. Compact figures/tables can be
+# committed separately after normalization; runtime launch state stays out.
+experiments/paper_artifacts/fit_modes_population_diagnostics/v002_lungmask_panelA/lungmask_before_after_curves_job_manifest.csv
+experiments/paper_artifacts/fit_modes_population_diagnostics/v002_lungmask_panelA/lungmask_before_after_curves_launcher_state.json
+experiments/paper_artifacts/fit_modes_population_diagnostics/v002_lungmask_panelA/lungmask_before_after_curves_monitor.md
+
+# Case01/case08 lung-mask diagnostic launcher state. Review figures/tables can
+# be committed after permissions/line endings are normalized.
+experiments/2026-08-14_dirlab_case01_case08_lungmask_diagnostics/lungmask_before_after_curves_job_manifest.csv
+experiments/2026-08-14_dirlab_case01_case08_lungmask_diagnostics/lungmask_before_after_curves_launcher_state.json
+experiments/2026-08-14_dirlab_case01_case08_lungmask_diagnostics/lungmask_before_after_curves_monitor.md
