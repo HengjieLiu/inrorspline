@@ -2,7 +2,7 @@
 
 ## Status
 
-- Generated: `2026-08-12T21:16:46.274333+00:00`
+- Generated: `2026-08-14T21:03:41.903324+00:00`
 - Expected curve records: `200`
 - Complete curve points: `20/20`
 - Review plot: `stage2_coarse_tre_stdlogj_curve.png`

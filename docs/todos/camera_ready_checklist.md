@@ -11,11 +11,12 @@ resolved or explicitly retained as a reported limitation.
 
 ## Blocking experiment consistency
 
-- [ ] **Resolve the DIR-LAB MR-D-BSCP schedule asymmetry in the population
+- [x] **Resolve the DIR-LAB MR-D-BSCP schedule asymmetry in the population
   fit-modes experiment.**
-  - Current Panel A registration schedule: cps `32-16-8-4`, downsample
+  - Historical Panel A registration schedule: cps `32-16-8-4`, downsample
     `8-4-2-1`, epochs `200/400/800/1000` = **2400 total**.
-  - Current Panel B field-fitting schedule: cps `32-16-8-4`, downsample
+  - Accepted replacement Panel A and current Panel B field-fitting schedule:
+    cps `32-16-8-4`, downsample
     `8-4-2-1`, epochs `400/400/800/900` = **2500 total**.
   - OASIS does not have this asymmetry: both panels use `400/800/1300` =
     2500 total.
@@ -30,16 +31,26 @@ resolved or explicitly retained as a reported limitation.
   - Acceptance: all 10 replacement runs complete; stage boundaries, final
     epoch, source curves, and endpoints validate; the result is compared with
     the historical 2400-epoch cohort before choosing the primary paper result.
+  - Completed 2026-08-13: `10/10` replacements passed with 251 full-crop
+    diagnostics each and zero unresolved failures. See
+    `experiments/2026-08-13_fit_modes_dirlab_panelA_schedule_refresh/acceptance_report.md`.
 
 ## Required downstream updates after the schedule fix
 
-- [ ] Reaggregate DIR-LAB Panel A MR-D-BSCP endpoints and population statistics.
-- [ ] Regenerate all affected DIR-LAB diagnostics and the compact paper figure
-  from source; update manifests and checksums.
+- [x] Reaggregate DIR-LAB Panel A MR-D-BSCP endpoints and population statistics
+  into the focused replacement and comparison indexes. Main population-index
+  integration remains part of figure step 4.
+- [x] Regenerate the schedule-matched OASIS10/DIR-LAB10 supplementary diagnostic
+  figures from source; update the versioned source index, manifests, checksums,
+  and visual-review record.
+- [ ] Design and regenerate the separate compact main-paper figure from the
+  accepted schedule-matched source index.
 - [ ] Update Methods, captions, legends, and reviewer response with the exact
   cps, downsample, stage-epoch schedule, and total optimization budget.
-- [ ] Remove any claim of identical MR-D-BSCP schedules or equal DIR-LAB Panel A
-  budgets until the replacement cohort passes acceptance.
+- [x] Resolve the claim blocker: the accepted replacement cohort now supports
+  identical DIR-LAB MR-D-BSCP schedules and equal 2500-epoch budgets in the
+  versioned camera-ready index; retain the historical-schedule caveat for the
+  original index.
 - [ ] State whether the historical 2400-epoch result is shown as a sensitivity
   analysis or retained only as provenance.
 
