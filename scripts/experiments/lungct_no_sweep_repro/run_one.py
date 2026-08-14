@@ -31,6 +31,7 @@ METHOD_DIRECT_CP_CPS4_GLOBAL_NCC_FD_BE = "direct_cp_cps4_global_ncc_fd_be"
 METHOD_DIRECT_CP_32_PTV = "direct_cp_32_16_8_4_ptv_lcc_isotv"
 METHOD_DIRECT_CP_32_GLOBAL_NCC_BE = "direct_cp_32_16_8_4_global_ncc_bspline_be"
 METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE = "direct_cp_32_16_8_4_global_ncc_fd_be"
+METHOD_DIRECT_CP_32_MASKED_NCC_BSPLINE_BE = "direct_cp_32_16_8_4_masked_ncc_bspline_be"
 METHOD_DIRECT_DVF_FD_BE = "direct_dvf_lungmask_sampled_ncc_fd_be"
 METHOD_DCTFIELD_FD_BE = "dctfield_lungmask_sampled_ncc_fd_be"
 METHODS = [
@@ -43,6 +44,7 @@ METHODS = [
     METHOD_DIRECT_CP_32_PTV,
     METHOD_DIRECT_CP_32_GLOBAL_NCC_BE,
     METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE,
+    METHOD_DIRECT_CP_32_MASKED_NCC_BSPLINE_BE,
     METHOD_DIRECT_DVF_FD_BE,
     METHOD_DCTFIELD_FD_BE,
 ]
@@ -99,6 +101,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--antialias-radius-sigma", type=float, default=3.0)
     parser.add_argument("--finest-loss-diagnostic", action="store_true")
     parser.add_argument("--finest-loss-every", type=int, default=1)
+    parser.add_argument("--prolongation-diagnostics", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--sample-checkpoints", action="store_true")
     parser.add_argument("--checkpoint-sample-count", type=int, default=100000)
     parser.add_argument("--checkpoint-sample-seed", type=int, default=1729)
@@ -256,6 +259,7 @@ def default_lr(method: str) -> float:
         METHOD_DIRECT_CP_32_PTV,
         METHOD_DIRECT_CP_32_GLOBAL_NCC_BE,
         METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE,
+        METHOD_DIRECT_CP_32_MASKED_NCC_BSPLINE_BE,
     }:
         return 1e-3
     return 1e-4
@@ -274,7 +278,7 @@ def run_name(args: argparse.Namespace, method: str, lr: float) -> str:
             f"{method}_{case_token}_sched{stage_full_name}_ds{stage_downsample_name}_"
             f"e{epoch_name}_lr{c.format_float(lr)}_w{c.format_float(args.ptv_isotv_weight)}_seed{args.seed}"
         )
-    if method == METHOD_DIRECT_CP_32_GLOBAL_NCC_BE:
+    if method in {METHOD_DIRECT_CP_32_GLOBAL_NCC_BE, METHOD_DIRECT_CP_32_MASKED_NCC_BSPLINE_BE}:
         epoch_name = args.stage_epochs.replace(" ", "").replace(",", "-")
         return (
             f"{method}_{case_token}_sched{stage_full_name}_ds{stage_downsample_name}_"
@@ -344,16 +348,18 @@ def global_ncc_diagnostic_row(
     global_epoch: int,
     eval_domain: str,
     device: torch.device,
+    fixed_mask_t: Optional[torch.Tensor] = None,
 ) -> Dict[str, float | str | bool]:
     eval_start = time.time()
     with torch.no_grad():
         warped = c.warp_full(moving_t, id_grid + dense_disp, mode="bilinear")
         loss = c.ncc_loss(fixed_t[None, None], warped[None, None])
+        masked_fields = lung_mask_ncc_fields(fixed_t, warped, fixed_mask_t)
     if device.type == "cuda":
         torch.cuda.synchronize()
     value = float(loss.detach().cpu())
     del warped, loss
-    return {
+    row: Dict[str, float | str | bool] = {
         "epoch": float(epoch),
         "global_epoch": float(global_epoch),
         "global_ncc_loss": value,
@@ -362,6 +368,36 @@ def global_ncc_diagnostic_row(
         "eval_domain": eval_domain,
         "affects_training": False,
         "eval_elapsed_sec": time.time() - eval_start,
+    }
+    row.update(masked_fields)
+    return row
+
+
+def lung_mask_ncc_fields(
+    fixed_t: torch.Tensor,
+    warped_t: torch.Tensor,
+    fixed_mask_t: Optional[torch.Tensor],
+    eps: float = 1.0e-10,
+) -> Dict[str, float | str | bool]:
+    if fixed_mask_t is None:
+        return {}
+    mask = fixed_mask_t.reshape(-1).bool()
+    fixed_values = fixed_t.reshape(-1)[mask]
+    warped_values = warped_t.reshape(-1)[mask]
+    if int(fixed_values.numel()) <= 1:
+        raise RuntimeError("Cannot compute lung-mask NCC on an empty/singleton mask.")
+    cc = ((fixed_values - fixed_values.mean()) * (warped_values - warped_values.mean())).mean()
+    std = torch.std(fixed_values) * torch.std(warped_values)
+    loss = -(cc / (std + eps))
+    value = float(loss.detach().cpu())
+    return {
+        "lung_mask_ncc_loss": value,
+        "lung_mask_ncc_value": -value,
+        "lung_mask_one_minus_ncc": 1.0 + value,
+        "lung_mask_diagnostic_name": "fixed_t00_lung_mask_global_ncc",
+        "lung_mask_eval_domain": "fixed_t00_lung_mask_reg1mm",
+        "lung_mask_affects_training": False,
+        "lung_mask_voxels": int(mask.sum().detach().cpu()),
     }
 
 
@@ -415,6 +451,7 @@ def evaluate_idir_global_ncc(
     device: torch.device,
     chunk_size: int,
     epoch: int,
+    fixed_mask_t: Optional[torch.Tensor] = None,
 ) -> Dict[str, float | str | bool]:
     eval_start = time.time()
     model.eval()
@@ -422,11 +459,12 @@ def evaluate_idir_global_ncc(
         dense = evaluate_idir_dense(model, image_shape, device, chunk_size)
         warped = c.warp_full(moving_t, id_dense + dense, mode="bilinear")
         loss = c.ncc_loss(fixed_t[None, None], warped[None, None])
+        masked_fields = lung_mask_ncc_fields(fixed_t, warped, fixed_mask_t)
     if device.type == "cuda":
         torch.cuda.synchronize()
     value = float(loss.detach().cpu())
     del dense, warped, loss
-    return {
+    row: Dict[str, float | str | bool] = {
         "epoch": float(epoch),
         "global_epoch": float(epoch),
         "global_ncc_loss": value,
@@ -436,6 +474,8 @@ def evaluate_idir_global_ncc(
         "affects_training": False,
         "eval_elapsed_sec": time.time() - eval_start,
     }
+    row.update(masked_fields)
+    return row
 
 
 def train_idir(
@@ -529,6 +569,7 @@ def train_idir(
                 device,
                 global_ncc_chunk_size,
                 epoch,
+                fixed_mask_t=mask_t,
             )
             global_ncc_diagnostic.append(diag_row)
             print(json.dumps({"global_ncc_diagnostic": diag_row}), flush=True)
@@ -584,6 +625,14 @@ def train_idir(
                 "full_crop_global_ncc"
                 if int(args.global_ncc_diagnostic_interval) > 0
                 else None
+            ),
+            "lung_mask_ncc_diagnostic_name": (
+                "fixed_t00_lung_mask_global_ncc"
+                if int(args.global_ncc_diagnostic_interval) > 0
+                else None
+            ),
+            "lung_mask_ncc_diagnostic_affects_training": (
+                False if int(args.global_ncc_diagnostic_interval) > 0 else None
             ),
             "global_ncc_diagnostic_affects_training": (
                 False if int(args.global_ncc_diagnostic_interval) > 0 else None
@@ -967,6 +1016,7 @@ def train_single_stage_spline(
 
     fixed_t = torch.from_numpy(case.fixed).to(device=device, dtype=torch.float32)
     moving_t = torch.from_numpy(case.moving).to(device=device, dtype=torch.float32)
+    fixed_mask_t = torch.from_numpy(case.fixed_mask.astype(np.bool_)).to(device=device)
     image_shape = tuple(int(v) for v in fixed_t.shape)
     control_coords, control_shape = c.bspline_control_coords(image_shape, args.cps, device)
     id_dense = c.make_coordinate_grid(image_shape, device).detach()
@@ -1044,18 +1094,19 @@ def train_single_stage_spline(
         }
         history.append(row)
         if is_global_fdbe and should_global_ncc_diagnostic(args, epoch, method_epochs):
-            global_ncc_diagnostic.append(
-                {
-                    "epoch": float(epoch),
-                    "global_epoch": float(epoch),
-                    "global_ncc_loss": row["data_loss"],
-                    "global_ncc_value": -row["data_loss"],
-                    "diagnostic_name": "full_crop_global_ncc",
-                    "eval_domain": "full_1mm_crop",
-                    "affects_training": False,
-                    "eval_elapsed_sec": 0.0,
-                }
-            )
+            diag_row = {
+                "epoch": float(epoch),
+                "global_epoch": float(epoch),
+                "global_ncc_loss": row["data_loss"],
+                "global_ncc_value": -row["data_loss"],
+                "diagnostic_name": "full_crop_global_ncc",
+                "eval_domain": "full_1mm_crop",
+                "affects_training": False,
+                "eval_elapsed_sec": 0.0,
+            }
+            with torch.no_grad():
+                diag_row.update(lung_mask_ncc_fields(fixed_t, warped.detach(), fixed_mask_t))
+            global_ncc_diagnostic.append(diag_row)
             print(json.dumps({"global_ncc_diagnostic": global_ncc_diagnostic[-1]}), flush=True)
         if sampler is not None and sampler.should_record(epoch):
             with torch.no_grad():
@@ -1111,6 +1162,14 @@ def train_single_stage_spline(
                 if int(args.global_ncc_diagnostic_interval) > 0
                 else None
             ),
+            "lung_mask_ncc_diagnostic_name": (
+                "fixed_t00_lung_mask_global_ncc"
+                if int(args.global_ncc_diagnostic_interval) > 0
+                else None
+            ),
+            "lung_mask_ncc_diagnostic_affects_training": (
+                False if int(args.global_ncc_diagnostic_interval) > 0 else None
+            ),
             "global_ncc_diagnostic_affects_training": (
                 False if int(args.global_ncc_diagnostic_interval) > 0 else None
             ),
@@ -1133,24 +1192,39 @@ def train_single_stage_spline(
 def prolongation_diagnostics(
     prev_control: torch.Tensor,
     prev_shape: Sequence[int],
-    prev_dense_full: torch.Tensor,
+    prev_dense_full: Optional[torch.Tensor],
     target_shape: Sequence[int],
     target_cps: int,
     image_shape: Sequence[int],
     stage_idx: int,
+    *,
+    compute_diagnostics: bool,
 ) -> Tuple[torch.Tensor, List[Dict[str, object]]]:
     prev_grid = c.flat_to_grid(prev_control.detach(), prev_shape)
     exact_grid = c.cubic_bspline_dyadic_knot_insert_3d(prev_grid, target_shape)
+    if not compute_diagnostics:
+        row: Dict[str, object] = {
+            "stage_idx": int(stage_idx),
+            "target_cps": int(target_cps),
+            "method": "exact_knot",
+            "source_shape_zyx": list(int(v) for v in prev_shape),
+            "target_shape_zyx": list(int(v) for v in target_shape),
+            "diagnostics_skipped": True,
+        }
+        return c.grid_to_flat(exact_grid).detach(), [row]
+    if prev_dense_full is None:
+        raise RuntimeError("Prolongation diagnostics require previous full-resolution dense field.")
     resize_grid = c.resize_control_grid(prev_grid, target_shape)
     rows: List[Dict[str, object]] = []
     for method, grid in (("exact_knot", exact_grid), ("trilinear_resize", resize_grid)):
         dense = c.expand_on_shape(c.grid_to_flat(grid), target_shape, target_cps, image_shape, 1)
-        row: Dict[str, object] = {
+        row = {
             "stage_idx": int(stage_idx),
             "target_cps": int(target_cps),
             "method": method,
             "source_shape_zyx": list(int(v) for v in prev_shape),
             "target_shape_zyx": list(int(v) for v in target_shape),
+            "diagnostics_skipped": False,
         }
         row.update(c.field_difference_metrics(dense - prev_dense_full, prefix="preserve_"))
         rows.append(row)
@@ -1194,6 +1268,7 @@ def optimize_stage(
     fixed_t: torch.Tensor,
     moving_t: torch.Tensor,
     full_border_mask: torch.Tensor,
+    full_fixed_mask: torch.Tensor,
     control: torch.nn.Parameter,
     control_shape: Sequence[int],
     full_cps: int,
@@ -1205,15 +1280,18 @@ def optimize_stage(
     total_epochs: int,
     global_ncc_diagnostic: List[Dict[str, float | str | bool]],
     sampler: Optional[CheckpointSampler] = None,
-) -> Tuple[torch.Tensor, Dict[str, object], List[Dict[str, object]]]:
+    return_dense_full: bool = True,
+) -> Tuple[Optional[torch.Tensor], Dict[str, object], List[Dict[str, object]]]:
     fixed_l, blur_sigma, blur_kernel = c.make_loss_volume(
         fixed_t, downsample, args.antialias_sigma_scale, args.antialias_radius_sigma
     )
     moving_l, _sigma_m, _kernel_m = c.make_loss_volume(
         moving_t, downsample, args.antialias_sigma_scale, args.antialias_radius_sigma
     )
-    is_analytic_be_loss = str(args.method) == METHOD_DIRECT_CP_32_GLOBAL_NCC_BE
+    is_full_analytic_be_loss = str(args.method) == METHOD_DIRECT_CP_32_GLOBAL_NCC_BE
     is_fd_be_loss = str(args.method) == METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE
+    is_masked_analytic_be_loss = str(args.method) == METHOD_DIRECT_CP_32_MASKED_NCC_BSPLINE_BE
+    is_analytic_be_loss = is_full_analytic_be_loss or is_masked_analytic_be_loss
     is_be_loss = is_analytic_be_loss or is_fd_be_loss
     if bool(args.finest_loss_diagnostic) and is_be_loss:
         raise ValueError("--finest-loss-diagnostic is only implemented for pTV LCC + isoTV multistage runs.")
@@ -1225,7 +1303,19 @@ def optimize_stage(
     eval_shape = tuple(int(v) for v in fixed_l.shape)
     cur_pix_zyx = c.stage_pix_zyx((1.0, 1.0, 1.0), fixed_t.shape, eval_shape)
     id_grid = c.make_coordinate_grid(eval_shape, fixed_t.device).detach()
+    id_flat = id_grid.reshape(-1, 3)
+    fixed_flat = fixed_l.reshape(-1)
     domain_cps = c.domain_cps_from_full(full_cps, downsample)
+    masked_train_indices = None
+    masked_train_count = None
+    masked_batch_size = None
+    if is_masked_analytic_be_loss:
+        fixed_mask_l = c.make_nearest_loss_mask(full_fixed_mask, eval_shape)
+        masked_train_indices = torch.nonzero(fixed_mask_l.reshape(-1), as_tuple=False).reshape(-1)
+        masked_train_count = int(masked_train_indices.numel())
+        masked_batch_size = min(int(args.batch_size), masked_train_count)
+        if masked_batch_size <= 0:
+            raise RuntimeError(f"Empty fixed-mask training coordinate set at stage {stage_idx}.")
     ptv_cache = None
     if not is_be_loss:
         ptv_cache = c.make_ptv_lcc_fixed_cache(
@@ -1264,34 +1354,66 @@ def optimize_stage(
                 "stage_pix_zyx_mm": list(cur_pix_zyx),
                 "epochs": int(epochs),
                 "lr": float(lr),
+                "masked_train_coords": int(masked_train_count or 0),
+                "masked_batch_size": int(masked_batch_size or 0),
                 "finest_loss_diagnostic": bool(args.finest_loss_diagnostic),
             }
         ),
         flush=True,
     )
     for epoch in range(1, int(epochs) + 1):
-        dense_disp = c.expand_on_shape(control, control_shape, full_cps, eval_shape, downsample)
-        warped = c.warp_full(moving_l, id_grid + dense_disp, mode="bilinear")
-        if is_be_loss:
-            data_loss = c.ncc_loss(fixed_l[None, None], warped[None, None])
+        if is_masked_analytic_be_loss:
+            assert masked_train_indices is not None and masked_batch_size is not None
+            local = torch.randperm(int(masked_train_indices.numel()), device=fixed_t.device)[: int(masked_batch_size)]
+            flat_idx = masked_train_indices[local]
+            coords = id_flat[flat_idx]
+            disp_samples = c.sample_cubic_bspline_derivative(
+                control,
+                control_shape,
+                eval_shape,
+                domain_cps,
+                flat_idx,
+                (0, 0, 0),
+            )
+            warped_samples = c.sample_volume(moving_l, coords + disp_samples, mode="bilinear")
+            fixed_samples = fixed_flat[flat_idx]
+            data_loss = c.ncc_loss(fixed_samples, warped_samples)
             reg_weight = float(args.alpha)
             if abs(reg_weight) <= 1e-12:
                 reg_loss = torch.zeros((), dtype=data_loss.dtype, device=data_loss.device)
-            elif is_analytic_be_loss:
-                reg_loss = c.analytic_bspline_sampled_be(
+            else:
+                reg_loss = c.sampled_cubic_bspline_be(
                     control,
                     control_shape,
                     eval_shape,
                     domain_cps,
+                    flat_idx,
                     component_reduction="mean",
                 )
-            else:
-                reg_loss = c.dense_forward_difference_be(dense_disp, component_reduction="mean")
+            dense_disp = None
         else:
-            assert ptv_cache is not None
-            data_loss = c.ptv_local_cc_loss_with_cache(warped, mask_l, ptv_cache, cur_pix_zyx, args.ptv_lcc_radius_sigma)
-            reg_loss = c.isotv_control_loss(control, control_shape, eval_shape, cur_pix_zyx, domain_cps, args.ptv_csqrt)
-            reg_weight = float(args.ptv_isotv_weight)
+            dense_disp = c.expand_on_shape(control, control_shape, full_cps, eval_shape, downsample)
+            warped = c.warp_full(moving_l, id_grid + dense_disp, mode="bilinear")
+            if is_be_loss:
+                data_loss = c.ncc_loss(fixed_l[None, None], warped[None, None])
+                reg_weight = float(args.alpha)
+                if abs(reg_weight) <= 1e-12:
+                    reg_loss = torch.zeros((), dtype=data_loss.dtype, device=data_loss.device)
+                elif is_analytic_be_loss:
+                    reg_loss = c.analytic_bspline_sampled_be(
+                        control,
+                        control_shape,
+                        eval_shape,
+                        domain_cps,
+                        component_reduction="mean",
+                    )
+                else:
+                    reg_loss = c.dense_forward_difference_be(dense_disp, component_reduction="mean")
+            else:
+                assert ptv_cache is not None
+                data_loss = c.ptv_local_cc_loss_with_cache(warped, mask_l, ptv_cache, cur_pix_zyx, args.ptv_lcc_radius_sigma)
+                reg_loss = c.isotv_control_loss(control, control_shape, eval_shape, cur_pix_zyx, domain_cps, args.ptv_csqrt)
+                reg_weight = float(args.ptv_isotv_weight)
         loss = data_loss + reg_weight * reg_loss
         finest_diag: Dict[str, object] = {}
         if bool(args.finest_loss_diagnostic) and not is_be_loss:
@@ -1360,6 +1482,7 @@ def optimize_stage(
                 global_epoch=int(row["global_epoch"]),
                 eval_domain="full_1mm_crop",
                 device=fixed_t.device,
+                fixed_mask_t=full_fixed_mask,
             )
             diag_row["stage_idx"] = float(stage_idx)
             diag_row["stage_epoch"] = float(epoch)
@@ -1388,8 +1511,10 @@ def optimize_stage(
             )
         if epoch == 1 or epoch % int(args.eval_interval) == 0 or epoch == int(epochs):
             print(json.dumps(row), flush=True)
-    with torch.no_grad():
-        dense_full = c.expand_on_shape(control, control_shape, full_cps, fixed_t.shape, 1)
+    dense_full: Optional[torch.Tensor] = None
+    if bool(return_dense_full):
+        with torch.no_grad():
+            dense_full = c.expand_on_shape(control, control_shape, full_cps, fixed_t.shape, 1)
     elapsed = time.time() - start
     ctrl_abs = control.detach().abs().reshape(-1)
     summary = {
@@ -1407,7 +1532,9 @@ def optimize_stage(
         "alpha": float(args.alpha) if is_be_loss else None,
         "loss_mode": (
             "global_ncc_bspline_be"
-            if is_analytic_be_loss
+            if is_full_analytic_be_loss
+            else "fixed_mask_sampled_ncc_bspline_be"
+            if is_masked_analytic_be_loss
             else "global_ncc_fd_be"
             if is_fd_be_loss
             else "ptv_lcc_isotv"
@@ -1422,8 +1549,11 @@ def optimize_stage(
         "elapsed_sec": float(elapsed),
         "control_abs_max_norm": float(ctrl_abs.max().detach().cpu()),
         "control_abs_p95_norm": float(torch.quantile(ctrl_abs, 0.95).detach().cpu()),
+        "masked_train_coords": int(masked_train_count or 0),
+        "masked_batch_size": int(masked_batch_size or 0),
+        "dense_full_expanded": bool(return_dense_full),
     }
-    return dense_full.detach(), summary, rows
+    return None if dense_full is None else dense_full.detach(), summary, rows
 
 
 def train_multistage(
@@ -1443,6 +1573,7 @@ def train_multistage(
 
     fixed_t = torch.from_numpy(case.fixed).to(device=device, dtype=torch.float32)
     moving_t = torch.from_numpy(case.moving).to(device=device, dtype=torch.float32)
+    fixed_mask_t = torch.from_numpy(case.fixed_mask.astype(np.bool_)).to(device=device)
     image_shape = tuple(int(v) for v in fixed_t.shape)
     border_mask = c.make_border_mask(image_shape, int(args.border_mask_voxels), device, fixed_t.dtype)
     nested_shapes = c.build_nested_cp_shapes(image_shape, base_spacing=base_spacing, spacings=stage_cps)
@@ -1469,13 +1600,14 @@ def train_multistage(
             dense_disp_norm_xyz=torch.zeros((*image_shape, 3), dtype=torch.float32, device=device),
             row_extra={"method": args.method, "checkpoint_source": "model_init"},
         )
+    use_prolongation_diagnostics = bool(args.prolongation_diagnostics)
     for stage_idx, (full_cps, downsample, epochs, lr) in enumerate(
         zip(stage_cps, stage_downsample, stage_epochs, stage_lr)
     ):
         global_epoch_offset = int(sum(stage_epochs[:stage_idx]))
         control_shape = tuple(int(v) for v in nested_shapes[int(full_cps)])
         control = torch.nn.Parameter(torch.zeros(int(np.prod(control_shape)), 3, device=device, dtype=torch.float32))
-        if prev_control is not None and prev_shape is not None and prev_dense_full is not None:
+        if prev_control is not None and prev_shape is not None:
             init_flat, rows = prolongation_diagnostics(
                 prev_control,
                 prev_shape,
@@ -1484,6 +1616,7 @@ def train_multistage(
                 int(full_cps),
                 image_shape,
                 int(stage_idx),
+                compute_diagnostics=use_prolongation_diagnostics,
             )
             with torch.no_grad():
                 control.copy_(init_flat)
@@ -1494,6 +1627,7 @@ def train_multistage(
             fixed_t,
             moving_t,
             border_mask,
+            fixed_mask_t,
             control,
             control_shape,
             int(full_cps),
@@ -1505,11 +1639,13 @@ def train_multistage(
             int(sum(stage_epochs)),
             global_ncc_diagnostic,
             sampler=sampler,
+            return_dense_full=use_prolongation_diagnostics or int(stage_idx) == len(stage_cps) - 1,
         )
         prev_control = control.detach()
         prev_shape = control_shape
-        prev_dense_full = dense_full
-        final_dense = dense_full
+        if dense_full is not None:
+            prev_dense_full = dense_full
+            final_dense = dense_full
         final_control = control.detach()
         final_control_shape = control_shape
         final_domain_cps = int(full_cps)
@@ -1526,7 +1662,11 @@ def train_multistage(
     if global_ncc_diagnostic:
         c.write_csv(out_dir / "global_ncc_diagnostic.csv", global_ncc_diagnostic)
     analytic_regularity: Dict[str, float] = {}
-    if str(args.method) == METHOD_DIRECT_CP_32_GLOBAL_NCC_BE and final_control is not None and final_control_shape is not None:
+    if (
+        str(args.method) in {METHOD_DIRECT_CP_32_GLOBAL_NCC_BE, METHOD_DIRECT_CP_32_MASKED_NCC_BSPLINE_BE}
+        and final_control is not None
+        and final_control_shape is not None
+    ):
         mask_t = torch.from_numpy(case.fixed_mask.astype(np.bool_)).to(device=device)
         cps = int(final_domain_cps if final_domain_cps is not None else stage_cps[-1])
         analytic_regularity = {
@@ -1545,11 +1685,12 @@ def train_multistage(
             "final_control_cps": float(cps),
         }
     is_analytic_be_loss = str(args.method) == METHOD_DIRECT_CP_32_GLOBAL_NCC_BE
+    is_masked_analytic_be_loss = str(args.method) == METHOD_DIRECT_CP_32_MASKED_NCC_BSPLINE_BE
     is_fd_be_loss = str(args.method) == METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE
-    is_be_loss = is_analytic_be_loss or is_fd_be_loss
+    is_be_loss = is_analytic_be_loss or is_masked_analytic_be_loss or is_fd_be_loss
     regularizer_name = (
         "analytic_cubic_bspline_be"
-        if is_analytic_be_loss
+        if is_analytic_be_loss or is_masked_analytic_be_loss
         else "dense_forward_difference_be"
         if is_fd_be_loss
         else "ptv_isotv"
@@ -1570,13 +1711,27 @@ def train_multistage(
             "loss": (
                 "full-crop global NCC + analytic cubic B-spline BE"
                 if is_analytic_be_loss
+                else "fixed-mask sampled NCC + sampled analytic cubic B-spline BE"
+                if is_masked_analytic_be_loss
                 else "full-crop global NCC + dense forward-difference BE"
                 if is_fd_be_loss
                 else "pTV-style LCC + isoTV"
             ),
-            "image_loss": "full_crop_global_ncc" if is_be_loss else "ptv_lcc",
+            "image_loss": (
+                "fixed_mask_sampled_global_ncc"
+                if is_masked_analytic_be_loss
+                else "full_crop_global_ncc"
+                if is_be_loss
+                else "ptv_lcc"
+            ),
             "regularizer": regularizer_name,
             "alpha": float(args.alpha) if is_be_loss else None,
+            "batch_size": int(args.batch_size) if is_masked_analytic_be_loss else None,
+            "sample_domain": (
+                f"fixed_{case.fixed_label.lower()}_lung_mask_stage_grid_points"
+                if is_masked_analytic_be_loss
+                else None
+            ),
             "ptv_lcc_sigma_mm": None if is_be_loss else float(args.ptv_lcc_sigma_mm),
             "ptv_isotv_weight": None if is_be_loss else float(args.ptv_isotv_weight),
             "ptv_csqrt": None if is_be_loss else float(args.ptv_csqrt),
@@ -1591,6 +1746,14 @@ def train_multistage(
                 "full_crop_global_ncc"
                 if int(args.global_ncc_diagnostic_interval) > 0
                 else None
+            ),
+            "lung_mask_ncc_diagnostic_name": (
+                "fixed_t00_lung_mask_global_ncc"
+                if int(args.global_ncc_diagnostic_interval) > 0
+                else None
+            ),
+            "lung_mask_ncc_diagnostic_affects_training": (
+                False if int(args.global_ncc_diagnostic_interval) > 0 else None
             ),
             "global_ncc_diagnostic_affects_training": (
                 False if int(args.global_ncc_diagnostic_interval) > 0 else None
@@ -1713,6 +1876,18 @@ def main() -> None:
         mask_rule = "fixed_t00_lung_mask_metric_only"
         loss_domain = "full_crop_global_ncc"
         method_note = "This method uses full-crop global NCC with no border-mask or lung-mask loss weighting."
+    elif method == METHOD_DIRECT_CP_32_MASKED_NCC_BSPLINE_BE:
+        result = train_multistage(args, case, device, out_dir, sampler=sampler)
+        protocol_tag = (
+            "ptv_directcp_multistage+ptv_landmark_crop_1mm+"
+            "fixed_t00_lung_mask_sampled_global_ncc_bspline_be"
+        )
+        mask_rule = "fixed_t00_lung_mask_sampling_and_metric"
+        loss_domain = "fixed_t00_lung_mask_sampled_grid_points"
+        method_note = (
+            "This method uses fixed T00 lung-mask sampled global NCC and sampled analytic "
+            "cubic B-spline BE during optimization."
+        )
     elif method == METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE:
         result = train_multistage(args, case, device, out_dir, sampler=sampler)
         protocol_tag = (

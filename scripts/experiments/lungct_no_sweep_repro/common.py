@@ -487,6 +487,24 @@ def cubic_bspline_value(x: float, derivative: int = 0) -> float:
     raise ValueError(f"Unsupported derivative: {derivative}")
 
 
+def cubic_bspline_value_tensor(x: torch.Tensor, derivative: int = 0) -> torch.Tensor:
+    t = x.abs()
+    zero = torch.zeros_like(x)
+    if derivative == 0:
+        inner = (2.0 / 3.0) + 0.5 * t**3 - t**2
+        outer = ((2.0 - t).clamp_min(0.0) ** 3) / 6.0
+        return torch.where(t < 1.0, inner, torch.where(t < 2.0, outer, zero))
+    if derivative == 1:
+        inner = (1.5 * t - 2.0) * x
+        outer = torch.where(x < 0.0, 0.5 * (t - 2.0) ** 2, -0.5 * (t - 2.0) ** 2)
+        return torch.where(t < 1.0, inner, torch.where(t < 2.0, outer, zero))
+    if derivative == 2:
+        inner = 3.0 * t - 2.0
+        outer = -t + 2.0
+        return torch.where(t < 1.0, inner, torch.where(t < 2.0, outer, zero))
+    raise ValueError(f"Unsupported derivative: {derivative}")
+
+
 def cubic_bspline1d(stride: int, derivative: int = 0, dtype=None, device=None) -> torch.Tensor:
     if dtype is None:
         dtype = torch.float32
@@ -638,6 +656,87 @@ def analytic_bspline_sampled_be(
     ]
     density = _density_from_terms(terms, component_reduction=component_reduction)
     return _masked_density_mean(density, mask)
+
+
+def flat_indices_to_zyx(flat_indices: torch.Tensor, image_shape: Sequence[int]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    if flat_indices.ndim != 1:
+        raise ValueError(f"Expected 1D flat indices, got shape {tuple(flat_indices.shape)}")
+    d, h, w = (int(v) for v in image_shape)
+    z = torch.div(flat_indices, h * w, rounding_mode="floor")
+    rem = flat_indices - z * h * w
+    y = torch.div(rem, w, rounding_mode="floor")
+    x = rem - y * w
+    return z, y, x
+
+
+def sample_cubic_bspline_derivative(
+    control_values: torch.Tensor,
+    control_shape: Sequence[int],
+    image_shape: Sequence[int],
+    cps: int,
+    flat_indices: torch.Tensor,
+    derivative_orders: Sequence[int],
+) -> torch.Tensor:
+    """Evaluate a cubic B-spline derivative at selected voxel-center indices."""
+    if len(tuple(derivative_orders)) != 3:
+        raise ValueError(f"Expected three derivative orders, got {derivative_orders}")
+    control_grid = flat_to_grid(control_values, control_shape)
+    cd, ch, cw = (int(v) for v in control_shape)
+    z, y, x = flat_indices_to_zyx(flat_indices.to(device=control_values.device, dtype=torch.long), image_shape)
+    coords = [
+        z.to(dtype=control_values.dtype) / float(cps) + 1.0,
+        y.to(dtype=control_values.dtype) / float(cps) + 1.0,
+        x.to(dtype=control_values.dtype) / float(cps) + 1.0,
+    ]
+    bases = [torch.floor(coord).to(dtype=torch.long) - 1 for coord in coords]
+    sizes = (cd, ch, cw)
+    values = torch.zeros((int(flat_indices.numel()), 3), dtype=control_values.dtype, device=control_values.device)
+    for oz in range(4):
+        kz = bases[0] + int(oz)
+        wz = cubic_bspline_value_tensor(coords[0] - kz.to(dtype=control_values.dtype), int(derivative_orders[0]))
+        if int(derivative_orders[0]):
+            wz = wz * (1.0 / float(cps)) ** int(derivative_orders[0])
+        vz = (kz >= 0) & (kz < sizes[0])
+        kz_clamped = kz.clamp(0, sizes[0] - 1)
+        for oy in range(4):
+            ky = bases[1] + int(oy)
+            wy = cubic_bspline_value_tensor(coords[1] - ky.to(dtype=control_values.dtype), int(derivative_orders[1]))
+            if int(derivative_orders[1]):
+                wy = wy * (1.0 / float(cps)) ** int(derivative_orders[1])
+            vy = (ky >= 0) & (ky < sizes[1])
+            ky_clamped = ky.clamp(0, sizes[1] - 1)
+            for ox in range(4):
+                kx = bases[2] + int(ox)
+                wx = cubic_bspline_value_tensor(coords[2] - kx.to(dtype=control_values.dtype), int(derivative_orders[2]))
+                if int(derivative_orders[2]):
+                    wx = wx * (1.0 / float(cps)) ** int(derivative_orders[2])
+                vx = (kx >= 0) & (kx < sizes[2])
+                kx_clamped = kx.clamp(0, sizes[2] - 1)
+                weight = wz * wy * wx
+                valid = (vz & vy & vx).to(dtype=weight.dtype)
+                values = values + control_grid[kz_clamped, ky_clamped, kx_clamped] * (weight * valid).unsqueeze(-1)
+    return values
+
+
+def sampled_cubic_bspline_be(
+    control_values: torch.Tensor,
+    control_shape: Sequence[int],
+    image_shape: Sequence[int],
+    cps: int,
+    flat_indices: torch.Tensor,
+    *,
+    component_reduction: str = "mean",
+) -> torch.Tensor:
+    terms = [
+        (sample_cubic_bspline_derivative(control_values, control_shape, image_shape, cps, flat_indices, (2, 0, 0)), 1.0),
+        (sample_cubic_bspline_derivative(control_values, control_shape, image_shape, cps, flat_indices, (0, 2, 0)), 1.0),
+        (sample_cubic_bspline_derivative(control_values, control_shape, image_shape, cps, flat_indices, (0, 0, 2)), 1.0),
+        (sample_cubic_bspline_derivative(control_values, control_shape, image_shape, cps, flat_indices, (1, 1, 0)), 2.0),
+        (sample_cubic_bspline_derivative(control_values, control_shape, image_shape, cps, flat_indices, (1, 0, 1)), 2.0),
+        (sample_cubic_bspline_derivative(control_values, control_shape, image_shape, cps, flat_indices, (0, 1, 1)), 2.0),
+    ]
+    density = _density_from_terms(terms, component_reduction=component_reduction)
+    return density.mean()
 
 
 def analytic_bspline_sampled_diffusion(
@@ -851,6 +950,17 @@ def make_loss_mask(
         return full_mask
     mask_l, _sigma, _kernel = make_loss_volume(full_mask, factor, sigma_scale, radius_sigma)
     return mask_l.clamp(0.0, 1.0)
+
+
+def make_nearest_loss_mask(
+    full_mask: torch.Tensor,
+    eval_shape: Sequence[int],
+) -> torch.Tensor:
+    target_shape = tuple(int(v) for v in eval_shape)
+    if tuple(int(v) for v in full_mask.shape) == target_shape:
+        return full_mask.bool()
+    mask_l = F.interpolate(full_mask[None, None].float(), size=target_shape, mode="nearest")
+    return mask_l.squeeze(0).squeeze(0).bool()
 
 
 def stage_pix_zyx(reg_pix_zyx: Sequence[float], full_shape: Sequence[int], eval_shape: Sequence[int]) -> Tuple[float, float, float]:
