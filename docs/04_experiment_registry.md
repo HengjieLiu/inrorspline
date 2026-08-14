@@ -40,6 +40,398 @@ Next decision:
 
 ## Planned Priority Runs
 
+### P2q: DIR-LAB Fit-Modes Panel A MR-D-BSCP Diagnostic Schedule Refresh
+
+- Run ID: `fit_modes_dirlab_panelA_mrdbscp_e400_400_800_900_diag10_v1`.
+- Status: completed and technically accepted 2026-08-13 (`10/10`).
+- Owner/agent: Codex.
+- Date planned: 2026-08-13.
+- Date started: 2026-08-13.
+- Date completed: 2026-08-13.
+- Server: local project GPU server; no private hostname recorded.
+- GPU model/count: two NVIDIA RTX 6000 Ada GPUs, locked to GPU indices `0,1`,
+  one optimization per GPU with dynamic work stealing.
+- Git commit: `17034615581f7fb3b251a1a82d28bd5d68dab1c6`, dirty source tree; exact
+  dirty paths and source hashes will be stored in the run provenance.
+- Branch: `gpu8`.
+- Docker image/container: `${DOCKER_IMAGE}` / `${CONTAINER_NAME}`; the exact
+  execution image is retained in private run provenance.
+- Dataset root: `${LUNGCT_PTVREG_ISO1MM}`.
+- Dataset manifest: canonical pTVReg 1 mm DIR-LAB cases `01-10`; all ten
+  preprocessed case fields must resolve before execution.
+- Split config: all DIR-LAB 4DCT cases `01-10`; moving T50 to fixed T00.
+- Standards preflight: reviewed `docs/standards/README.md`,
+  `docs/standards/fair_experiment_checklist.md`,
+  `docs/standards/lungct_protocol.md`, and LungCT protocol warnings.
+- Protocol tag:
+  `ptv_directcp_multistage+ptv_landmark_crop_1mm_no_lungmask+full_crop_global_ncc_dense_fd_be+fixed_t00_lung_mask_metric`.
+- Method: `direct_cp_32_16_8_4_global_ncc_fd_be`, control spacing
+  `32/16/8/4`, downsampling `8/4/2/1`, stages `400/400/800/900`, LR
+  `1e-3`, alpha `10000`, seed `1`, full-crop global-NCC diagnostic every 10
+  epochs.
+- Command: run
+  `scripts/experiments/fit_modes_population/launch_dirlab_panelA_schedule_refresh.py`
+  in dry-run, isolated smoke, then full modes; aggregate with the corresponding
+  focused aggregator.
+- Output root:
+  `${RUN_ROOT}/fit_modes_dirlab_panelA_mrdbscp_e400_400_800_900_diag10_v1`.
+- Review root:
+  `experiments/2026-08-13_fit_modes_dirlab_panelA_schedule_refresh/`.
+- Primary metric: full-crop diagnostic `1-NCC` at epoch 2500. Secondary
+  metrics: native snap TRE, foreground stdLogJ, foreground folding percentage,
+  runtime, and peak memory.
+- Comparison: paired against the accepted population records with
+  `200/400/800/1000` and cross-checked against the August 13
+  diagnostic-disabled `400/400/800/900` outputs.
+- Acceptance: `10/10` completed, exact metadata, 2500 history rows, 251 finite
+  diagnostic rows per case, finite secondary metrics, and zero unresolved
+  failures. Final result: PASS.
+- Result: historical versus replacement `1-NCC` was
+  `0.003216 +/- 0.001950` versus `0.003215 +/- 0.001950`; paired mean change
+  `-0.000000441`, range `[-0.000006, 0.000001]`. All population comparisons
+  use ten paired cases.
+- Replay cross-check: the ten diagnostic-enabled reruns reproduced the August
+  13 diagnostic-disabled displacement-derived TRE, stdLogJ, folding, peak
+  memory, and native-crop headline TRE exactly at stored precision. The
+  diagnostic added `89.9 s` mean runtime.
+- Reports:
+  `experiments/2026-08-13_fit_modes_dirlab_panelA_schedule_refresh/acceptance_report.md`
+  and
+  `experiments/2026-08-13_fit_modes_dirlab_panelA_schedule_refresh/comparison_report.md`.
+- Schedule-matched supplementary/reviewer diagnostics completed with a
+  versioned 160-record source index, two 4-by-5 dataset composites, 20
+  individual case figures, endpoint validation, checksums, and visual review:
+  `experiments/paper_artifacts/fit_modes_population_diagnostics/v001_schedule_matched/`.
+- Known limitations: this is a 2500-versus-2400 epoch schedule correction, not
+  a fixed-budget schedule ablation; it refreshes only MR-D-BSCP Panel A. The
+  original 2400-epoch index and figures remain immutable sensitivity evidence.
+- Next decision: design the separate compact main-paper figure, then revise
+  Methods, caption, and reviewer response. The 4-by-5 composites are explicitly
+  supplementary/reviewer diagnostics.
+
+### P2p: OASIS100 Selected Fast-Schedule Validation
+
+- Run ID: `oasis_selected_fast_first100_alpha1000_v1`.
+- Status: launching 2026-08-13.
+- Owner/agent: Codex.
+- Date planned: 2026-08-13.
+- Date started: 2026-08-13.
+- Dataset: OASIS BrainMR seed-3 shuffled `pair_test_200` first100.
+- Purpose: validate the selected accelerated schedules on OASIS100 after the
+  unified first10 runtime-reduction screen.
+- Selected schedules:
+  `MR_A_fast_decay`, `D2_A_bal_lr10x`, `D4_A_bal_lr10x`,
+  `S2_A_bal_lr10x`, and `S4_A_bal_lr10x`.
+- First10 reuse policy: reuse ranks `0-9` from
+  `/database/inrorspline/runs/oasis_unified_acceleration_sweep_alpha1000_v1`;
+  do not rerun them in this output root.
+- New-run policy: evaluate ranks `10-99` only, producing `450` new
+  registrations and a combined `500`-row selected OASIS100 report.
+- Execution order: first run `MR_A_fast_decay` data-parallel across rank chunks
+  `10-32`, `33-55`, `56-77`, and `78-99` on GPUs `0,1,2,3`; after MR
+  completes, run `D2_A_bal_lr10x`, `D4_A_bal_lr10x`, `S2_A_bal_lr10x`, and
+  `S4_A_bal_lr10x` model-parallel on GPUs `0,1,2,3`, each over ranks `10-99`.
+- Alpha: `1000`.
+- Protocol tag:
+  `oasis_seed3_first100_selected_fast_alpha1000_reuse_first10`.
+- Standards preflight: OASIS BrainMR protocol and fair experiment checklist
+  reviewed; use seed-3 shuffled first100 and fixed raw image-positive
+  foreground convention.
+- Docker image/container: `py310sitreg_v1_test1`,
+  `hengjieliu96/dl_dir:py310sitreg_v1`.
+- Dataset root:
+  `/database/wavereg/datasets/OASIS/OASIS_official/oasis_organized/split_v1`.
+- Split config:
+  `configs/splits/oasis/pair_test_200_shuffled_seed000003.txt`.
+- Output root:
+  `/database/inrorspline/runs/oasis_selected_fast_first100_alpha1000_v1`.
+- Review root:
+  `experiments/2026-08-13_oasis_selected_fast_first100/`.
+- Commands:
+  syntax check with
+  `docker exec py310sitreg_v1_test1 python -m py_compile /homebase/code_sync/inrorspline/scripts/experiments/oasis_alpha_sweep/run_one.py /homebase/code_sync/inrorspline/scripts/experiments/oasis_alpha_sweep/launch_oasis_unified_acceleration_sweep.py /homebase/code_sync/inrorspline/scripts/experiments/oasis_alpha_sweep/launch_oasis_selected_fast_first100.py /homebase/code_sync/inrorspline/scripts/experiments/oasis_alpha_sweep/aggregate_oasis_selected_fast_first100.py`;
+  smoke with
+  `docker exec py310sitreg_v1_test1 python /homebase/code_sync/inrorspline/scripts/experiments/oasis_alpha_sweep/launch_oasis_selected_fast_first100.py --stage smoke --epoch-override 1 --gpus 0,1,2,3 --max-concurrent 4 --skip-aggregate`;
+  full launch with
+  `docker exec py310sitreg_v1_test1 python /homebase/code_sync/inrorspline/scripts/experiments/oasis_alpha_sweep/launch_oasis_selected_fast_first100.py --stage all --gpus 0,1,2,3 --max-concurrent 4 --allow-incomplete-aggregate`.
+- Primary metrics: OASIS100 Dice, HD95, ASD, foreground regularity metrics,
+  actual epochs, peak GPU memory, and reference runtime.
+- Known limitations: runtime is reference-only because GPUs were explicitly
+  allowed to remain shared/occupied; final cold/warm deployment timing should
+  be measured later under isolated persistent-process conditions.
+- Next decision: after aggregation, compare selected fast schedules with the
+  full-budget OASIS100 counterparts and decide final paper rows.
+
+### P2o: OASIS Unified Runtime-Reduction Sweep
+
+- Run ID: `oasis_unified_acceleration_sweep_alpha1000_v1`.
+- Status: launching 2026-08-13.
+- Owner/agent: Codex.
+- Date planned: 2026-08-13.
+- Date started: 2026-08-13.
+- Dataset: OASIS BrainMR seed-3 shuffled `pair_test_200` first10.
+- Purpose: apply a unified acceleration template before selecting one
+  accelerated variant each for MR-D-BSCP `8-4-2`, D-BSCP `cps2`, and SINR
+  `cps2` for later first100 validation; then run D-BSCP/SINR `cps4` as
+  contextual follow-up.
+- Methods:
+  `direct_cp_8_4_2_be_bspline_analytic_multistage`,
+  `direct_cp_cps2_be_bspline_analytic`,
+  `sinr_cps2_be_bspline_analytic`,
+  `direct_cp_cps4_be_bspline_analytic`, and
+  `sinr_cps4_be_bspline_analytic`.
+- Candidate template: method-native baseline LR, fixed epoch budgets
+  `60%/40%/25%` with LR multipliers `3x/10x/30x`, and adaptive `A_bal_lr10x`
+  / `A_fast_lr30x` schedules; MR-D-BSCP additionally includes decayed-stage LR
+  variants and the previous `A_fast_decay_legacy`.
+- Alpha: `1000`.
+- Protocol tag:
+  `oasis_seed3_first10_unified_acceleration_alpha1000_persistent_candidate_workers`.
+- Standards preflight: OASIS BrainMR protocol and fair experiment checklist
+  reviewed; use seed-3 shuffled first10 and fixed raw image-positive foreground
+  convention.
+- Docker image/container: `py310sitreg_v1_test1`,
+  `hengjieliu96/dl_dir:py310sitreg_v1`.
+- Dataset root:
+  `/database/wavereg/datasets/OASIS/OASIS_official/oasis_organized/split_v1`.
+- Split config:
+  `configs/splits/oasis/pair_test_200_shuffled_seed000003.txt`.
+- Output root:
+  `/database/inrorspline/runs/oasis_unified_acceleration_sweep_alpha1000_v1`.
+- Review root:
+  `experiments/2026-08-13_oasis_unified_acceleration_sweep/`.
+- Commands:
+  syntax check with
+  `docker exec py310sitreg_v1_test1 python -m py_compile /homebase/code_sync/inrorspline/scripts/experiments/oasis_alpha_sweep/run_one.py /homebase/code_sync/inrorspline/scripts/experiments/oasis_alpha_sweep/launch_oasis_unified_acceleration_sweep.py /homebase/code_sync/inrorspline/scripts/experiments/oasis_alpha_sweep/aggregate_oasis_unified_acceleration_sweep.py`;
+  primary launch with
+  `docker exec py310sitreg_v1_test1 python /homebase/code_sync/inrorspline/scripts/experiments/oasis_alpha_sweep/launch_oasis_unified_acceleration_sweep.py --phase primary --gpus 0,1,2,3 --max-concurrent 4 --allow-incomplete-aggregate`;
+  cps4 launch with
+  `docker exec py310sitreg_v1_test1 python /homebase/code_sync/inrorspline/scripts/experiments/oasis_alpha_sweep/launch_oasis_unified_acceleration_sweep.py --phase cps4 --gpus 0,1,2,3 --max-concurrent 4 --allow-incomplete-aggregate`.
+- Primary metrics: Dice degradation grades versus same-method baseline,
+  HD95/ASD degradation, full registration cold/warm runtime,
+  loaded-images-to-DVF-file cold/warm runtime, actual epochs, and peak GPU
+  memory.
+- Known limitations: existing GPU jobs were explicitly allowed by the user, so
+  screening runtime may be noisier than final timing; this is first10 screening
+  only; first100 validation and final isolated deployment timing are deferred
+  until variants are selected.
+- Next decision: after aggregation, select accelerated variants for first100
+  OASIS validation and controlled paper-facing timing.
+
+### P2n: LungCT Figure 2 MR-D-BSCP 2500-Step Schedule Refresh
+
+- Run ID: `lungct_fig2_mrdbscp_2500_schedule_refresh_v1`.
+- Status: planned for launch 2026-08-13.
+- Owner/agent: Codex.
+- Date planned: 2026-08-13.
+- Dataset: DIR-Lab 4DCT cases `01-10`, canonical regenerated pTVReg-style
+  landmark crop resampled to 1mm.
+- Purpose: rerun only the Figure 2 MR-D-BSCP curve points that currently use
+  the old `200,400,800,1000` schedule, changing only the schedule to
+  `400,400,800,900` while preserving each plotted method/loss definition.
+- IDIR-loss method: `direct_cp_32_16_8_4_global_ncc_fd_be`, full-crop global
+  NCC plus dense forward-difference BE, alphas
+  `1000,3000,10000,30000,100000`.
+- pTVReg-loss method: `direct_cp_32_16_8_4_ptv_lcc_isotv`, pTV-LCC plus isoTV,
+  weights `0.011,0.033,0.055,0.11,0.33`; reuse completed 2500-step `w=0.11`
+  anchor if validation passes.
+- Fixed parameters: stage full control points `32,16,8,4`, downsample
+  `8,4,2,1`, stage epochs `400,400,800,900`, seed `1`, `lr=1e-3`.
+- Protocol tag:
+  `ptv_directcp_multistage_fig2_schedule_refresh_2500`.
+- Standards preflight: LungCT protocol tags, fair experiment checklist,
+  Docker GPU workflow, pTVReg protocol warnings, and previous schedule pilot
+  reviewed before launch.
+- Docker image/container: `py310sitreg_v1_test1`,
+  `hengjieliu96/dl_dir:py310sitreg_v1`.
+- Dataset root: `/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm`.
+- Output roots:
+  `/database/inrorspline/runs/lungct_fig2_mrdbscp_idirloss_fdbe_e400_400_800_900_v1`
+  and
+  `/database/inrorspline/runs/lungct_fig2_mrdbscp_ptvloss_e400_400_800_900_v1`.
+- Review root:
+  `experiments/2026-08-13_lungct_fig2_mrdbscp_2500_schedule_refresh/`.
+- Commands:
+  `docker exec py310sitreg_v1_test1 python /homebase/code_sync/inrorspline/scripts/experiments/lungct_no_sweep_repro/launch_lungct_fig2_mrdbscp_2500_schedule_refresh.py --families idir_fdbe --gpus 0,1,2,3`
+  followed by
+  `docker exec py310sitreg_v1_test1 python /homebase/code_sync/inrorspline/scripts/experiments/lungct_no_sweep_repro/launch_lungct_fig2_mrdbscp_2500_schedule_refresh.py --families ptv --gpus 0,1,2,3`.
+- Primary metrics: original/native-crop snap TRE mean/std, foreground fixed
+  T00 lung-mask stdLogJ mean/std, foreground `J<=0%`, elapsed time, peak
+  memory, and case-by-case TRE.
+- Known limitations: schedule-refresh comparison only; does not switch Figure 2
+  to the newer corrected fixed-mask NCC + analytic B-spline BE protocol; does
+  not update plotting source until the comparison table is reviewed.
+- Next decision: after aggregation, decide whether the 2500-step refreshed rows
+  should replace the old Figure 2 MR-D-BSCP schedule rows.
+
+### P2m: LungCT 2500-Step Schedule Standardization Pilots
+
+- Run ID: `lungct_2500_schedule_standardization_pilot_v1`.
+- Status: planned for launch 2026-08-12.
+- Owner/agent: Codex.
+- Date planned: 2026-08-12.
+- Dataset: DIR-Lab 4DCT cases `01-10`, canonical regenerated pTVReg-style
+  landmark crop resampled to 1mm.
+- Purpose: standardize LungCT multistage MR-D-BSCP pilot schedules to
+  `400,400,800,900` epochs (`2500` total) before deciding whether full
+  2500-step sweeps are necessary for paper curves.
+- Pilot A method: `direct_cp_32_16_8_4_ptv_lcc_isotv`, pTVReg loss,
+  `ptv_isotv_weight=0.11`, `lr=1e-3`.
+- Pilot B method: `direct_cp_32_16_8_4_masked_ncc_bspline_be`, corrected
+  IDIR loss with fixed T00 lung-mask sampled NCC plus analytic cubic B-spline
+  BE, `alpha=33333.333333333336`, `lr=1e-3`.
+- Fixed schedule: stage full control points `32,16,8,4`, stage downsample
+  `8,4,2,1`, stage epochs `400,400,800,900`, seed `1`.
+- Protocol tag:
+  `ptv_directcp_multistage_schedule_standardization_2500_pilot`.
+- Standards preflight: LungCT protocol tags, fair experiment checklist,
+  Docker GPU workflow, pTVReg protocol warnings, and prior epoch-budget audit
+  reviewed before launch.
+- Docker image/container: `py310sitreg_v1_test1`,
+  `hengjieliu96/dl_dir:py310sitreg_v1`.
+- Dataset root: `/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm`.
+- Output roots:
+  `/database/inrorspline/runs/lungct_directcp32_ptvlcc_w0p11_e400_400_800_900_all10_v1`
+  and
+  `/database/inrorspline/runs/lungct_directcp4stage_masked_ncc_bspline_be_alpha33333_e400_400_800_900_all10_v1`.
+- Review roots:
+  `experiments/2026-08-12_lungct_directcp32_ptvlcc_w0p11_schedule_standardization/`,
+  `experiments/2026-08-12_lungct_directcp4stage_masked_ncc_bspline_be_alpha33333_e400_400_800_900_all10/`,
+  and
+  `experiments/2026-08-12_lungct_2500_schedule_standardization_pilot/`.
+- Commands:
+  `docker exec py310sitreg_v1_test1 python /homebase/code_sync/inrorspline/scripts/experiments/lungct_no_sweep_repro/launch_lungct_2500_schedule_pilots.py --pilots ptvreg_w0p11 --gpus 0,1,2,3`
+  followed by
+  `docker exec py310sitreg_v1_test1 python /homebase/code_sync/inrorspline/scripts/experiments/lungct_no_sweep_repro/launch_lungct_2500_schedule_pilots.py --pilots masked_alpha33333 --gpus 0,1,2,3`.
+- Primary metrics: original/native-crop snap TRE mean/std, foreground fixed
+  T00 lung-mask stdLogJ mean/std, foreground `J<=0%`, elapsed time, peak
+  memory, and case-by-case TRE.
+- Known limitations: pilot only; no full sweep should be launched from this
+  entry; comparisons are schedule-standardization checks and not method-only
+  claims across unmatched loss/preprocessing families.
+- Next decision: after both reports complete, decide whether pTVReg-loss and
+  corrected IDIR-loss rows warrant full 2500-step sweep reruns.
+
+### P2l: LungCT Corrected MR-D-BSCP IDIR-Loss Alpha Sweep
+
+- Run ID: `lungct_directcp4stage_masked_ncc_bspline_be_alpha_sweep_v1`.
+- Status: stopped after alpha `100000` completed, 2026-08-12.
+- Owner/agent: Codex.
+- Date planned: 2026-08-12.
+  Date started: 2026-08-12.
+  Date stopped: 2026-08-12.
+- Dataset: DIR-Lab 4DCT cases `01-10`, canonical regenerated pTVReg-style
+  landmark crop resampled to 1mm.
+- Purpose: resolve the apparent regularization-scale mismatch in the corrected
+  `MR-D-BSCP (IDIR loss)` protocol by sweeping alpha around and beyond the
+  completed `alpha=10000` anchor before choosing finer `/3` or `x3` scales.
+- Method: `direct_cp_32_16_8_4_masked_ncc_bspline_be`.
+- Objective: fixed T00 lung-mask sampled global NCC plus `alpha *` sampled
+  analytic cubic B-spline BE.
+- New sweep alphas: `100`, `1000`, `100000`, `1000000`.
+- Aggregation anchor: completed P2k `alpha=10000` result, imported into the
+  review table rather than re-run.
+- Fixed parameters: `lr=1e-3`, seed `1`, sampled batch size `10000`, stage
+  full cps `32,16,8,4`, downsample `8,4,2,1`, stage epochs
+  `200,400,800,1000`.
+- Protocol tag:
+  `ptv_directcp_multistage+ptv_landmark_crop_1mm+fixed_t00_lung_mask_sampled_global_ncc_bspline_be_alpha_sweep`.
+- Standards preflight: LungCT protocol tags, TRE metric conventions, pTVReg
+  protocol warnings, fair experiment checklist, Docker GPU workflow, and P2k
+  corrected-method audit reviewed.
+- Docker image/container: `py310sitreg_v1_test1`,
+  `hengjieliu96/dl_dir:py310sitreg_v1`.
+- Dataset root: `/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm`.
+- Output root:
+  `/database/inrorspline/runs/lungct_directcp4stage_masked_ncc_bspline_be_alpha_sweep_v1`.
+- Review root:
+  `experiments/2026-08-12_lungct_directcp4stage_masked_ncc_bspline_be_alpha_sweep/`.
+- Command:
+  `docker exec py310sitreg_v1_test1 python /homebase/code_sync/inrorspline/scripts/experiments/lungct_no_sweep_repro/launch_directcp4stage_masked_ncc_bspline_be_alpha_sweep.py --gpus 0,1,2,3`.
+- Primary metrics: original/native-crop snap TRE mean/std and foreground
+  fixed T00 lung-mask stdLogJ mean/std; retain all four TRE variants and
+  foreground regularity metrics.
+- Known limitations: scale-finding sweep only; alpha `10000` is reused from
+  P2k; pTVReg-style 1mm crop input is not the native full-volume original IDIR
+  protocol; sampled fixed-mask NCC introduces stochasticity.
+- Verification so far: compile/import passed; dry-run queued exactly `40` new
+  jobs across GPUs `0,1,2,3`; patched non-final stage initialization to skip
+  full 1mm prolongation diagnostics by default; patched case01
+  `stage_epochs=1,1,1,1` smoke passed and wrote final metrics; `alpha=100000`
+  completed all `10/10` cases with return code `0`; launcher and in-progress
+  `alpha=1000000` workers were stopped by request before any `alpha=1000000`
+  summaries completed; aggregation over alpha `10000` and `100000` completed
+  with errors `[]`.
+- Partial result: corrected alpha `100000` original-snap TRE
+  `1.003 +/- 0.154 mm`, foreground stdLogJ
+  `0.155840 +/- 0.033335`, foreground `J<=0` `0.0005%`, foreground BE
+  `0.001099`, foreground diffusion `0.008170`.
+- Interpretation: alpha `100000` improves the corrected protocol strongly over
+  alpha `10000` and is smoother than the current full-crop NCC + dense-FD-BE
+  reference, but the current reference still has lower TRE
+  (`0.966 +/- 0.151 mm`).
+- Next decision: if continuing this corrected variant, test local scales around
+  `100000`, especially `/3` and `x3`; otherwise retain the current reference
+  row for TRE-dominant paper plotting.
+
+### P2k: LungCT Corrected MR-D-BSCP IDIR-Loss Alpha10000 All10
+
+- Run ID: `lungct_directcp4stage_masked_ncc_bspline_be_alpha10000_all10_v1`.
+- Status: completed 2026-08-12.
+- Owner/agent: Codex.
+- Date planned: 2026-08-12.
+  Date started: 2026-08-12.
+  Date completed: 2026-08-12.
+- Dataset: DIR-Lab 4DCT cases `01-10`, canonical regenerated pTVReg-style
+  landmark crop resampled to 1mm.
+- Purpose: correct the plotted `MR-D-BSCP (IDIR loss)` operating point by
+  matching the intended fixed T00 lung-mask sampled loss domain and analytic
+  cubic B-spline bending-energy regularizer, then compare against the current
+  all-case full-crop global-NCC + dense-FD-BE best point.
+- Method: `direct_cp_32_16_8_4_masked_ncc_bspline_be`.
+- Objective: fixed T00 lung-mask sampled global NCC plus `alpha *` sampled
+  analytic cubic B-spline BE.
+- Fixed parameters: alpha `10000`, `lr=1e-3`, seed `1`, sampled batch size
+  `10000`, stage full cps `32,16,8,4`, downsample `8,4,2,1`, stage epochs
+  `200,400,800,1000`.
+- Comparison target: existing `direct_cp_32_16_8_4_global_ncc_fd_be`, alpha
+  `10000`, full-crop global NCC + dense forward-difference BE, fixed T00 lung
+  mask metric-only, current all-case TRE `0.966 +/- 0.151 mm` and foreground
+  stdLogJ `0.185452 +/- 0.060879`.
+- Protocol tag:
+  `ptv_directcp_multistage+ptv_landmark_crop_1mm+fixed_t00_lung_mask_sampled_global_ncc_bspline_be`.
+- Standards preflight: LungCT protocol tags, TRE metric conventions, pTVReg
+  protocol warnings, fair experiment checklist, and Docker GPU workflow
+  reviewed.
+- Docker image/container: `py310sitreg_v1_test1`,
+  `hengjieliu96/dl_dir:py310sitreg_v1`.
+- Dataset root: `/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm`.
+- Output root:
+  `/database/inrorspline/runs/lungct_directcp4stage_masked_ncc_bspline_be_alpha10000_all10_v1`.
+- Review root:
+  `experiments/2026-08-12_lungct_directcp4stage_masked_ncc_bspline_be_alpha10000_all10/`.
+- Primary metrics: original/native-crop snap TRE mean/std and foreground
+  fixed T00 lung-mask stdLogJ mean/std; retain all four TRE variants and
+  foreground regularity metrics.
+- Verification: compile/import passed; sampled analytic B-spline derivative
+  check matched dense expansion with maximum absolute error `1.788e-7`;
+  case01 `1,1,1,1` smoke passed; dry-run queued exactly `10` jobs; full
+  all-10 launch completed `10/10` jobs with return code `0`; aggregation
+  completed with errors `[]`.
+- Actual corrected result at alpha `10000`: original-snap TRE
+  `1.037 +/- 0.153 mm`, foreground stdLogJ `0.265395 +/- 0.063547`,
+  foreground `J<=0` `0.0349%`, foreground BE `0.006341`, foreground diffusion
+  `0.016738`.
+- Comparison target remains better at the same alpha: existing
+  `direct_cp_32_16_8_4_global_ncc_fd_be` original-snap TRE
+  `0.966 +/- 0.151 mm`, foreground stdLogJ `0.185452 +/- 0.060879`,
+  foreground `J<=0` `0.0037%`.
+- Known limitations: single alpha only; pTVReg-style 1mm crop input, not native
+  full-volume original IDIR; stochastic sampled loss.
+- Next decision: do not replace the current plotted `MR-D-BSCP (IDIR loss)`
+  point with this corrected alpha-10000 point unless a follow-up alpha sweep or
+  regularization-scale adjustment improves the corrected protocol.
+
 ### P0: Scaffold Only
 
 - Status: complete when root scaffold lands.
@@ -1678,7 +2070,8 @@ Next decision:
 
 ### P13: OASIS10/DIR-LAB10 Population Fit-Modes Figure
 
-- Status: completed and accepted 2026-08-02. Final aggregate: 160/160 terminal-
+- Status: completed and accepted 2026-08-02; schedule-matched diagnostic refresh
+  accepted 2026-08-13. Original aggregate: 160/160 terminal-
   success records, including 136 new completions and 24 exact-compatible
   reuses; 0 failures; all 16 dataset/panel/method groups have N=10.
 - Purpose: replace the illustrative one-OASIS/two-DIR-LAB representation-
@@ -1693,9 +2086,12 @@ Next decision:
 - OASIS Panel A: IDIR `alpha=1, lr=1e-4`; INR-BSCP cps2
   `alpha=1000, lr=1e-4`; D-BSCP cps2 `alpha=1000, lr=1e-3`; MR-D-BSCP
   `8-4-2`, `lr=1e-3`, stage epochs `400,800,1300`; total 2500 epochs.
-- DIR-LAB Panel A: IDIR `alpha_BE=3, lr=1e-4`; INR-BSCP cps4
+- Historical DIR-LAB Panel A index: IDIR `alpha_BE=3, lr=1e-4`; INR-BSCP cps4
   `alpha=10000, lr=1e-4`; D-BSCP cps4 `alpha=10000, lr=1e-3`;
   MR-D-BSCP `32-16-8-4`, `lr=1e-3`, stage epochs `200,400,800,1000`.
+- Versioned schedule-matched diagnostic index: the same 150 nonreplacement
+  records plus ten accepted DIR-LAB Panel A MR-D-BSCP records at
+  `400,400,800,900` (2500 epochs). The original index is not overwritten.
 - Panel B: MSE-only normalized-grid target-field fitting. OASIS uses SITReg
   targets and the fixed `image>0` mask; DIR-LAB uses reconstructed pTVReg
   targets and the fixed-T00 lung mask. Multistage schedules are OASIS
@@ -1734,18 +2130,24 @@ Next decision:
   accepted index; axis limits are shared within each dataset and recorded in
   `diagnostic_manifest.json`. A compact final population-statistics figure is
   still a separate paper-design step.
+- Schedule-matched diagnostic outputs:
+  `experiments/paper_artifacts/fit_modes_population_diagnostics/v001_schedule_matched/`.
+  The versioned source index contains exactly 160 records with 10 replacements
+  and 150 canonically unchanged rows. All 160 endpoints validate; all ten new
+  DIR-LAB curves contain 251 finite diagnostics through epoch 2500. Two 4-by-5
+  dataset composites and 20 individual case PNGs passed checksum and visual
+  review gates on globally locked panel axes.
 - Known limitation: OASIS N=10 resolves the single-case cherry-picking concern
   but does not literally repeat the previous N=100 testing cohort.
-- Open camera-ready issue: DIR-LAB MR-D-BSCP Panel A uses
-  `200,400,800,1000` (2400 total), while Panel B uses `400,400,800,900` (2500
-  total) and the Panel A single-stage methods use 2500 epochs. Until a
-  schedule-matched replacement cohort is accepted, claim only final-spacing
-  matching. The preferred replacement is versioned Panel A N=10 at
-  `400,400,800,900`; tracked in `docs/todos/camera_ready_checklist.md`.
+- Resolved camera-ready issue: the schedule-matched supplementary diagnostics
+  use `400,400,800,900` for DIR-LAB MR-D-BSCP in both panels. The historical
+  `200,400,800,1000` rows remain provenance/sensitivity evidence.
 - Implementation entry point:
   `scripts/experiments/fit_modes_population/launch_population.py`.
 - Diagnostic entry point:
   `scripts/experiments/fit_modes_population/plot_case_diagnostics.py`.
+- Schedule-matched diagnostic entry point:
+  `scripts/experiments/fit_modes_population/render_schedule_matched_diagnostics.py`.
 
 ### P14: DUAL-INR-DIR Author Reproduction and Semantic-Loss Ablation
 
