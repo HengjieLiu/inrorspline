@@ -1,0 +1,21 @@
+{
+  "errors": [],
+  "idir_alphas": [
+    1000.0,
+    3000.0,
+    10000.0,
+    30000.0,
+    100000.0
+  ],
+  "ptv_weights": [
+    0.011,
+    0.033,
+    0.055,
+    0.11,
+    0.33
+  ],
+  "stage_epochs": "400,400,800,900",
+  "idir_run_root": "${DATA_ROOT}/runs/lungct_fig2_mrdbscp_idirloss_fdbe_e400_400_800_900_v1",
+  "ptv_run_root": "${DATA_ROOT}/runs/lungct_fig2_mrdbscp_ptvloss_e400_400_800_900_v1",
+  "ptv_anchor_root": "${DATA_ROOT}/runs/lungct_directcp32_ptvlcc_w0p11_e400_400_800_900_all10_v1"
+}

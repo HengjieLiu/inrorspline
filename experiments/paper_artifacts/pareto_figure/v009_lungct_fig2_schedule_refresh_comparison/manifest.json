@@ -1,0 +1,25 @@
+{
+  "artifact": "lungct_fig2_left_bottom_schedule_refresh_comparison",
+  "created_utc": "2026-08-13T06:56:57.258340+00:00",
+  "sources": {
+    "unchanged_idir_ptvreg": "experiments/paper_artifacts/pareto_figure/v002_candidate/lungct10_pareto_source_rows.csv",
+    "mrdbscp_old_new_mean_rows": "experiments/2026-08-13_lungct_fig2_mrdbscp_2500_schedule_refresh/mean_rows.csv",
+    "old_new_comparison": "experiments/2026-08-13_lungct_fig2_mrdbscp_2500_schedule_refresh/schedule_comparison_rows.csv"
+  },
+  "outputs": {
+    "figure": "experiments/paper_artifacts/pareto_figure/v009_lungct_fig2_schedule_refresh_comparison/lungct_fig2_left_bottom_schedule_refresh_2x2.png",
+    "source_rows": "experiments/paper_artifacts/pareto_figure/v009_lungct_fig2_schedule_refresh_comparison/source_rows.csv",
+    "review_report": "experiments/paper_artifacts/pareto_figure/v009_lungct_fig2_schedule_refresh_comparison/review_report.md"
+  },
+  "panels": {
+    "top_left": "previous 2400 schedule, unannotated",
+    "top_right": "2500 schedule refresh, unannotated",
+    "bottom_left": "previous 2400 schedule, annotated",
+    "bottom_right": "2500 schedule refresh, annotated"
+  },
+  "x_axis": "foreground stdLogJ",
+  "y_axis": "original snap TRE in mm",
+  "ellipse_definition": "full width/height equals 2 * sample SD",
+  "figure2_source_updated": false,
+  "row_count": 28
+}
