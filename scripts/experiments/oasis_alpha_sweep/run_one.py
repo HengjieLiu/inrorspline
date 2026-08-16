@@ -696,11 +696,12 @@ def global_ncc_diagnostic_row(
     fixed: torch.Tensor,
     moving: torch.Tensor,
     dense_coords: torch.Tensor,
+    fixed_mask: torch.Tensor | None = None,
     epoch: int,
     global_epoch: int,
     eval_domain: str,
     device: torch.device,
-) -> Dict[str, float | str | bool]:
+) -> Dict[str, float | str | bool | int]:
     eval_start = time.time()
     with torch.no_grad():
         warped = c.warp_full(moving, dense_coords, mode="bilinear")
@@ -708,6 +709,7 @@ def global_ncc_diagnostic_row(
     if device.type == "cuda":
         torch.cuda.synchronize()
     value = float(loss.detach().cpu())
+    fixed_positive_fields = fixed_image_positive_ncc_fields(fixed, warped, fixed_mask)
     del warped, loss
     return {
         "epoch": float(epoch),
@@ -718,6 +720,33 @@ def global_ncc_diagnostic_row(
         "eval_domain": eval_domain,
         "affects_training": False,
         "eval_elapsed_sec": time.time() - eval_start,
+        **fixed_positive_fields,
+    }
+
+
+def fixed_image_positive_ncc_fields(
+    fixed: torch.Tensor,
+    warped: torch.Tensor,
+    fixed_mask: torch.Tensor | None,
+) -> Dict[str, float | str | int]:
+    if fixed_mask is None:
+        return {}
+    with torch.no_grad():
+        mask = fixed_mask.detach().bool()
+        voxels = int(mask.sum().detach().cpu())
+        if voxels < 2:
+            raise RuntimeError("Cannot compute fixed-image-positive NCC on an empty/singleton mask.")
+        fixed_masked = fixed.detach()[mask]
+        warped_masked = warped.detach()[mask]
+        loss = c.ncc_loss(fixed_masked, warped_masked)
+        value = float(loss.detach().cpu())
+    return {
+        "fixed_image_positive_ncc_loss": value,
+        "fixed_image_positive_ncc_value": -value,
+        "fixed_image_positive_one_minus_ncc": 1.0 + value,
+        "fixed_image_positive_mask_voxels": voxels,
+        "fixed_image_positive_diagnostic_name": "fixed_image_positive_global_ncc",
+        "fixed_image_positive_eval_domain": "fixed_raw_image_gt_0",
     }
 
 
@@ -727,11 +756,13 @@ def evaluate_idir_full_image_ncc(
     device: torch.device,
     chunk_size: int,
     epoch: int,
-) -> Dict[str, float | str | bool]:
+) -> Dict[str, float | str | bool | int]:
     fixed = batch["fixed"]
     moving = batch["moving"]
+    fixed_mask = batch["fixed_mask"]
     assert isinstance(fixed, torch.Tensor)
     assert isinstance(moving, torch.Tensor)
+    assert isinstance(fixed_mask, torch.Tensor)
     eval_start = time.time()
     coords_all = c.make_coordinate_tensor(c.IMAGE_SHAPE, device)
     chunks: List[torch.Tensor] = []
@@ -746,6 +777,7 @@ def evaluate_idir_full_image_ncc(
     if device.type == "cuda":
         torch.cuda.synchronize()
     value = float(loss.detach().cpu())
+    fixed_positive_fields = fixed_image_positive_ncc_fields(fixed, warped, fixed_mask)
     del coords_all, chunks, dense_coords, warped, loss
     return {
         "epoch": float(epoch),
@@ -756,6 +788,7 @@ def evaluate_idir_full_image_ncc(
         "eval_domain": "full_image",
         "affects_training": False,
         "eval_elapsed_sec": time.time() - eval_start,
+        **fixed_positive_fields,
     }
 
 
@@ -775,8 +808,10 @@ def train_idir(
     batch_size = min(int(args.coords_batch_size), n_train)
     moving = batch["moving"]
     fixed_image = batch["fixed"]
+    fixed_mask = batch["fixed_mask"]
     assert isinstance(moving, torch.Tensor)
     assert isinstance(fixed_image, torch.Tensor)
+    assert isinstance(fixed_mask, torch.Tensor)
     history: List[Dict[str, float]] = []
     image_similarity_eval: List[Dict[str, float | str | bool]] = []
     image_sim_chunk_size = int(args.image_sim_eval_chunk_size or args.eval_chunk_size)
@@ -813,18 +848,20 @@ def train_idir(
             print(json.dumps({"image_similarity_eval": sim_row}), flush=True)
         if should_global_ncc_diagnostic(args, epoch, int(args.epochs)):
             diag_row = evaluate_idir_full_image_ncc(model, batch, device, global_ncc_chunk_size, epoch)
-            global_ncc_diagnostic.append(
-                {
-                    "epoch": diag_row["epoch"],
-                    "global_epoch": diag_row["global_epoch"],
-                    "global_ncc_loss": diag_row["similarity_loss"],
-                    "global_ncc_value": diag_row["similarity_value"],
-                    "diagnostic_name": "full_image_global_ncc",
-                    "eval_domain": "full_image",
-                    "affects_training": False,
-                    "eval_elapsed_sec": diag_row["eval_elapsed_sec"],
-                }
-            )
+            row = {
+                "epoch": diag_row["epoch"],
+                "global_epoch": diag_row["global_epoch"],
+                "global_ncc_loss": diag_row["similarity_loss"],
+                "global_ncc_value": diag_row["similarity_value"],
+                "diagnostic_name": "full_image_global_ncc",
+                "eval_domain": "full_image",
+                "affects_training": False,
+                "eval_elapsed_sec": diag_row["eval_elapsed_sec"],
+            }
+            for key, value in diag_row.items():
+                if str(key).startswith("fixed_image_positive_"):
+                    row[key] = value
+            global_ncc_diagnostic.append(row)
             print(json.dumps({"global_ncc_diagnostic": global_ncc_diagnostic[-1]}), flush=True)
         if sampler is not None:
             sampler.record_idir(
@@ -1248,8 +1285,10 @@ def train_mr_sinr842_composed(
 
     moving = batch["moving"]
     fixed_image = batch["fixed"]
+    fixed_mask = batch["fixed_mask"]
     assert isinstance(moving, torch.Tensor)
     assert isinstance(fixed_image, torch.Tensor)
+    assert isinstance(fixed_mask, torch.Tensor)
     id_dense = c.make_coordinate_grid(c.IMAGE_SHAPE, device).detach()
     if sampler is not None and sampler.enabled:
         sampler.record_dense(
@@ -1652,8 +1691,10 @@ def train_spline(
 
     moving = batch["moving"]
     fixed_image = batch["fixed"]
+    fixed_mask = batch["fixed_mask"]
     assert isinstance(moving, torch.Tensor)
     assert isinstance(fixed_image, torch.Tensor)
+    assert isinstance(fixed_mask, torch.Tensor)
 
     train_token = timer.start(
         "training",
@@ -1779,6 +1820,7 @@ def train_spline(
             best_reg_loss = float(entry["reg_loss"])
             best_epoch = int(epoch)
         if should_global_ncc_diagnostic(args, epoch, int(args.epochs)):
+            fixed_positive_fields = fixed_image_positive_ncc_fields(fixed_image, warped, fixed_mask)
             global_ncc_diagnostic.append(
                 {
                     "epoch": float(epoch),
@@ -1794,6 +1836,7 @@ def train_spline(
                     "full_cps": float(cps),
                     "downsample": 1.0,
                     "domain_cps": float(cps),
+                    **fixed_positive_fields,
                 }
             )
             print(json.dumps({"global_ncc_diagnostic": global_ncc_diagnostic[-1]}), flush=True)
@@ -2149,6 +2192,7 @@ def optimize_multistage_stage(
     args: argparse.Namespace,
     fixed_image: torch.Tensor,
     moving: torch.Tensor,
+    fixed_mask: torch.Tensor,
     control: torch.nn.Parameter,
     control_shape: Sequence[int],
     full_cps: int,
@@ -2293,6 +2337,7 @@ def optimize_multistage_stage(
                 fixed=fixed_image,
                 moving=moving,
                 dense_coords=dense_coords_diag,
+                fixed_mask=fixed_mask,
                 epoch=int(epoch),
                 global_epoch=int(row["global_epoch"]),
                 eval_domain="full_image",
@@ -2481,8 +2526,10 @@ def train_multistage_direct_cp(
 
     moving = batch["moving"]
     fixed_image = batch["fixed"]
+    fixed_mask = batch["fixed_mask"]
     assert isinstance(moving, torch.Tensor)
     assert isinstance(fixed_image, torch.Tensor)
+    assert isinstance(fixed_mask, torch.Tensor)
     dense_grid_token = timer.start(
         "training.initial_dense_grid",
         category="fixed_stage_overhead",
@@ -2564,6 +2611,7 @@ def train_multistage_direct_cp(
             args,
             fixed_image,
             moving,
+            fixed_mask,
             control,
             control_shape,
             int(full_cps),
@@ -2996,7 +3044,15 @@ def write_outputs(
             if int(args.global_ncc_diagnostic_interval) > 0
             else None
         ),
+        "fixed_image_positive_ncc_diagnostic_name": (
+            "fixed_image_positive_global_ncc"
+            if int(args.global_ncc_diagnostic_interval) > 0
+            else None
+        ),
         "global_ncc_diagnostic_affects_training": (
+            False if int(args.global_ncc_diagnostic_interval) > 0 else None
+        ),
+        "fixed_image_positive_ncc_diagnostic_affects_training": (
             False if int(args.global_ncc_diagnostic_interval) > 0 else None
         ),
         "global_ncc_diagnostic_tail": metrics.get("global_ncc_diagnostic", [])[-10:],
