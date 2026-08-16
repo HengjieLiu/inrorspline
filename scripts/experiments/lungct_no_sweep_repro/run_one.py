@@ -28,10 +28,13 @@ METHOD_SINR_CPS4_PTV = "sinr_cps4_ptv_lcc_isotv"
 METHOD_DIRECT_CP_CPS4_PTV = "direct_cp_cps4_ptv_lcc_isotv"
 METHOD_SINR_CPS4_GLOBAL_NCC_FD_BE = "sinr_cps4_global_ncc_fd_be"
 METHOD_DIRECT_CP_CPS4_GLOBAL_NCC_FD_BE = "direct_cp_cps4_global_ncc_fd_be"
+METHOD_SINR_CPS4_MASKED_NCC_FD_BE = "sinr_cps4_masked_ncc_fd_be"
+METHOD_DIRECT_CP_CPS4_MASKED_NCC_FD_BE = "direct_cp_cps4_masked_ncc_fd_be"
 METHOD_DIRECT_CP_32_PTV = "direct_cp_32_16_8_4_ptv_lcc_isotv"
 METHOD_DIRECT_CP_32_GLOBAL_NCC_BE = "direct_cp_32_16_8_4_global_ncc_bspline_be"
 METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE = "direct_cp_32_16_8_4_global_ncc_fd_be"
 METHOD_DIRECT_CP_32_MASKED_NCC_BSPLINE_BE = "direct_cp_32_16_8_4_masked_ncc_bspline_be"
+METHOD_DIRECT_CP_32_MASKED_NCC_FD_BE = "direct_cp_32_16_8_4_masked_ncc_fd_be"
 METHOD_DIRECT_DVF_FD_BE = "direct_dvf_lungmask_sampled_ncc_fd_be"
 METHOD_DCTFIELD_FD_BE = "dctfield_lungmask_sampled_ncc_fd_be"
 METHODS = [
@@ -41,10 +44,13 @@ METHODS = [
     METHOD_DIRECT_CP_CPS4_PTV,
     METHOD_SINR_CPS4_GLOBAL_NCC_FD_BE,
     METHOD_DIRECT_CP_CPS4_GLOBAL_NCC_FD_BE,
+    METHOD_SINR_CPS4_MASKED_NCC_FD_BE,
+    METHOD_DIRECT_CP_CPS4_MASKED_NCC_FD_BE,
     METHOD_DIRECT_CP_32_PTV,
     METHOD_DIRECT_CP_32_GLOBAL_NCC_BE,
     METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE,
     METHOD_DIRECT_CP_32_MASKED_NCC_BSPLINE_BE,
+    METHOD_DIRECT_CP_32_MASKED_NCC_FD_BE,
     METHOD_DIRECT_DVF_FD_BE,
     METHOD_DCTFIELD_FD_BE,
 ]
@@ -247,7 +253,12 @@ class CheckpointSampler:
 
 
 def default_epochs(method: str) -> int:
-    if method in {METHOD_DIRECT_CP_32_PTV, METHOD_DIRECT_CP_32_GLOBAL_NCC_BE, METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE}:
+    if method in {
+        METHOD_DIRECT_CP_32_PTV,
+        METHOD_DIRECT_CP_32_GLOBAL_NCC_BE,
+        METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE,
+        METHOD_DIRECT_CP_32_MASKED_NCC_FD_BE,
+    }:
         raise ValueError("Multistage method uses --stage-epochs, not --epochs.")
     return 2500
 
@@ -256,10 +267,12 @@ def default_lr(method: str) -> float:
     if method in {
         METHOD_DIRECT_CP_CPS4_PTV,
         METHOD_DIRECT_CP_CPS4_GLOBAL_NCC_FD_BE,
+        METHOD_DIRECT_CP_CPS4_MASKED_NCC_FD_BE,
         METHOD_DIRECT_CP_32_PTV,
         METHOD_DIRECT_CP_32_GLOBAL_NCC_BE,
         METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE,
         METHOD_DIRECT_CP_32_MASKED_NCC_BSPLINE_BE,
+        METHOD_DIRECT_CP_32_MASKED_NCC_FD_BE,
     }:
         return 1e-3
     return 1e-4
@@ -284,7 +297,7 @@ def run_name(args: argparse.Namespace, method: str, lr: float) -> str:
             f"{method}_{case_token}_sched{stage_full_name}_ds{stage_downsample_name}_"
             f"e{epoch_name}_lr{c.format_float(lr)}_a{c.format_float(args.alpha)}_seed{args.seed}"
         )
-    if method == METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE:
+    if method in {METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE, METHOD_DIRECT_CP_32_MASKED_NCC_FD_BE}:
         epoch_name = args.stage_epochs.replace(" ", "").replace(",", "-")
         return (
             f"{method}_{case_token}_sched{stage_full_name}_ds{stage_downsample_name}_"
@@ -296,7 +309,12 @@ def run_name(args: argparse.Namespace, method: str, lr: float) -> str:
             f"{method}_{case_token}_k{int(args.dct_size)}_e{epochs}"
             f"_lr{c.format_float(lr)}_bend{c.format_float(args.alpha_bending)}_seed{args.seed}"
         )
-    if method in {METHOD_SINR_CPS4_GLOBAL_NCC_FD_BE, METHOD_DIRECT_CP_CPS4_GLOBAL_NCC_FD_BE}:
+    if method in {
+        METHOD_SINR_CPS4_GLOBAL_NCC_FD_BE,
+        METHOD_DIRECT_CP_CPS4_GLOBAL_NCC_FD_BE,
+        METHOD_SINR_CPS4_MASKED_NCC_FD_BE,
+        METHOD_DIRECT_CP_CPS4_MASKED_NCC_FD_BE,
+    }:
         return (
             f"{method}_{case_token}_e{epochs}"
             f"_lr{c.format_float(lr)}_a{c.format_float(args.alpha)}_seed{args.seed}"
@@ -1010,13 +1028,25 @@ def train_single_stage_spline(
 ) -> Dict[str, object]:
     method_epochs = int(args.epochs if args.epochs is not None else 2500)
     method_lr = float(args.lr if args.lr is not None else (1e-3 if direct_cp else 1e-4))
-    is_global_fdbe = str(args.method) in {METHOD_SINR_CPS4_GLOBAL_NCC_FD_BE, METHOD_DIRECT_CP_CPS4_GLOBAL_NCC_FD_BE}
+    is_full_global_fdbe = str(args.method) in {
+        METHOD_SINR_CPS4_GLOBAL_NCC_FD_BE,
+        METHOD_DIRECT_CP_CPS4_GLOBAL_NCC_FD_BE,
+    }
+    is_masked_global_fdbe = str(args.method) in {
+        METHOD_SINR_CPS4_MASKED_NCC_FD_BE,
+        METHOD_DIRECT_CP_CPS4_MASKED_NCC_FD_BE,
+    }
+    is_global_fdbe = is_full_global_fdbe or is_masked_global_fdbe
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
     fixed_t = torch.from_numpy(case.fixed).to(device=device, dtype=torch.float32)
     moving_t = torch.from_numpy(case.moving).to(device=device, dtype=torch.float32)
     fixed_mask_t = torch.from_numpy(case.fixed_mask.astype(np.bool_)).to(device=device)
+    fixed_mask_flat = fixed_mask_t.reshape(-1).bool()
+    fixed_mask_voxels = int(fixed_mask_flat.sum().detach().cpu())
+    if is_masked_global_fdbe and fixed_mask_voxels <= 1:
+        raise RuntimeError("Empty/singleton fixed lung mask for masked NCC training.")
     image_shape = tuple(int(v) for v in fixed_t.shape)
     control_coords, control_shape = c.bspline_control_coords(image_shape, args.cps, device)
     id_dense = c.make_coordinate_grid(image_shape, device).detach()
@@ -1067,7 +1097,10 @@ def train_single_stage_spline(
         dense_disp = c.expand_bspline_controls(control, control_shape, image_shape, args.cps)
         warped = c.warp_full(moving_t, id_dense + dense_disp, mode="bilinear")
         if is_global_fdbe:
-            data_loss = c.ncc_loss(fixed_t[None, None], warped[None, None])
+            if is_masked_global_fdbe:
+                data_loss = c.ncc_loss(fixed_t.reshape(-1)[fixed_mask_flat], warped.reshape(-1)[fixed_mask_flat])
+            else:
+                data_loss = c.ncc_loss(fixed_t[None, None], warped[None, None])
             reg_loss = c.dense_forward_difference_be(dense_disp, component_reduction="mean")
             reg_weight = float(args.alpha)
         else:
@@ -1094,11 +1127,13 @@ def train_single_stage_spline(
         }
         history.append(row)
         if is_global_fdbe and should_global_ncc_diagnostic(args, epoch, method_epochs):
+            with torch.no_grad():
+                full_crop_ncc_loss = c.ncc_loss(fixed_t[None, None], warped.detach()[None, None])
             diag_row = {
                 "epoch": float(epoch),
                 "global_epoch": float(epoch),
-                "global_ncc_loss": row["data_loss"],
-                "global_ncc_value": -row["data_loss"],
+                "global_ncc_loss": float(full_crop_ncc_loss.detach().cpu()),
+                "global_ncc_value": float((-full_crop_ncc_loss).detach().cpu()),
                 "diagnostic_name": "full_crop_global_ncc",
                 "eval_domain": "full_1mm_crop",
                 "affects_training": False,
@@ -1106,6 +1141,8 @@ def train_single_stage_spline(
             }
             with torch.no_grad():
                 diag_row.update(lung_mask_ncc_fields(fixed_t, warped.detach(), fixed_mask_t))
+            if is_masked_global_fdbe:
+                diag_row["lung_mask_affects_training"] = True
             global_ncc_diagnostic.append(diag_row)
             print(json.dumps({"global_ncc_diagnostic": global_ncc_diagnostic[-1]}), flush=True)
         if sampler is not None and sampler.should_record(epoch):
@@ -1146,12 +1183,30 @@ def train_single_stage_spline(
             "epochs": method_epochs,
             "lr": method_lr,
             "optimizer": "Adam",
-            "loss": "full-crop global NCC + dense forward-difference BE" if is_global_fdbe else "pTV-style LCC + isoTV",
-            "image_loss": "full_crop_global_ncc" if is_global_fdbe else "ptv_lcc",
+            "loss": (
+                "fixed T00 lung-mask global NCC + dense forward-difference BE"
+                if is_masked_global_fdbe
+                else "full-crop global NCC + dense forward-difference BE"
+                if is_global_fdbe
+                else "pTV-style LCC + isoTV"
+            ),
+            "image_loss": (
+                "fixed_t00_lung_mask_global_ncc"
+                if is_masked_global_fdbe
+                else "full_crop_global_ncc"
+                if is_global_fdbe
+                else "ptv_lcc"
+            ),
             "regularizer": "dense_forward_difference_be" if is_global_fdbe else "ptv_isotv",
             "alpha": float(args.alpha) if is_global_fdbe else None,
             "cps": int(args.cps),
             "bspline_order": 3,
+            "train_coords": fixed_mask_voxels if is_masked_global_fdbe else None,
+            "sample_domain": (
+                f"fixed_{case.fixed_label.lower()}_lung_mask_reg1mm_grid_points"
+                if is_masked_global_fdbe
+                else None
+            ),
             "ptv_lcc_sigma_mm": None if is_global_fdbe else float(args.ptv_lcc_sigma_mm),
             "ptv_isotv_weight": None if is_global_fdbe else float(args.ptv_isotv_weight),
             "ptv_csqrt": None if is_global_fdbe else float(args.ptv_csqrt),
@@ -1168,7 +1223,7 @@ def train_single_stage_spline(
                 else None
             ),
             "lung_mask_ncc_diagnostic_affects_training": (
-                False if int(args.global_ncc_diagnostic_interval) > 0 else None
+                bool(is_masked_global_fdbe) if int(args.global_ncc_diagnostic_interval) > 0 else None
             ),
             "global_ncc_diagnostic_affects_training": (
                 False if int(args.global_ncc_diagnostic_interval) > 0 else None
@@ -1289,7 +1344,8 @@ def optimize_stage(
         moving_t, downsample, args.antialias_sigma_scale, args.antialias_radius_sigma
     )
     is_full_analytic_be_loss = str(args.method) == METHOD_DIRECT_CP_32_GLOBAL_NCC_BE
-    is_fd_be_loss = str(args.method) == METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE
+    is_masked_fd_be_loss = str(args.method) == METHOD_DIRECT_CP_32_MASKED_NCC_FD_BE
+    is_fd_be_loss = str(args.method) in {METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE, METHOD_DIRECT_CP_32_MASKED_NCC_FD_BE}
     is_masked_analytic_be_loss = str(args.method) == METHOD_DIRECT_CP_32_MASKED_NCC_BSPLINE_BE
     is_analytic_be_loss = is_full_analytic_be_loss or is_masked_analytic_be_loss
     is_be_loss = is_analytic_be_loss or is_fd_be_loss
@@ -1309,12 +1365,13 @@ def optimize_stage(
     masked_train_indices = None
     masked_train_count = None
     masked_batch_size = None
-    if is_masked_analytic_be_loss:
+    if is_masked_analytic_be_loss or is_masked_fd_be_loss:
         fixed_mask_l = c.make_nearest_loss_mask(full_fixed_mask, eval_shape)
         masked_train_indices = torch.nonzero(fixed_mask_l.reshape(-1), as_tuple=False).reshape(-1)
         masked_train_count = int(masked_train_indices.numel())
-        masked_batch_size = min(int(args.batch_size), masked_train_count)
-        if masked_batch_size <= 0:
+        if is_masked_analytic_be_loss:
+            masked_batch_size = min(int(args.batch_size), masked_train_count)
+        if masked_train_count <= 1 or (is_masked_analytic_be_loss and int(masked_batch_size or 0) <= 0):
             raise RuntimeError(f"Empty fixed-mask training coordinate set at stage {stage_idx}.")
     ptv_cache = None
     if not is_be_loss:
@@ -1395,7 +1452,11 @@ def optimize_stage(
             dense_disp = c.expand_on_shape(control, control_shape, full_cps, eval_shape, downsample)
             warped = c.warp_full(moving_l, id_grid + dense_disp, mode="bilinear")
             if is_be_loss:
-                data_loss = c.ncc_loss(fixed_l[None, None], warped[None, None])
+                if is_masked_fd_be_loss:
+                    assert masked_train_indices is not None
+                    data_loss = c.ncc_loss(fixed_flat[masked_train_indices], warped.reshape(-1)[masked_train_indices])
+                else:
+                    data_loss = c.ncc_loss(fixed_l[None, None], warped[None, None])
                 reg_weight = float(args.alpha)
                 if abs(reg_weight) <= 1e-12:
                     reg_loss = torch.zeros((), dtype=data_loss.dtype, device=data_loss.device)
@@ -1484,6 +1545,8 @@ def optimize_stage(
                 device=fixed_t.device,
                 fixed_mask_t=full_fixed_mask,
             )
+            if is_masked_fd_be_loss:
+                diag_row["lung_mask_affects_training"] = True
             diag_row["stage_idx"] = float(stage_idx)
             diag_row["stage_epoch"] = float(epoch)
             diag_row["full_cps"] = float(full_cps)
@@ -1535,6 +1598,8 @@ def optimize_stage(
             if is_full_analytic_be_loss
             else "fixed_mask_sampled_ncc_bspline_be"
             if is_masked_analytic_be_loss
+            else "fixed_t00_lung_mask_global_ncc_fd_be"
+            if is_masked_fd_be_loss
             else "global_ncc_fd_be"
             if is_fd_be_loss
             else "ptv_lcc_isotv"
@@ -1686,7 +1751,8 @@ def train_multistage(
         }
     is_analytic_be_loss = str(args.method) == METHOD_DIRECT_CP_32_GLOBAL_NCC_BE
     is_masked_analytic_be_loss = str(args.method) == METHOD_DIRECT_CP_32_MASKED_NCC_BSPLINE_BE
-    is_fd_be_loss = str(args.method) == METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE
+    is_masked_fd_be_loss = str(args.method) == METHOD_DIRECT_CP_32_MASKED_NCC_FD_BE
+    is_fd_be_loss = str(args.method) in {METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE, METHOD_DIRECT_CP_32_MASKED_NCC_FD_BE}
     is_be_loss = is_analytic_be_loss or is_masked_analytic_be_loss or is_fd_be_loss
     regularizer_name = (
         "analytic_cubic_bspline_be"
@@ -1713,6 +1779,8 @@ def train_multistage(
                 if is_analytic_be_loss
                 else "fixed-mask sampled NCC + sampled analytic cubic B-spline BE"
                 if is_masked_analytic_be_loss
+                else "fixed T00 lung-mask global NCC + dense forward-difference BE"
+                if is_masked_fd_be_loss
                 else "full-crop global NCC + dense forward-difference BE"
                 if is_fd_be_loss
                 else "pTV-style LCC + isoTV"
@@ -1720,6 +1788,8 @@ def train_multistage(
             "image_loss": (
                 "fixed_mask_sampled_global_ncc"
                 if is_masked_analytic_be_loss
+                else "fixed_t00_lung_mask_global_ncc"
+                if is_masked_fd_be_loss
                 else "full_crop_global_ncc"
                 if is_be_loss
                 else "ptv_lcc"
@@ -1729,7 +1799,7 @@ def train_multistage(
             "batch_size": int(args.batch_size) if is_masked_analytic_be_loss else None,
             "sample_domain": (
                 f"fixed_{case.fixed_label.lower()}_lung_mask_stage_grid_points"
-                if is_masked_analytic_be_loss
+                if is_masked_analytic_be_loss or is_masked_fd_be_loss
                 else None
             ),
             "ptv_lcc_sigma_mm": None if is_be_loss else float(args.ptv_lcc_sigma_mm),
@@ -1753,7 +1823,7 @@ def train_multistage(
                 else None
             ),
             "lung_mask_ncc_diagnostic_affects_training": (
-                False if int(args.global_ncc_diagnostic_interval) > 0 else None
+                bool(is_masked_fd_be_loss) if int(args.global_ncc_diagnostic_interval) > 0 else None
             ),
             "global_ncc_diagnostic_affects_training": (
                 False if int(args.global_ncc_diagnostic_interval) > 0 else None
@@ -1852,6 +1922,18 @@ def main() -> None:
         mask_rule = "fixed_t00_lung_mask_metric_only"
         loss_domain = "full_crop_global_ncc"
         method_note = "This method uses full-crop global NCC with no border-mask or lung-mask loss weighting."
+    elif method == METHOD_SINR_CPS4_MASKED_NCC_FD_BE:
+        result = train_single_stage_spline(args, case, device, out_dir, direct_cp=False, sampler=sampler)
+        protocol_tag = (
+            "ptv_landmark_crop_1mm_with_lungmask+single_stage_sinr_cps4+"
+            "fixed_t00_lung_mask_global_ncc_dense_fd_be"
+        )
+        mask_rule = "fixed_t00_lung_mask_loss_and_metric"
+        loss_domain = "fixed_t00_lung_mask_global_ncc"
+        method_note = (
+            "This method changes only the global NCC data-loss domain to fixed T00 "
+            "lung-mask voxels; dense forward-difference BE remains unmasked."
+        )
     elif method == METHOD_DIRECT_CP_CPS4_GLOBAL_NCC_FD_BE:
         result = train_single_stage_spline(args, case, device, out_dir, direct_cp=True, sampler=sampler)
         protocol_tag = (
@@ -1861,6 +1943,18 @@ def main() -> None:
         mask_rule = "fixed_t00_lung_mask_metric_only"
         loss_domain = "full_crop_global_ncc"
         method_note = "This method uses full-crop global NCC with no border-mask or lung-mask loss weighting."
+    elif method == METHOD_DIRECT_CP_CPS4_MASKED_NCC_FD_BE:
+        result = train_single_stage_spline(args, case, device, out_dir, direct_cp=True, sampler=sampler)
+        protocol_tag = (
+            "ptv_landmark_crop_1mm_with_lungmask+single_stage_directcp_cps4+"
+            "fixed_t00_lung_mask_global_ncc_dense_fd_be"
+        )
+        mask_rule = "fixed_t00_lung_mask_loss_and_metric"
+        loss_domain = "fixed_t00_lung_mask_global_ncc"
+        method_note = (
+            "This method changes only the global NCC data-loss domain to fixed T00 "
+            "lung-mask voxels; dense forward-difference BE remains unmasked."
+        )
     elif method == METHOD_DIRECT_CP_32_PTV:
         result = train_multistage(args, case, device, out_dir, sampler=sampler)
         protocol_tag = "ptv_directcp_multistage+ptv_landmark_crop_1mm_no_lungmask+fixed_t00_lung_mask_metric"
@@ -1897,6 +1991,18 @@ def main() -> None:
         mask_rule = "fixed_t00_lung_mask_metric_only"
         loss_domain = "full_crop_global_ncc"
         method_note = "This method uses full-crop global NCC with no border-mask or lung-mask loss weighting."
+    elif method == METHOD_DIRECT_CP_32_MASKED_NCC_FD_BE:
+        result = train_multistage(args, case, device, out_dir, sampler=sampler)
+        protocol_tag = (
+            "ptv_directcp_multistage+ptv_landmark_crop_1mm_with_lungmask+"
+            "fixed_t00_lung_mask_global_ncc_dense_fd_be"
+        )
+        mask_rule = "fixed_t00_lung_mask_loss_and_metric"
+        loss_domain = "fixed_t00_lung_mask_global_ncc"
+        method_note = (
+            "This method changes only the global NCC data-loss domain to fixed T00 "
+            "lung-mask voxels; dense forward-difference BE remains unmasked."
+        )
     else:
         raise ValueError(f"Unknown method: {method}")
 
@@ -1921,6 +2027,7 @@ def main() -> None:
         "run_name": out_dir.name,
         "status": "completed",
         "method": method,
+        "implementation_id": method,
         "dataset": case.dataset,
         "case_id": int(args.case_id),
         "seed": int(args.seed),
