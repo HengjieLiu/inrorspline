@@ -13,3 +13,6 @@
 [submodule "external/DUAL-INR-DIR"]
 	path = external/DUAL-INR-DIR
 	url = https://github.com/IPMI-ICNS-UKE/DUAL-INR-DIR
+[submodule "external/ptvreg-python"]
+	path = external/ptvreg-python
+	url = https://github.com/oazeybekoglu/ptvreg-python
