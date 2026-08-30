@@ -1,0 +1,58 @@
+% Camera-ready OASIS runtime addition, alternate table with peak GPU memory.
+% Suggested insertion point: Results section, after the Fig. 2 OASIS/DIR-LAB
+% registration-results discussion and before the supervised target-field
+% fitting diagnostic.
+
+We also evaluated whether these pair-specific optimizers can be made faster
+without sacrificing the registration accuracy. We focus this runtime analysis on
+OASIS, where all registrations share the same image size; DIR-LAB cases differ
+in crop size and motion difficulty, making a compact runtime comparison less
+controlled. For each spline-based method, we kept the objective and
+regularization weight fixed and screened learning-rate multipliers, shortened
+optimization-step budgets, and adaptive early stopping on OASIS. The selected
+schedules were then evaluated on the OASIS100 test set and timed from input
+images to the saved dense displacement field, including full optimization but
+excluding evaluation metrics. Table~\ref{tab:oasis_runtime} reports both
+cold-process and warm-process runtimes, since the first case in a Python/CUDA
+process includes one-time library and kernel setup. The optimized schedules
+preserve OASIS100 Dice closely while substantially reducing runtime; MR-D-BSCP
+in particular remains the most accurate tested continuous parameterization
+while reducing warm input-to-DVF time from about 62~s to 11~s.
+
+\begin{table}[t]
+\centering
+\caption{Runtime-reduced OASIS schedules versus their 2500-step counterparts.
+Accuracy is OASIS100. Runtime is input-image to saved dense displacement field,
+including optimization and DVF output, excluding metric evaluation.
+Cold indicates a fresh process/CUDA context; warm indicates persistent-process
+timing after warmup.}
+\label{tab:oasis_runtime}
+\fontsize{8}{9}\selectfont
+\setlength{\tabcolsep}{2.5pt}
+\begin{tabular}{@{}lccccc@{}}
+\hline
+Method & Dice & Steps & Cold (s) & Warm (s) & Peak GPU (GB) \\
+ & base$\rightarrow$fast & base$\rightarrow$fast & base$\rightarrow$fast & base$\rightarrow$fast & - \\
+\hline
+MR-D-BSCP (8-4-2) &
+0.810$\rightarrow$0.809 & 2500$\rightarrow$440 &
+152.0$\rightarrow$101.1 & 62.4$\rightarrow$11.0 & 3.93 \\
+D-BSCP (cps2) &
+0.805$\rightarrow$0.805 & 2500$\rightarrow$431 &
+135.4$\rightarrow$76.9 & 80.9$\rightarrow$14.4 & 2.16 \\
+D-BSCP (cps4) &
+0.799$\rightarrow$0.797 & 2500$\rightarrow$477 &
+126.3$\rightarrow$78.6 & 80.9$\rightarrow$15.3 & 1.83 \\
+INR-BSCP (cps2) &
+0.799$\rightarrow$0.793 & 2500$\rightarrow$799 &
+370.9$\rightarrow$171.4 & 277.9$\rightarrow$90.2 & 7.72 \\
+INR-BSCP (cps4) &
+0.796$\rightarrow$0.786 & 2500$\rightarrow$644 &
+175.0$\rightarrow$90.4 & 107.8$\rightarrow$29.2 & 2.58 \\
+\hline
+\end{tabular}
+\end{table}
+
+% Optional conclusion clause:
+% These results also show that direct multiresolution B-Spline optimization can
+% be made practically fast, not only accurate.
