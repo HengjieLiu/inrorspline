@@ -40,6 +40,347 @@ Next decision:
 
 ## Planned Priority Runs
 
+### P2w: ptvreg-python COPD Fixed All10 Trial
+
+- Run ID: `ptvreg_python_copd_fixed_all10_v1`.
+- Status: adapter/preflight implemented 2026-08-28; production all-10 launch
+  gated after reduced 1mm smoke did not return cleanly and native-grid case08
+  showed very high memory use.
+- Owner/agent: Codex.
+- Date planned: 2026-08-28.
+- Date started: preflight started 2026-08-28.
+- Date completed: pending.
+- Server: local project GPU server; no private hostname recorded.
+- GPU model/count: four GPUs requested for production launch, with cases
+  parallelized one case per GPU.
+- Git commit: `8204459` plus dirty source tree until the adapter changes are
+  committed or otherwise snapshotted by source hashes.
+- Branch: `gpu8`.
+- Docker image/container: `hengjieliu96/dl_dir:py310sitreg_v1` /
+  `py310sitreg_v1_test1`.
+- Dataset roots: `${LUNGCT_PTVREG_ISO1MM}` for canonical 1mm inputs, plus raw
+  `${LUNGCT_DATA}/raw/COPD` for paper-HU native-crop inputs.
+- Dataset manifest: canonical pTVReg-style 1 mm COPD cases `01-10`; raw COPD
+  case files and native lung masks are used for the native-crop gate.
+- Split config: all COPD cases `01-10`; moving `eBHCT` to fixed `iBHCT`.
+- Standards preflight: reviewed `docs/standards/README.md`,
+  `docs/standards/fair_experiment_checklist.md`,
+  `docs/standards/lungct_protocol_tags.md`,
+  `docs/standards/lungct_tre_metric_conventions.md`, and LungCT protocol
+  warnings.
+- Protocol tags:
+  `ptvreg_python_admm+canonical_ptv_landmark_crop_1mm_no_lungmask` and
+  `ptvreg_python_admm+paper_hu_landmark_crop_1mm_no_lungmask`, plus
+  `ptvreg_python_admm+paper_hu_native_landmark_crop_no_lungmask`.
+- Method/objective: public `external/ptvreg-python` ADMM registration imported
+  through `ptv.register_min.register_pair_min(moving, fixed, opts)`.
+- Fixed options: `opt_method=admm`, `grid_spacing=(8,8,8)`, `isoTV=0.12`,
+  `metric=lcc`, `metric_param=(2.1,2.1,2.1)`,
+  `scale_metric_param=True`, `pix_resolution=(1,1,1)`,
+  `spline_order=1`, `k_down=0.7`, `border_mask=5`, `interp_type=1`,
+  `dtype=float64`. The native-crop protocol overrides `pix_resolution` per case
+  with the raw COPD native spacing.
+- Command: preflight tests and loader audit first; synthetic CUDA smoke passed;
+  reduced full-volume case01 smoke was attempted and manually stopped after it
+  remained inside the external registration call with no completed summary.
+  Prepared production all-10 canonical run with
+  `scripts/experiments/ptvreg_python_repro/launch_copd_fixed_all10.py --protocol canonical_1mm --gpus 0,1,2,3`;
+  then repeat the same fixed all-10 launch with `--protocol paper_hu_iso1mm`.
+  Native-crop paper-HU dry-run is prepared with `--protocol paper_hu_native
+  --gpus 0,1,2,3`, skipping completed case08 by default.
+- Output root:
+  `/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1`.
+- Review root:
+  `experiments/2026-08-28_ptvreg_python_copd_fixed_all10/`.
+- Primary metrics: native-crop snap TRE, native-crop subvoxel TRE, cropped-1mm
+  or native registration-grid snap/subvoxel TRE as appropriate, foreground
+  stdLogJ, foreground folding percentage, bending energy, diffusion L2,
+  runtime, and peak memory.
+- Known limitations: `ptvreg-python` may not be numerically identical to
+  MATLAB pTVReg; canonical inputs retain this repo's regenerated pTVReg-style
+  crop/interpolation conventions; paper-HU input changes intensity only while
+  reusing the same crop/landmark geometry.
+- Preflight result: adapter tests passed (`12/12`), canonical loader audit passed
+  (`10/10`), four GPUs visible, canonical and paper-HU four-GPU dry-run
+  manifests generated, synthetic CUDA registration smoke passed, and paper-HU
+  inputs were generated/verified for all ten cases.
+- Native-crop gate result: COPD case08 completed with native paper-HU crop shape
+  `[100,299,409]`, spacing `[2.5,0.586,0.586]`, headline
+  `native_crop_tre_snap_to_voxel=2.8865 mm`, subvoxel TRE `3.0143 mm`,
+  identity TRE `26.4569 mm`, elapsed `914.5 s`, and peak GPU memory
+  `46.72 GiB`. This is a one-case gate, not a production all-10 result.
+- Acceptance: require `10/10` completed cases, finite TRE/regularity, dense
+  field shape equal to input shape, no NaNs/infinities, all four TRE
+  conventions present, and no production launch if field-conversion tests fail.
+- Next decision: after canonical and paper-HU aggregate, decide whether the new
+  public Python pTVReg row is a useful contextual baseline or only a protocol
+  diagnostic.
+
+### P2v: OASIS Paper Cold/Warm DVF Timing Rerun
+
+- Run ID: `oasis_paper_cold_warm_timing_alpha1000_v1`.
+- Status: completed 2026-08-15 after dry-run, smoke, full timing, and
+  aggregation.
+- Owner/agent: Codex.
+- Date planned: 2026-08-15.
+- Date started: 2026-08-15.
+- Date completed: 2026-08-15.
+- Server: local project GPU server; no private hostname recorded.
+- GPU model/count: four NVIDIA RTX 6000 Ada GPUs observed inside
+  `py310sitreg_v1_test1`.
+- Git commit: `68d2c4cc02ae465f2a9b23dfb965ee46ca864f41`, dirty source tree.
+- Branch: `gpu8`.
+- Docker image/container: `hengjieliu96/dl_dir:py310sitreg_v1` /
+  `py310sitreg_v1_test1`.
+- Dataset root: `${OASIS_ROOT}` / default container OASIS split root.
+- Dataset manifest: OASIS BrainMR seed-3 shuffled `pair_test_200`, ranks `0-9`.
+- Split config:
+  `configs/splits/oasis/pair_test_200_shuffled_seed000003.txt`.
+- Standards preflight: reviewed `docs/standards/README.md`,
+  `docs/standards/fair_experiment_checklist.md`, and
+  `docs/standards/oasis_brainmr_protocol.md`.
+- Protocol tag:
+  `oasis_seed3_first10_dvf_only_loaded_images_to_saved_dense_dvf_cold_warm_timing`.
+- Methods: five selected fast schedules
+  (`MR_A_fast_decay`, `D2_A_bal_lr10x`, `D4_A_bal_lr10x`,
+  `S2_A_bal_lr10x`, `S4_A_bal_lr10x`) and their five 2500-step baselines.
+- Timing convention: for each method, run rank `0` once as cold in a fresh
+  worker, then rerun rank `0` and ranks `1-9` in the same worker as warm
+  measured runs. This is process/GPU warmup timing, not registration warm-start.
+- Command: dry-run, smoke, full fast phase, full baseline phase, and final
+  aggregation with
+  `scripts/experiments/oasis_alpha_sweep/run_oasis_paper_cold_warm_timing.py`.
+- Output root:
+  `/database/inrorspline/runs/oasis_paper_cold_warm_timing_alpha1000_v1`.
+- Review root:
+  `experiments/2026-08-15_oasis_paper_cold_warm_timing/`.
+- Primary metrics: loaded-images-to-saved-DVF time, script-to-saved-DVF time,
+  persistent worker wall time, actual optimizer steps, and peak GPU memory.
+- Known limitations: OASIS-only timing; four-GPU execution may include
+  GPU-to-GPU noise; runtime jobs are DVF-only and exclude Dice/HD95/ASD/dense
+  NCC/regularity evaluation.
+- Acceptance: passed. Dry-run planned `10` candidates and `110` measured
+  registrations; smoke completed `20/20`; full timing completed `110/110`
+  valid rows with zero missing/failed jobs, finite DVF endpoint times, existing
+  dense DVF files, and `no_evaluation=true`.
+- Result artifacts:
+  `experiments/2026-08-15_oasis_paper_cold_warm_timing/paper_cold_warm_timing_report.md`
+  and
+  `experiments/2026-08-15_oasis_paper_cold_warm_timing/paper_runtime_table_values.csv`.
+- Next decision: paste the refreshed compact runtime table into the camera-ready
+  LaTeX source.
+
+### P2s: LungCT FD-BE cps4 Alpha Extension for Expanded TRE/SDlogJ Panel
+
+- Run ID: `lungct_fdbe_cps4_alpha1e5_1e6_all10_v1`.
+- Status: completed and technically accepted 2026-08-14 (`40/40`).
+- Owner/agent: Codex.
+- Date planned: 2026-08-14.
+- Date started: 2026-08-14.
+- Date completed: 2026-08-14.
+- Server: local project GPU server; no private hostname recorded.
+- GPU model/count: four NVIDIA RTX 6000 Ada GPUs, one alpha lane per GPU.
+- Git commit: `68d2c4cc02ae465f2a9b23dfb965ee46ca864f41`, dirty source tree.
+- Branch: `gpu8`.
+- Docker image/container: `hengjieliu96/dl_dir:py310sitreg_v1` /
+  `py310sitreg_v1_test1`.
+- Dataset root: `${LUNGCT_PTVREG_ISO1MM}`.
+- Dataset manifest: canonical pTVReg 1 mm DIR-Lab cases `01-10`; all ten
+  preprocessed case fields must resolve before execution.
+- Split config: all DIR-Lab 4DCT cases `01-10`; moving T50 to fixed T00.
+- Standards preflight: reviewed `docs/standards/README.md`,
+  `docs/standards/fair_experiment_checklist.md`,
+  `docs/standards/lungct_protocol_tags.md`, and LungCT protocol warnings.
+- Protocol tag:
+  `ptv_landmark_crop_1mm_no_lungmask+single_stage_{sinr,directcp}_cps4+full_crop_global_ncc_dense_fd_be+fixed_t00_lung_mask_metric`.
+- Methods: `sinr_cps4_global_ncc_fd_be` at LR `1e-4` and
+  `direct_cp_cps4_global_ncc_fd_be` at LR `1e-3`, each with cps `4`, seed `1`,
+  epochs `2500`, alpha `100000` and `1000000`.
+- GPU schedule: GPU `0` INR-BSCP alpha `100000`, GPU `1` INR-BSCP alpha
+  `1000000`, GPU `2` D-BSCP alpha `100000`, GPU `3` D-BSCP alpha `1000000`;
+  each lane runs case01 through case10 sequentially.
+- Command: dry-run, smoke, then full launch with
+  `scripts/experiments/lungct_no_sweep_repro/launch_fdbe_cps4_alpha_extension_all10.py`;
+  aggregate with
+  `scripts/experiments/lungct_no_sweep_repro/aggregate_fdbe_cps4_alpha_extension_all10.py`;
+  refresh the figure with
+  `experiments/paper_artifacts/pareto_figure/build_current_tre_stdlogj_expanded.py`.
+- Output root:
+  `/database/inrorspline/runs/lungct_fdbe_cps4_alpha1e5_1e6_all10_v1`.
+- Review root:
+  `experiments/2026-08-14_lungct_fdbe_cps4_alpha1e5_1e6_all10/`.
+- Paper artifact root:
+  `experiments/paper_artifacts/pareto_figure/v011_current_tre_stdlogj_fdbe_cps4_alpha_extension/`.
+- Primary metrics: native-crop snap TRE, foreground stdLogJ, foreground folding
+  percentage, full-crop `1-NCC`, fixed-T00 lung-mask diagnostic `1-NCC`,
+  runtime, peak memory, final data loss, and final regularization loss.
+- Known limitations: alpha scales are FD-BE-family operating points only and are
+  not directly comparable to IDIR, pTVReg isoTV, or Dual-INR loss weights. The
+  fixed T00 lung mask is metric-only here; no masked-loss variant is launched.
+- Acceptance: dry-run planned exactly `40` jobs; smoke completed `4/4`; full
+  launch completed `40/40`; aggregation found zero validation errors and no
+  masked-loss method IDs or masked-loss source paths.
+- Result: alpha `100000` improved the cps4 FD-BE operating point substantially
+  for both INR-BSCP and D-BSCP while keeping foreground folding at `0%`; alpha
+  `1000000` was smoother but had worse TRE. Mean native-crop snap TRE/stdLogJ
+  were `1.043/0.1193` and `1.218/0.0858` for INR-BSCP, and `1.016/0.1182` and
+  `1.209/0.0857` for D-BSCP at alpha `100000` and `1000000`, respectively.
+- Result artifacts:
+  `experiments/2026-08-14_lungct_fdbe_cps4_alpha1e5_1e6_all10/acceptance_report.md`
+  and
+  `experiments/paper_artifacts/pareto_figure/v011_current_tre_stdlogj_fdbe_cps4_alpha_extension/`.
+- Next decision: decide whether the expanded panel should keep the old alpha
+  `10000` cps4 FD-BE points as cautionary context or show only the useful
+  alpha-extension sweep segment.
+
+### P2t: LungCT FD-BE cps4 Alpha Landscape for Expanded TRE/SDlogJ Panel
+
+- Run ID: `lungct_fdbe_cps4_alpha_landscape_all10_v1`.
+- Status: completed 2026-08-14 after dry-run, smoke, full launch,
+  aggregation, casewise report, and v012 figure refresh.
+- Owner/agent: Codex.
+- Date planned: 2026-08-14.
+- Date started: 2026-08-14.
+- Date completed: 2026-08-14.
+- Server: local project GPU server; no private hostname recorded.
+- GPU model/count: four NVIDIA RTX 6000 Ada GPUs expected; alpha lanes share
+  GPUs by running INR-BSCP then D-BSCP sequentially.
+- Git commit: `68d2c4cc02ae465f2a9b23dfb965ee46ca864f41`, dirty source tree.
+- Branch: `gpu8`.
+- Docker image/container: `hengjieliu96/dl_dir:py310sitreg_v1` /
+  `py310sitreg_v1_test1`.
+- Dataset root: `${LUNGCT_PTVREG_ISO1MM}`.
+- Dataset manifest: canonical pTVReg 1 mm DIR-Lab cases `01-10`; all ten
+  preprocessed case fields must resolve before execution.
+- Split config: all DIR-Lab 4DCT cases `01-10`; moving T50 to fixed T00.
+- Standards preflight: reviewed `docs/standards/README.md`,
+  `docs/standards/fair_experiment_checklist.md`,
+  `docs/standards/lungct_protocol_tags.md`,
+  `docs/standards/lungct_tre_metric_conventions.md`, and LungCT protocol
+  warnings.
+- Protocol tag:
+  `ptv_landmark_crop_1mm_no_lungmask+single_stage_{sinr,directcp}_cps4+full_crop_global_ncc_dense_fd_be+fixed_t00_lung_mask_metric`.
+- Methods: `sinr_cps4_global_ncc_fd_be` at LR `1e-4` and
+  `direct_cp_cps4_global_ncc_fd_be` at LR `1e-3`, each with cps `4`, seed `1`,
+  epochs `2500`. New/current-source alphas are `10000`, `20000`, `50000`,
+  `200000`, and `500000`; accepted P2s rows are reused for `100000` and
+  `1000000`.
+- GPU schedule: wave 1 assigns alpha lanes `20000`, `50000`, `200000`,
+  `500000` to GPUs `0`, `1`, `2`, `3`; each lane runs INR-BSCP cases `01-10`
+  then D-BSCP cases `01-10`. Wave 2 reruns alpha `10000` with INR-BSCP on GPU
+  `0` and D-BSCP on GPU `1`.
+- Command: dry-run, smoke, then full launch with
+  `scripts/experiments/lungct_no_sweep_repro/launch_fdbe_cps4_alpha_landscape_all10.py`;
+  aggregate with
+  `scripts/experiments/lungct_no_sweep_repro/aggregate_fdbe_cps4_alpha_landscape_all10.py`;
+  refresh the figure with
+  `experiments/paper_artifacts/pareto_figure/build_current_tre_stdlogj_fdbe_landscape.py`.
+- Output root:
+  `/database/inrorspline/runs/lungct_fdbe_cps4_alpha_landscape_all10_v1`.
+- Review root:
+  `experiments/2026-08-14_lungct_fdbe_cps4_alpha_landscape_all10/`.
+- Paper artifact root:
+  `experiments/paper_artifacts/pareto_figure/v012_current_tre_stdlogj_fdbe_cps4_alpha_landscape/`.
+- Primary metrics: native-crop snap TRE, foreground stdLogJ, foreground folding
+  percentage, full-crop `1-NCC`, fixed-T00 lung-mask diagnostic `1-NCC`,
+  runtime, peak memory, final data loss, and final regularization loss.
+- Known limitations: alpha scales are FD-BE-family operating points only and are
+  not directly comparable to IDIR, pTVReg isoTV, or Dual-INR loss weights. The
+  fixed T00 lung mask is metric-only here; no masked-loss variant is launched.
+- Acceptance: passed. Dry-run verified `80` wave-1 jobs and `20` wave-2 jobs;
+  smoke verified `8/8` wave-1 jobs and `2/2` wave-2 jobs. Full launch completed
+  `100/100` new jobs with `100/100` valid aggregate rows and no masked-loss
+  source rows. The v012 FD-BE case table has `140` rows after merging accepted
+  `1e5/1e6` rows, and the alpha `1e4` rerun-vs-legacy audit reported `0.0 mm`
+  mean TRE delta and `0.0 mm` max case TRE delta for both FD-BE methods.
+- Next decision: inspect the seven-point FD-BE cps4 TRE/stdLogJ landscape and
+  decide the paper-facing sweep subset.
+
+### P2r: OASIS Fit-Modes Panel A Fixed-Mask Diagnostic Refresh
+
+- Run ID: `oasis_panelA_fixedmask_diag_curves_v1`.
+- Status: completed and technically accepted 2026-08-14 (`40/40`).
+- Owner/agent: Codex.
+- Date planned: 2026-08-14.
+- Date started: 2026-08-14.
+- Date completed: 2026-08-14.
+- Dataset: OASIS BrainMR seed-3 shuffled `pair_test_200` first10.
+- Purpose: refresh OASIS Panel A registration diagnostics so the plotted
+  `1-NCC` metric is evaluated inside the fixed raw `image > 0` foreground mask,
+  matching the OASIS Panel B fixed-domain convention.
+- Scope: rerun only OASIS Panel A diagnostics for `10 cases × 4 methods = 40`
+  records; preserve optimization objectives and all v002 non-OASIS-Panel-A
+  records.
+- Methods:
+  `idir_original`, `sinr_cps2_be_bspline_analytic`,
+  `direct_cp_cps2_be_bspline_analytic`, and
+  `direct_cp_8_4_2_be_bspline_analytic_multistage`.
+- OASIS settings: IDIR alpha `1`, LR `1e-4`; INR-BSCP/D-BSCP cps `2`, alpha
+  `1000`, LRs `1e-4`/`1e-3`; MR-D-BSCP cps `8/4/2`, downsample `4/2/1`,
+  stages `400/800/1300`, LR `1e-3`; seed `1`; 2500 epochs total.
+- GPU schedule: GPUs `0,1` split ranks `0-4`/`5-9` for INR-BSCP then D-BSCP;
+  GPUs `2,3` split ranks `0-4`/`5-9` for IDIR then MR-D-BSCP.
+- Docker image/container: `${DOCKER_IMAGE}` / `${CONTAINER_NAME}`.
+- Dataset root: `${OASIS_ROOT}`.
+- Split config:
+  `configs/splits/oasis/pair_test_200_shuffled_seed000003.txt`.
+- Output root: `${OASIS_MASKED_PANELA_RUN_ROOT}`.
+- Review root:
+  `experiments/2026-08-14_oasis_panelA_fixedmask_diagnostics/`.
+- Paper artifact root:
+  `experiments/paper_artifacts/fit_modes_population_diagnostics/v003_masked_panelA_both_datasets/`.
+- Primary metric: fixed raw `image > 0` masked `1-NCC` at epoch 2500.
+- Secondary metric: full-image global `1-NCC` retained in the same diagnostic
+  curve CSV as a reproducibility cross-check versus v002.
+- Acceptance: `40/40` completed, zero unresolved failures, 251 finite
+  fixed-mask diagnostics per curve ending at epoch 2500, exact MR-D-BSCP
+  schedule metadata, and a v003 160-row source index with exactly 40 OASIS
+  Panel A replacements.
+- Result artifacts: `validation_report.md`, `curve_summary.csv`,
+  `figure_manifest.json`, 20 individual case figures, two 4-by-5 composites,
+  and population overlay/design-trial figures under the v003 paper artifact
+  root.
+- Known limitations: diagnostic/evaluation-domain correction only; training
+  objectives are unchanged.
+- Next decision: use v003 as the camera-ready diagnostic candidate and update
+  figure captions/reviewer response.
+
+### P2u: Fit-Modes Figure 3 v004 DIR-LAB Regularity-Matched Panel A Refresh
+
+- Run ID: `fit_modes_figure3_v004_dirlab_regularity_matched_panelA`.
+- Status: completed and technically accepted 2026-08-14.
+- Owner/agent: Codex.
+- Date planned: 2026-08-14.
+- Date completed: 2026-08-14.
+- Purpose: create a no-overwrite Figure 3 candidate that preserves the v003
+  fixed-domain metric convention while replacing DIR-LAB Panel A single-stage
+  BSCP alphas with regularity-matched settings from the accepted FD-BE cps4
+  alpha landscape.
+- Scope: no new optimization was required. The renderer exact-compatible reused
+  the existing all-10 DIR-LAB alpha-landscape diagnostic curves for
+  INR-BSCP cps4 `a=20000` and D-BSCP cps4 `a=50000`.
+- Preserved rows: all OASIS v003 records, all Panel B records, DIR-LAB Panel A
+  IDIR `a=3`, and DIR-LAB Panel A MR-D-BSCP `a=10000` with
+  `400/400/800/900`.
+- Replacement rows: `20/20` DIR-LAB Panel A rows, all with 251 finite
+  fixed-T00-lung-mask `1-NCC` diagnostics through epoch 2500.
+- Primary artifact root:
+  `experiments/paper_artifacts/fit_modes_population_diagnostics/v004_dirlab_regularity_matched_panelA/`.
+- Source index:
+  `camera_ready_source_index_dirlab_regularity_matched_panelA.csv`.
+- Axis convention: Panel A `1e-2–1e0`; Panel B `1e-1–1e3`.
+- TRE labeling: DIR-LAB Panel A case figures, the DIR-LAB 4-by-5 composite, and
+  the representative-case 2-by-4 figure label all four methods using
+  `tre_snap_to_voxel.tre_mean_mm` from each run summary.
+- Acceptance: passed. The v004 source index has exactly 160 rows, exactly 20
+  replacements relative to v003, zero duplicate dataset/case/panel/method
+  records, and all plotted endpoints match the source index.
+- Known limitations: v004 regularity-matches the plotted DIR-LAB operating
+  points by foreground `SD(log J)`, but it does not make the underlying
+  optimization/training domains identical across all methods.
+- Next decision: use v004 as the camera-ready Figure 3 candidate unless visual
+  styling changes are requested.
+
 ### P2q: DIR-LAB Fit-Modes Panel A MR-D-BSCP Diagnostic Schedule Refresh
 
 - Run ID: `fit_modes_dirlab_panelA_mrdbscp_e400_400_800_900_diag10_v1`.
@@ -3042,3 +3383,62 @@ Next decision:
 - Known limitation: `PL1C` uses sampled pTVReg-style LCC/isoTV on a DUAL SIREN
   displacement and original DUAL blur schedule; it is a loss-control curve
   candidate, not a reproduced pTVReg or MR-D-BSCP architecture.
+
+### P30: LungCT Case01/Case08 Masked-NCC FD-BE Quick A/B
+
+- Status: completed 2026-08-14; all six masked jobs finished and the matched
+  masked-vs-unmasked aggregate was generated.
+- Purpose: test whether replacing full-crop global NCC with fixed T00
+  lung-mask global NCC changes the LungCT case01/case08 behavior for the
+  FD-BE family, while keeping the dense FD-BE regularizer matched to the
+  previous unmasked runs.
+- Dataset: DIR-Lab 4DCT only.
+- Cases: selected cases `01` and `08`.
+- Direction: T50/end-exhale moving image to T00/end-inhale fixed image.
+- Data root:
+  `/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm`.
+- Output root:
+  `/database/inrorspline/runs/lungct_case01_case08_masked_ncc_fdbe_quick_v1`.
+- Review root:
+  `experiments/2026-08-14_lungct_case01_case08_masked_ncc_fdbe_quick/`.
+- Comparison source:
+  `/database/inrorspline/runs/dirlab_case01_case08_panelA_lungmask_diag_curves_v1`
+  and
+  `experiments/2026-08-14_dirlab_case01_case08_lungmask_diagnostics/lungmask_before_after_curves_summary.csv`.
+- New method IDs:
+  - `sinr_cps4_masked_ncc_fd_be`
+  - `direct_cp_cps4_masked_ncc_fd_be`
+  - `direct_cp_32_16_8_4_masked_ncc_fd_be`
+- Hyperparameters:
+  - SINR cps4: alpha `10000`, lr `1e-4`, epochs `2500`, seed `1`.
+  - D-BSCP cps4: alpha `10000`, lr `1e-3`, epochs `2500`, seed `1`.
+  - MR-D-BSCP: alpha `10000`, lr `1e-3`, cps `32,16,8,4`,
+    downsample `8,4,2,1`, epochs `400,400,800,900`, seed `1`.
+- GPU assignment: one method queue per GPU, with SINR on GPU `1`, D-BSCP on
+  GPU `2`, and MR-D-BSCP on GPU `3`; each queue runs case01 then case08.
+- Protocol tag pattern:
+  `ptv_landmark_crop_1mm_with_lungmask+...+fixed_t00_lung_mask_global_ncc_dense_fd_be`.
+- Acceptance: py-compile passes, three one-epoch smoke runs pass, launcher
+  dry-run reports exactly six jobs, GPU preflight returns within timeout and
+  assigned GPUs have the configured free-memory margin, all six full jobs
+  complete, and the aggregate side-by-side report is generated.
+- Verification/results:
+  - Py-compile passed for the modified runner, launcher, and aggregator.
+  - One-epoch Docker smoke runs passed for SINR cps4, D-BSCP cps4, and
+    MR-D-BSCP `32-16-8-4` on case01.
+  - Launcher dry-run reported six planned jobs; full launch completed all six
+    jobs with no failed records.
+  - Aggregate outputs:
+    `experiments/2026-08-14_lungct_case01_case08_masked_ncc_fdbe_quick/masked_vs_unmasked_summary.csv`,
+    `experiments/2026-08-14_lungct_case01_case08_masked_ncc_fdbe_quick/masked_vs_unmasked_long.csv`,
+    and
+    `experiments/2026-08-14_lungct_case01_case08_masked_ncc_fdbe_quick/masked_vs_unmasked_report.md`.
+  - Main quick-check observation: fixed-T00 lung-mask NCC improves the
+    fixed-mask `1-NCC` diagnostic for all six rows, but usually worsens TRE and
+    foreground regularity at the reused unmasked hyperparameters. The only TRE
+    exception is case08 MR-D-BSCP, which changes from `1.087` mm to `1.054` mm
+    while stdLogJ increases from `0.1922` to `0.3518`.
+- Known limitation: this isolates the NCC data-loss domain within the FD-BE
+  family. It is not a native-IDIR equivalence claim because native IDIR differs
+  in image domain, model, sampling, and analytic/autograd bending-energy
+  implementation.

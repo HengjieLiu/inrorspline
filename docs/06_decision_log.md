@@ -58,6 +58,30 @@ Rationale:
 - External integrity records allow the dataset root to remain clean without
   discarding provenance.
 
+## 2026-08-15: Freeze v013 As Camera-Ready Figure 2
+
+Decision:
+
+- Use `experiments/paper_artifacts/pareto_figure/v013_final_dirlab4dct_axes_labels/`
+  as the final camera-ready Figure 2 artifact family.
+- The camera-ready files are
+  `pareto_four_panel_final_dirlab4dct_no_annotations.png` and
+  `pareto_four_panel_final_dirlab4dct_no_annotations.pdf`; the annotated PNG is
+  review-only.
+- The four-panel figure uses `Foreground SDlogJ` consistently across OASIS and
+  DIR-LAB panels. The DIR-LAB panels are ordered as all methods then selected
+  methods, with shared bottom-row axis limits and ticks.
+
+Rationale:
+
+- The final source manifest validates that OASIS rows are unchanged from the
+  paper-ready `v003_candidate_oasis100` source table and DIR-LAB rows match the
+  `v012_current_tre_stdlogj_fdbe_cps4_alpha_landscape` source table.
+- No masked-loss method IDs or masked-loss source paths enter the final source
+  rows.
+- The final styling keeps pTVReg-loss methods marked with a dagger and defines
+  `† pTVReg loss` as a bottom legend entry.
+
 ## Pending Decisions
 
 - Final public dataset handles that avoid private host paths.

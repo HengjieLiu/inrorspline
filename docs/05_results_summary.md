@@ -47,6 +47,22 @@ This repo carries audited generated results together with planning reports.
   are in
   `experiments/2026-08-02_dual_inr_dirlab_controlled_multires/camera_ready_readout.md`.
 
+## Camera-Ready Figure Artifacts
+
+- Final Figure 2 for camera-ready:
+  `experiments/paper_artifacts/pareto_figure/v013_final_dirlab4dct_axes_labels/`.
+  Use `pareto_four_panel_final_dirlab4dct_no_annotations.png` or
+  `pareto_four_panel_final_dirlab4dct_no_annotations.pdf` for the manuscript;
+  `pareto_four_panel_final_dirlab4dct_annotated_review.png` is review-only.
+- Figure 2 combines unchanged OASIS100 source rows from
+  `v003_candidate_oasis100` with the DIR-LAB 4DCT source table from
+  `v012_current_tre_stdlogj_fdbe_cps4_alpha_landscape`. The final source
+  manifest validates both source matches and excludes masked-loss rows.
+- All four Figure 2 panels use `Foreground SDlogJ` as the x-axis label. OASIS
+  foreground means fixed raw image-positive foreground; DIR-LAB foreground
+  means the fixed T00 lung/lobe foreground used by each row's documented metric
+  protocol.
+
 ## Source Reports
 
 - `docs/reports/current_results_audit_and_plan.md`

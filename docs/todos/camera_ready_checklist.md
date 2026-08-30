@@ -11,6 +11,35 @@ resolved or explicitly retained as a reported limitation.
 
 ## Blocking experiment consistency
 
+- [x] **Resolve the OASIS Panel A metric-domain mismatch in the population
+  fit-modes diagnostic figure.**
+  - v002 uses fixed T00 lung-mask `1-NCC` for DIR-LAB Panel A but still uses
+    full-image global `1-NCC` for OASIS Panel A.
+  - Preferred camera-ready fix: rerun OASIS Panel A diagnostics for the seed-3
+    first10 cohort with paired full-image and fixed raw `image > 0` masked NCC
+    curves, then plot the fixed-mask metric in v003.
+  - Acceptance: all 40 OASIS Panel A records complete; each curve has 251
+    finite fixed-mask diagnostics through epoch 2500; v003 replaces exactly
+    OASIS Panel A and preserves DIR-LAB v002 Panel A plus all Panel B rows.
+  - Completed 2026-08-14: `40/40` OASIS Panel A records passed and the v003
+    figure family was regenerated from a 160-row source index. See
+    `experiments/paper_artifacts/fit_modes_population_diagnostics/v003_masked_panelA_both_datasets/validation_report.md`.
+
+- [x] **Refresh DIR-LAB Panel A single-stage BSCP alphas for regularity-matched
+  Figure 3 diagnostics.**
+  - v003 used fixed-domain metrics but retained the same nominal FD-BE alpha
+    for INR-BSCP and D-BSCP. The DIR-LAB Pareto sweep showed this did not give
+    comparable foreground `SD(log J)`.
+  - Camera-ready v004 uses exact-compatible reuse of the accepted all-10
+    FD-BE cps4 alpha-landscape curves: INR-BSCP cps4 `a=20000` and D-BSCP cps4
+    `a=50000`.
+  - Acceptance: v004 replaces exactly 20 DIR-LAB Panel A rows, preserves the
+    other 140 v003 rows, validates 251 finite fixed-T00-lung-mask diagnostics
+    for every replacement, and regenerates the Figure 3 artifact family with
+    Panel A axis `1e-2–1e0`.
+  - Completed 2026-08-14: see
+    `experiments/paper_artifacts/fit_modes_population_diagnostics/v004_dirlab_regularity_matched_panelA/validation_report.md`.
+
 - [x] **Resolve the DIR-LAB MR-D-BSCP schedule asymmetry in the population
   fit-modes experiment.**
   - Historical Panel A registration schedule: cps `32-16-8-4`, downsample
@@ -43,8 +72,19 @@ resolved or explicitly retained as a reported limitation.
 - [x] Regenerate the schedule-matched OASIS10/DIR-LAB10 supplementary diagnostic
   figures from source; update the versioned source index, manifests, checksums,
   and visual-review record.
-- [ ] Design and regenerate the separate compact main-paper figure from the
+- [x] Design and regenerate the separate compact main-paper figure from the
   accepted schedule-matched source index.
+  - Completed 2026-08-15 UTC: final camera-ready Figure 2 is
+    `experiments/paper_artifacts/pareto_figure/v013_final_dirlab4dct_axes_labels/`.
+  - Camera-ready outputs:
+    `pareto_four_panel_final_dirlab4dct_no_annotations.png` and
+    `pareto_four_panel_final_dirlab4dct_no_annotations.pdf`.
+  - Review-only output:
+    `pareto_four_panel_final_dirlab4dct_annotated_review.png`.
+  - Source validation: OASIS rows match `v003_candidate_oasis100`; DIR-LAB
+    rows match `v012_current_tre_stdlogj_fdbe_cps4_alpha_landscape`; no
+    masked-loss rows or paths are included. All four panels use the unified
+    x-axis label `Foreground SDlogJ`.
 - [ ] Update Methods, captions, legends, and reviewer response with the exact
   cps, downsample, stage-epoch schedule, and total optimization budget.
 - [x] Resolve the claim blocker: the accepted replacement cohort now supports
