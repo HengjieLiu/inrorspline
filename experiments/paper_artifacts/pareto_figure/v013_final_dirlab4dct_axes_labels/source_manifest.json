@@ -1,0 +1,113 @@
+{
+  "artifact": "pareto_final_dirlab4dct_axes_labels",
+  "generated_utc": "2026-08-15T05:02:32+00:00",
+  "method_colors": {
+    "direct_cp_32_16_8_4_global_ncc_fd_be": "#7E57C2",
+    "direct_cp_32_16_8_4_ptv_lcc_isotv": "#D55E00",
+    "direct_cp_cps4_global_ncc_fd_be": "#66C2A5",
+    "dual_inr_pl1a_author_blur_native_loss": "#56B4E9",
+    "idir_be_default_lungmask": "#0072B2",
+    "ptvreg_reference": "#111111",
+    "sinr_cps4_global_ncc_fd_be": "#009E73"
+  },
+  "method_labels": {
+    "direct_cp_32_16_8_4_global_ncc_fd_be": "MR-D-BSCP (32-16-8-4)",
+    "direct_cp_32_16_8_4_ptv_lcc_isotv": "MR-D-BSCP (32-16-8-4)\u2020",
+    "direct_cp_cps4_global_ncc_fd_be": "D-BSCP (cps4)",
+    "dual_inr_pl1a_author_blur_native_loss": "MR-INR-Dense",
+    "idir_be_default_lungmask": "INR-Dense",
+    "ptvreg_reference": "pTVReg\u2020",
+    "sinr_cps4_global_ncc_fd_be": "INR-BSCP (cps4)"
+  },
+  "oasis_source_rows": "experiments/paper_artifacts/pareto_figure/v013_final_dirlab4dct_axes_labels/oasis100_pareto_source_rows.csv",
+  "outputs": [
+    "experiments/paper_artifacts/pareto_figure/v013_final_dirlab4dct_axes_labels/pareto_four_panel_final_dirlab4dct_no_annotations.png",
+    "experiments/paper_artifacts/pareto_figure/v013_final_dirlab4dct_axes_labels/pareto_four_panel_final_dirlab4dct_no_annotations.pdf",
+    "experiments/paper_artifacts/pareto_figure/v013_final_dirlab4dct_axes_labels/pareto_four_panel_final_dirlab4dct_annotated_review.png"
+  ],
+  "panel_layout": {
+    "A": "Dice vs Foreground SDlogJ, OASIS N=100, unchanged from v003 source rows",
+    "B": "HD95 vs Foreground SDlogJ, OASIS N=100, unchanged from v003 source rows",
+    "C": "TRE vs Foreground SDlogJ (DIR-LAB 4DCT N=10), all",
+    "D": "TRE vs Foreground SDlogJ (DIR-LAB 4DCT N=10), selected"
+  },
+  "source_inputs": {
+    "oasis100_base": "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/oasis100_pareto_source_rows.csv",
+    "v012_source_rows": "experiments/paper_artifacts/pareto_figure/v012_current_tre_stdlogj_fdbe_cps4_alpha_landscape/source_rows.csv"
+  },
+  "source_rows": "experiments/paper_artifacts/pareto_figure/v013_final_dirlab4dct_axes_labels/source_rows.csv",
+  "style_policy": {
+    "legend_note": "\u2020 pTVReg loss",
+    "legend_note_position": "bottom_entry",
+    "non_reference_markers": "solid_circle",
+    "panel3_ellipses": false,
+    "panel4_ellipses": true,
+    "ptvreg_marker": "black_star",
+    "x_axis_label": "Foreground SDlogJ"
+  },
+  "validation": {
+    "bottom_axis_policy": {
+      "xlim": [
+        0.06,
+        0.5
+      ],
+      "xticks": [
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.5
+      ],
+      "ylim": [
+        0.6,
+        2.05
+      ],
+      "yticks": [
+        0.6,
+        0.8,
+        1.0,
+        1.2,
+        1.4,
+        1.6,
+        1.8,
+        2.0
+      ]
+    },
+    "masked_method_ids_in_source_rows": [],
+    "masked_ncc_source_paths_in_source_rows": [],
+    "oasis_rows_match_v003": true,
+    "panel3_ellipses": false,
+    "panel3_labels_all": [
+      "INR-Dense",
+      "MR-INR-Dense",
+      "INR-BSCP (cps4)",
+      "D-BSCP (cps4)",
+      "MR-D-BSCP (32-16-8-4)",
+      "MR-D-BSCP (32-16-8-4)\u2020",
+      "pTVReg\u2020"
+    ],
+    "panel3_methods_all": [
+      "idir_be_default_lungmask",
+      "dual_inr_pl1a_author_blur_native_loss",
+      "sinr_cps4_global_ncc_fd_be",
+      "direct_cp_cps4_global_ncc_fd_be",
+      "direct_cp_32_16_8_4_global_ncc_fd_be",
+      "direct_cp_32_16_8_4_ptv_lcc_isotv",
+      "ptvreg_reference"
+    ],
+    "panel4_ellipses": true,
+    "panel4_labels_selected": [
+      "INR-Dense",
+      "MR-D-BSCP (32-16-8-4)",
+      "MR-D-BSCP (32-16-8-4)\u2020",
+      "pTVReg\u2020"
+    ],
+    "panel4_methods_selected": [
+      "idir_be_default_lungmask",
+      "direct_cp_32_16_8_4_global_ncc_fd_be",
+      "direct_cp_32_16_8_4_ptv_lcc_isotv",
+      "ptvreg_reference"
+    ],
+    "source_rows_match_v012": true
+  }
+}

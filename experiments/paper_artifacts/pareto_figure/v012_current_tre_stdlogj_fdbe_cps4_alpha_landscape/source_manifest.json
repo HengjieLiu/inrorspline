@@ -1,0 +1,127 @@
+{
+  "alpha1e4_rerun_audit": {
+    "audit_csv": "experiments/paper_artifacts/pareto_figure/v012_current_tre_stdlogj_fdbe_cps4_alpha_landscape/fdbe_alpha1e4_legacy_vs_rerun_audit.csv",
+    "legacy_case_rows": "experiments/paper_artifacts/pareto_figure/v011_current_tre_stdlogj_fdbe_cps4_alpha_extension/fdbe_cps4_alpha_sweep_case_rows.csv",
+    "method_summaries": {
+      "d_bscp": {
+        "legacy_mean_tre": 3.8939052760537223,
+        "max_abs_case_delta_tre": 0.0,
+        "mean_delta_tre": 0.0,
+        "rerun_mean_tre": 3.8939052760537223,
+        "review_only": false,
+        "rows": 10
+      },
+      "inr_bscp": {
+        "legacy_mean_tre": 1.7617957443804848,
+        "max_abs_case_delta_tre": 0.0,
+        "mean_delta_tre": 0.0,
+        "rerun_mean_tre": 1.7617957443804848,
+        "review_only": false,
+        "rows": 10
+      }
+    },
+    "review_only": false,
+    "thresholds": {
+      "case_abs_delta_tre_mm": 0.25,
+      "mean_abs_delta_tre_mm": 0.05
+    }
+  },
+  "artifact": "pareto_current_tre_stdlogj_fdbe_cps4_alpha_landscape",
+  "fdbe_cps4_alpha_sweep_case_rows": "experiments/paper_artifacts/pareto_figure/v012_current_tre_stdlogj_fdbe_cps4_alpha_landscape/fdbe_cps4_alpha_sweep_case_rows.csv",
+  "fdbe_cps4_alpha_sweep_policy": "Use current-source unmasked full-crop global-NCC + dense FD-BE cps4 rows for alpha=1e4/2e4/5e4/2e5/5e5 plus accepted current alpha=1e5/1e6 rows.",
+  "generated_utc": "2026-08-15T03:46:29+00:00",
+  "masked_loss_rows_included": false,
+  "new_fdbe_alpha_landscape_runs_included": true,
+  "oasis_source_rows": "experiments/paper_artifacts/pareto_figure/v012_current_tre_stdlogj_fdbe_cps4_alpha_landscape/oasis100_pareto_source_rows.csv",
+  "outputs": [
+    "experiments/paper_artifacts/pareto_figure/v012_current_tre_stdlogj_fdbe_cps4_alpha_landscape/pareto_four_panel_current_fdbe_alpha_landscape_no_annotations.png",
+    "experiments/paper_artifacts/pareto_figure/v012_current_tre_stdlogj_fdbe_cps4_alpha_landscape/pareto_four_panel_current_fdbe_alpha_landscape_panel4_matched_panel3_y_no_annotations.png",
+    "experiments/paper_artifacts/pareto_figure/v012_current_tre_stdlogj_fdbe_cps4_alpha_landscape/pareto_four_panel_current_fdbe_alpha_landscape_annotated_review.png",
+    "experiments/paper_artifacts/pareto_figure/v012_current_tre_stdlogj_fdbe_cps4_alpha_landscape/pareto_four_panel_current_fdbe_alpha_landscape_zoomed_review.png"
+  ],
+  "panel_layout": {
+    "A": "Dice vs SDlogJ, OASIS N=100, unchanged from v003 source rows",
+    "B": "HD95 vs SDlogJ, OASIS N=100, unchanged from v003 source rows",
+    "C": "TRE vs SDlogJ, LungCT N=10, original structure plus 2500 MR-D-BSCP refresh",
+    "D": "Expanded TRE vs SDlogJ, LungCT N=10, no ellipses, FD-BE cps4 alpha landscape"
+  },
+  "review_only_due_to_alpha1e4_audit": false,
+  "source_inputs": {
+    "dual_pl1a_stage2": "experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_revision/stage2_curve_points.csv",
+    "dual_pl1a_stage3": "experiments/2026-08-07_lungct_dual_inr_1mm_lungmask_revision/stage3_pl1a_refinement_curve_points.csv",
+    "fdbe_accepted_1e5_1e6_case_rows": "experiments/2026-08-14_lungct_fdbe_cps4_alpha1e5_1e6_all10/case_rows.csv",
+    "fdbe_landscape_case_rows": "experiments/2026-08-14_lungct_fdbe_cps4_alpha_landscape_all10/case_rows.csv",
+    "fdbe_legacy_v011_case_rows_for_alpha1e4_audit": "experiments/paper_artifacts/pareto_figure/v011_current_tre_stdlogj_fdbe_cps4_alpha_extension/fdbe_cps4_alpha_sweep_case_rows.csv",
+    "legacy_w0022_source": "experiments/2026-06-25_lungct_ptvprep_reg_sweep_idir_directcp32/directcp_refined_mean_rows.csv",
+    "lungct_schedule_refresh": "experiments/paper_artifacts/pareto_figure/v009_lungct_fig2_schedule_refresh_comparison/source_rows.csv",
+    "oasis100_base": "experiments/paper_artifacts/pareto_figure/v003_candidate_oasis100/oasis100_pareto_source_rows.csv"
+  },
+  "source_rows": "experiments/paper_artifacts/pareto_figure/v012_current_tre_stdlogj_fdbe_cps4_alpha_landscape/source_rows.csv",
+  "validation": {
+    "expected_fdbe_cps4_alpha_values": {
+      "direct_cp_cps4_global_ncc_fd_be": [
+        10000.0,
+        20000.0,
+        50000.0,
+        100000.0,
+        200000.0,
+        500000.0,
+        1000000.0
+      ],
+      "sinr_cps4_global_ncc_fd_be": [
+        10000.0,
+        20000.0,
+        50000.0,
+        100000.0,
+        200000.0,
+        500000.0,
+        1000000.0
+      ]
+    },
+    "fdbe_case_row_count": 140,
+    "fdbe_case_row_count_ok": true,
+    "fdbe_cps4_alpha_values": {
+      "direct_cp_cps4_global_ncc_fd_be": [
+        10000.0,
+        20000.0,
+        50000.0,
+        100000.0,
+        200000.0,
+        500000.0,
+        1000000.0
+      ],
+      "sinr_cps4_global_ncc_fd_be": [
+        10000.0,
+        20000.0,
+        50000.0,
+        100000.0,
+        200000.0,
+        500000.0,
+        1000000.0
+      ]
+    },
+    "fdbe_expected_case_row_count": 140,
+    "masked_method_ids_in_source_rows": [],
+    "masked_ncc_source_paths_in_source_rows": [],
+    "oasis_row_count": 41,
+    "oasis_rows_match_v003": true,
+    "panel3_methods": [
+      "direct_cp_32_16_8_4_global_ncc_fd_be",
+      "direct_cp_32_16_8_4_ptv_lcc_isotv",
+      "idir_be_default_lungmask",
+      "ptvreg_reference"
+    ],
+    "panel3_row_count": 19,
+    "panel4_ellipse_policy": "none",
+    "panel4_methods": [
+      "direct_cp_32_16_8_4_global_ncc_fd_be",
+      "direct_cp_32_16_8_4_ptv_lcc_isotv",
+      "direct_cp_cps4_global_ncc_fd_be",
+      "dual_inr_pl1a_author_blur_native_loss",
+      "idir_be_default_lungmask",
+      "ptvreg_reference",
+      "sinr_cps4_global_ncc_fd_be"
+    ],
+    "panel4_row_count": 39
+  }
+}
