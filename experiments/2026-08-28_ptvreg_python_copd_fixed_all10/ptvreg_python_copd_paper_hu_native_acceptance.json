@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "n_completed": 1,
+  "n_requested": 1,
+  "missing_cases": [],
+  "invalid_items": [],
+  "required_tre_conventions": [
+    "native_crop_tre_snap_to_voxel",
+    "native_crop_tre_subvoxel",
+    "tre_snap_to_voxel",
+    "tre_subvoxel"
+  ],
+  "headline_metric": "native_crop_tre_snap_to_voxel"
+}

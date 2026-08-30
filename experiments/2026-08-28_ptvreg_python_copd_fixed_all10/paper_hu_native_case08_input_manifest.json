@@ -1,0 +1,69 @@
+{
+  "status": "completed",
+  "created_wall": "2026-08-28 07:20:00 +0000",
+  "dataset": "copd",
+  "protocol": "paper_hu_native",
+  "paper_hu_root": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_native_inputs",
+  "canonical_ptvprep_root": "/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm",
+  "raw_dirlab_root": "/database/datasets/lungCT/DIR-Lab",
+  "mask_root": "/database/datasets/lungCT/DIR-Lab/processed/lungmask_R231_native",
+  "case_ids": [
+    8
+  ],
+  "n_cases": 1,
+  "all_verification_pass": true,
+  "rows": [
+    {
+      "case_id": 8,
+      "input_protocol": "paper_hu_native",
+      "paper_hu_created_this_run": true,
+      "paper_hu_root": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_native_inputs",
+      "paper_hu_case_dir": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_native_inputs/COPD/case08",
+      "paper_hu_audit": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_native_inputs/COPD/case08/preprocess_audit.json",
+      "raw_dirlab_root": "/database/datasets/lungCT/DIR-Lab",
+      "mask_root": "/database/datasets/lungCT/DIR-Lab/processed/lungmask_R231_native",
+      "intensity_rule": "clip [-1000, 500], normalize to [0,1]",
+      "crop_rule": "pTVReg landmark bbox margin xyz [10,10,5], exact 1-based MATLAB formula converted to 0-based zyx",
+      "crop_convention": "ptvreg_formula_1based_xyz_to_python_0based_zyx",
+      "crop_bounds_zyx_inclusive": [
+        [
+          6,
+          105
+        ],
+        [
+          113,
+          411
+        ],
+        [
+          54,
+          462
+        ]
+      ],
+      "registration_shape_zyx": [
+        100,
+        299,
+        409
+      ],
+      "registration_spacing_zyx_mm": [
+        2.5,
+        0.586,
+        0.586
+      ],
+      "registration_grid": "native_landmark_crop_anisotropic_spacing",
+      "verification_pass": true
+    }
+  ],
+  "source_provenance": {
+    "repo_commit": "8204459dbad1b363348fd536f7a85c5e9560d00c",
+    "repo_branch": "gpu8",
+    "repo_dirty_tracked": null,
+    "external_ptvreg_python_commit": "64ed3f2fd3bb4a5f5df1f0a165d521b9d1552715",
+    "external_ptvreg_python_path": "/homebase/code_sync/inrorspline/external/ptvreg-python",
+    "adapter_source_sha256": {
+      "scripts/experiments/ptvreg_python_repro/__init__.py": "7dbad8652f224d9c0f51baeb813b007c947bfa1eacc0b49454a04a681fe58ece",
+      "scripts/experiments/ptvreg_python_repro/run_copd_case.py": "18e073833ccf99116029677a3a3ce69973c0a19ac5d7959f3c97e4911a6fa821",
+      "scripts/experiments/ptvreg_python_repro/launch_copd_fixed_all10.py": "a7286c33b08bf16c3138af0e72424d2274739eac0bf8ed23ca41ca415d937506",
+      "scripts/experiments/ptvreg_python_repro/aggregate_copd_fixed_all10.py": "1eaf207f70a854306dfad6fc12fe9d76b824947802756960920d1854f3442ef5"
+    }
+  }
+}

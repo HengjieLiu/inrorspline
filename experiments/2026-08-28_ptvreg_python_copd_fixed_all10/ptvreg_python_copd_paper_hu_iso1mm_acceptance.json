@@ -1,0 +1,25 @@
+{
+  "passed": false,
+  "n_completed": 0,
+  "n_requested": 10,
+  "missing_cases": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+  ],
+  "invalid_items": [],
+  "required_tre_conventions": [
+    "native_crop_tre_snap_to_voxel",
+    "native_crop_tre_subvoxel",
+    "tre_snap_to_voxel",
+    "tre_subvoxel"
+  ],
+  "headline_metric": "native_crop_tre_snap_to_voxel"
+}

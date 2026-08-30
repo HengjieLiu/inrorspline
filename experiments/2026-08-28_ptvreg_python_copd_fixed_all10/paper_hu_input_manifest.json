@@ -1,0 +1,348 @@
+{
+  "status": "completed",
+  "created_wall": "2026-08-28 07:01:21 +0000",
+  "dataset": "copd",
+  "protocol": "paper_hu_iso1mm",
+  "paper_hu_root": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs",
+  "canonical_ptvprep_root": "/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm",
+  "raw_dirlab_root": "/database/datasets/lungCT/DIR-Lab",
+  "case_ids": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+  ],
+  "n_cases": 10,
+  "all_verification_pass": true,
+  "rows": [
+    {
+      "case_id": 1,
+      "input_protocol": "paper_hu_iso1mm",
+      "paper_hu_created_this_run": true,
+      "paper_hu_root": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs",
+      "paper_hu_case_dir": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case01",
+      "paper_hu_audit": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case01/preprocess_audit.json",
+      "canonical_ptvprep_root": "/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm",
+      "raw_dirlab_root": "/database/datasets/lungCT/DIR-Lab",
+      "intensity_rule": "clip [-1000, 500], normalize to [0,1]",
+      "crop_bounds_zyx_inclusive": [
+        [
+          0,
+          109
+        ],
+        [
+          115,
+          435
+        ],
+        [
+          71,
+          436
+        ]
+      ],
+      "registration_shape_zyx": [
+        275,
+        201,
+        229
+      ],
+      "verification_pass": true
+    },
+    {
+      "case_id": 2,
+      "input_protocol": "paper_hu_iso1mm",
+      "paper_hu_created_this_run": true,
+      "paper_hu_root": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs",
+      "paper_hu_case_dir": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case02",
+      "paper_hu_audit": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case02/preprocess_audit.json",
+      "canonical_ptvprep_root": "/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm",
+      "raw_dirlab_root": "/database/datasets/lungCT/DIR-Lab",
+      "intensity_rule": "clip [-1000, 500], normalize to [0,1]",
+      "crop_bounds_zyx_inclusive": [
+        [
+          3,
+          88
+        ],
+        [
+          119,
+          424
+        ],
+        [
+          70,
+          451
+        ]
+      ],
+      "registration_shape_zyx": [
+        215,
+        197,
+        246
+      ],
+      "verification_pass": true
+    },
+    {
+      "case_id": 3,
+      "input_protocol": "paper_hu_iso1mm",
+      "paper_hu_created_this_run": true,
+      "paper_hu_root": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs",
+      "paper_hu_case_dir": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case03",
+      "paper_hu_audit": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case03/preprocess_audit.json",
+      "canonical_ptvprep_root": "/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm",
+      "raw_dirlab_root": "/database/datasets/lungCT/DIR-Lab",
+      "intensity_rule": "clip [-1000, 500], normalize to [0,1]",
+      "crop_bounds_zyx_inclusive": [
+        [
+          3,
+          103
+        ],
+        [
+          122,
+          410
+        ],
+        [
+          53,
+          457
+        ]
+      ],
+      "registration_shape_zyx": [
+        252,
+        188,
+        264
+      ],
+      "verification_pass": true
+    },
+    {
+      "case_id": 4,
+      "input_protocol": "paper_hu_iso1mm",
+      "paper_hu_created_this_run": true,
+      "paper_hu_root": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs",
+      "paper_hu_case_dir": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case04",
+      "paper_hu_audit": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case04/preprocess_audit.json",
+      "canonical_ptvprep_root": "/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm",
+      "raw_dirlab_root": "/database/datasets/lungCT/DIR-Lab",
+      "intensity_rule": "clip [-1000, 500], normalize to [0,1]",
+      "crop_bounds_zyx_inclusive": [
+        [
+          3,
+          103
+        ],
+        [
+          114,
+          406
+        ],
+        [
+          54,
+          448
+        ]
+      ],
+      "registration_shape_zyx": [
+        252,
+        173,
+        233
+      ],
+      "verification_pass": true
+    },
+    {
+      "case_id": 5,
+      "input_protocol": "paper_hu_iso1mm",
+      "paper_hu_created_this_run": true,
+      "paper_hu_root": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs",
+      "paper_hu_case_dir": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case05",
+      "paper_hu_audit": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case05/preprocess_audit.json",
+      "canonical_ptvprep_root": "/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm",
+      "raw_dirlab_root": "/database/datasets/lungCT/DIR-Lab",
+      "intensity_rule": "clip [-1000, 500], normalize to [0,1]",
+      "crop_bounds_zyx_inclusive": [
+        [
+          11,
+          115
+        ],
+        [
+          114,
+          411
+        ],
+        [
+          56,
+          438
+        ]
+      ],
+      "registration_shape_zyx": [
+        262,
+        193,
+        248
+      ],
+      "verification_pass": true
+    },
+    {
+      "case_id": 6,
+      "input_protocol": "paper_hu_iso1mm",
+      "paper_hu_created_this_run": true,
+      "paper_hu_root": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs",
+      "paper_hu_case_dir": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case06",
+      "paper_hu_audit": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case06/preprocess_audit.json",
+      "canonical_ptvprep_root": "/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm",
+      "raw_dirlab_root": "/database/datasets/lungCT/DIR-Lab",
+      "intensity_rule": "clip [-1000, 500], normalize to [0,1]",
+      "crop_bounds_zyx_inclusive": [
+        [
+          7,
+          107
+        ],
+        [
+          121,
+          404
+        ],
+        [
+          56,
+          443
+        ]
+      ],
+      "registration_shape_zyx": [
+        252,
+        180,
+        246
+      ],
+      "verification_pass": true
+    },
+    {
+      "case_id": 7,
+      "input_protocol": "paper_hu_iso1mm",
+      "paper_hu_created_this_run": true,
+      "paper_hu_root": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs",
+      "paper_hu_case_dir": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case07",
+      "paper_hu_audit": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case07/preprocess_audit.json",
+      "canonical_ptvprep_root": "/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm",
+      "raw_dirlab_root": "/database/datasets/lungCT/DIR-Lab",
+      "intensity_rule": "clip [-1000, 500], normalize to [0,1]",
+      "crop_bounds_zyx_inclusive": [
+        [
+          6,
+          107
+        ],
+        [
+          126,
+          392
+        ],
+        [
+          55,
+          456
+        ]
+      ],
+      "registration_shape_zyx": [
+        255,
+        167,
+        251
+      ],
+      "verification_pass": true
+    },
+    {
+      "case_id": 8,
+      "input_protocol": "paper_hu_iso1mm",
+      "paper_hu_created_this_run": true,
+      "paper_hu_root": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs",
+      "paper_hu_case_dir": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case08",
+      "paper_hu_audit": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case08/preprocess_audit.json",
+      "canonical_ptvprep_root": "/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm",
+      "raw_dirlab_root": "/database/datasets/lungCT/DIR-Lab",
+      "intensity_rule": "clip [-1000, 500], normalize to [0,1]",
+      "crop_bounds_zyx_inclusive": [
+        [
+          7,
+          106
+        ],
+        [
+          114,
+          412
+        ],
+        [
+          55,
+          463
+        ]
+      ],
+      "registration_shape_zyx": [
+        250,
+        175,
+        240
+      ],
+      "verification_pass": true
+    },
+    {
+      "case_id": 9,
+      "input_protocol": "paper_hu_iso1mm",
+      "paper_hu_created_this_run": true,
+      "paper_hu_root": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs",
+      "paper_hu_case_dir": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case09",
+      "paper_hu_audit": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case09/preprocess_audit.json",
+      "canonical_ptvprep_root": "/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm",
+      "raw_dirlab_root": "/database/datasets/lungCT/DIR-Lab",
+      "intensity_rule": "clip [-1000, 500], normalize to [0,1]",
+      "crop_bounds_zyx_inclusive": [
+        [
+          7,
+          102
+        ],
+        [
+          118,
+          404
+        ],
+        [
+          52,
+          449
+        ]
+      ],
+      "registration_shape_zyx": [
+        240,
+        191,
+        264
+      ],
+      "verification_pass": true
+    },
+    {
+      "case_id": 10,
+      "input_protocol": "paper_hu_iso1mm",
+      "paper_hu_created_this_run": true,
+      "paper_hu_root": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs",
+      "paper_hu_case_dir": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case10",
+      "paper_hu_audit": "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1/_paper_hu_iso1mm_inputs/COPD/case10/preprocess_audit.json",
+      "canonical_ptvprep_root": "/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm",
+      "raw_dirlab_root": "/database/datasets/lungCT/DIR-Lab",
+      "intensity_rule": "clip [-1000, 500], normalize to [0,1]",
+      "crop_bounds_zyx_inclusive": [
+        [
+          12,
+          104
+        ],
+        [
+          109,
+          394
+        ],
+        [
+          52,
+          452
+        ]
+      ],
+      "registration_shape_zyx": [
+        232,
+        212,
+        298
+      ],
+      "verification_pass": true
+    }
+  ],
+  "source_provenance": {
+    "repo_commit": "8204459dbad1b363348fd536f7a85c5e9560d00c",
+    "repo_branch": "gpu8",
+    "repo_dirty_tracked": null,
+    "external_ptvreg_python_commit": "64ed3f2fd3bb4a5f5df1f0a165d521b9d1552715",
+    "external_ptvreg_python_path": "/homebase/code_sync/inrorspline/external/ptvreg-python",
+    "adapter_source_sha256": {
+      "scripts/experiments/ptvreg_python_repro/__init__.py": "7dbad8652f224d9c0f51baeb813b007c947bfa1eacc0b49454a04a681fe58ece",
+      "scripts/experiments/ptvreg_python_repro/run_copd_case.py": "c3193a7f161840bf551c82445e0811189e39533ef91189d235d89f66f82cc5a7",
+      "scripts/experiments/ptvreg_python_repro/launch_copd_fixed_all10.py": "da0c865908bf961e624b3d7ffa20c5dcdbd2229ea0dad76673e3aefe8e10143f",
+      "scripts/experiments/ptvreg_python_repro/aggregate_copd_fixed_all10.py": "fb26c30a940e08726c19a13d1ae615ab88a6ed5216c75cd390619ff305849d4d"
+    }
+  }
+}
