@@ -3442,3 +3442,125 @@ Next decision:
   family. It is not a native-IDIR equivalence claim because native IDIR differs
   in image domain, model, sampling, and analytic/autograd bending-energy
   implementation.
+
+### P31: Learn2Breath-style P2e 1.5 mm Two-Window All-Case Audit
+
+- Status: complete. All 40 preflights and registrations passed, including the
+  four cold production-shaped gates before warm release; all four workers
+  returned zero.
+- Purpose: port the selected historical COPD DirectCP / MR-D-BSCP P2e
+  mechanics to the shared `224 x 192 x 224`, 1.5-mm challenge-like pair-local
+  grid, and report the locked CT-only two-window audit across COPD and
+  Learn2Breath validation cohorts without selecting a window.
+- Review artifact: `experiments/2026-08-30_learn2breath_copd10_pairlocal_coarse_registration/`.
+- Method: historical pTV local-CC plus physical isoTV with CP stages
+  `64,32,16,8,4`, image stages `16,8,4,2,1`, epochs
+  `400,400,400,400,900`, Adam `1e-3`, and seed `1`. The proposed 32x extension
+  is not part of this run.
+- Protocol tag: `challenge_like_pairlocal_1p5mm_fullgrid+historical_p2e_raw80_900_from_HUplus1000+ct_only`.
+- Direction: phase-2 EXP moving to phase-1 INSP fixed.
+- Field contract: fixed-grid `float32 [3,X,Y,Z]`, XYZ voxel components,
+  `moving(fixed + u)` sampling semantics.
+- Metrics: 300-landmark physical trilinear COPD TRE and per-landmark CSV;
+  validation per-lobe Dice and mean Dice; challenge whole-grid/fixed-lobe
+  folding, runtime, and cohort-appropriate QC-only coronal audits.
+- Acceptance: preflight verifies geometry/affines, HU occupancy, landmark
+  IDs/bounds and baseline TRE, R231 grid alignment, zero/known-shift field
+  handling, and output reload. The COPD8 inline 2x9 audit was reviewed before
+  the all-case rollout; each cohort/profile cold result must have finite fields
+  and metrics before its warm queue continues.
+- Correction: historical P2e applied `[80,900]` to raw DIR-Lab stored values.
+  The pair-local manifest declares `HU = stored - 1000`; consequently the
+  valid port uses `stored = HU + 1000` before the historical window. The first
+  run instead windowed HU directly, mapped 90.6% of fixed voxels to zero, and
+  produced `27.1577 mm` physical trilinear TRE versus `26.4270 mm` at identity.
+  Those artifacts are retained as superseded diagnostics only. No lobe label,
+  R231 mask, or landmark enters the objective.
+- Corrected COPD8 result: after applying the historical window to
+  `stored = HU + 1000`, physical trilinear TRE was `1.7129 mm` mean (median
+  `0.9413`, p95 `8.8858`) versus `26.4270 mm` at identity across 300
+  landmarks. Whole-grid folding was `0.22037%`; the executed QC notebook
+  follows the accepted mask-audit coronal orientation. This historical
+  single-case result is retained as provenance and was superseded for uniform
+  timing/output metadata by the authorized all-case rerun.
+- Rollout: execute each cohort under both `p2e_equiv_hu` `[-920,-100]` and
+  `l2b_lung_hu` `[-1000,200]` profiles. GPU 0 owns COPD/P2e-equivalent, GPU 1
+  COPD/Learn2Breath-lung, GPU 2 validation/P2e-equivalent, and GPU 3
+  validation/Learn2Breath-lung. Each persistent worker records one cold and
+  nine warm runs. Record synchronized optimizer-only time, full
+  load-to-evaluation time, worker totals, and four-worker makespan. Report both
+  profiles without selecting a winner; all lobe labels remain evaluation/QC-only.
+- Completed results: COPD mean TRE was `1.4683 mm` with `0.2444%` challenge
+  whole-grid folding for `p2e_equiv_hu`, and `1.7598 mm` with `0.7905%`
+  folding for `l2b_lung_hu`. Validation mean lobe Dice was `0.9724` with
+  `0.2767%` whole-grid folding for `p2e_equiv_hu`, and `0.9700` with `0.5832%`
+  folding for `l2b_lung_hu`; per-lobe Dice remains in the external per-case
+  record. These are reported-only values, not a profile-selection result.
+- Runtime: cold full-case times were `394.7`, `411.7`, `446.7`, and `446.6 s`
+  in GPU order 0--3; warm full-case means +/- SD were `311.7 +/- 121.4`,
+  `268.5 +/- 96.0`, `327.1 +/- 132.8`, and `326.3 +/- 134.1 s`. Persistent
+  worker totals were `3256.7`, `2867.3`, `3392.9`, and `3386.2 s`; measured
+  four-GPU makespan was `3395.8 s`.
+- QC: both all-case Docker notebooks executed with 20 inline 2x9 panels and
+  no cell errors. COPD uses R231 masks and validation uses challenge-sampler
+  lobe masks in the accepted coronal orientation.
+
+### P32: Learn2Breath-style FireANTs Greedy CT-only Two-Window Audit
+
+- Status: all-40 preflight passed and a recovery-environment production relaunch
+  is underway. P31 P2e records are locked, read-only provenance and will not
+  be rerun.
+- Purpose: run the CT-only FireANTs Greedy local-NCC method under the same two
+  physical-HU profile names and shared 1.5-mm grids as P31, then provide
+  detailed case-by-case COPD TRE/folding and validation per-lobe Dice/folding
+  tables for both methods and both profiles.
+- Dataset / direction: challenge-style COPD `case_104` through `case_113` and
+  Learn2Breath validation `NLST_0001` through `NLST_0010`; phase-2 EXP moving
+  to phase-1 INSP fixed.
+- Protocol tag:
+  `challenge_like_pairlocal_1p5mm_fullgrid+fireants_greedy_local_ncc_ct_only+two_physical_hu_windows`.
+- FireANTs configuration: scalar CT only; Greedy local NCC kernel `5`, scales
+  `16,8,4,2,1`, iterations `200,200,200,200,200`, Adam LR `0.2`, compositive
+  deformation, warp/gradient smoothing `0.25/0.5`, tolerance `1e-4`, ten
+  tolerance iterations, identity affine. No lobe label, R231 mask, or landmark
+  enters the registration input or loss.
+- Intensity profiles: `p2e_equiv_hu` clips physical HU `[-920,-100]` then
+  applies `(HU+920)/820`; `l2b_lung_hu` clips `[-1000,200]` then applies
+  `(HU+1000)/1200`. FireANTs' legacy direct `[80,900]` HU normalizer is
+  excluded.
+- Field / metric contract: export fixed-grid `float32 [3,X,Y,Z]`, XYZ voxel
+  components with `moving(fixed + u)` semantics. FireANTs sign/axis conversion
+  is selected only by native normalized warped-CT agreement, then validated by
+  NIfTI reload and challenge sampling. COPD reports physical trilinear TRE;
+  validation reports five per-lobe Dice values and mean Dice. Learn2Breath
+  challenge whole-grid folding is headline for both cohorts; validation also
+  reports fixed-lobe folding.
+- GPU protocol: four persistent workers, GPU 0 COPD/P2e-equivalent, GPU 1
+  COPD/Learn2Breath-lung, GPU 2 validation/P2e-equivalent, GPU 3
+  validation/Learn2Breath-lung. Each worker has one cold plus nine warm cases;
+  all four cold fields and metrics must pass before warm release. Record
+  optimizer-only, full-case, worker-case, worker-total, peak memory, and
+  four-GPU-makespan timing.
+- Reporting: merge 40 new FireANTs rows with 40 immutable P31 rows into two
+  detailed 40-row cohort tables, preserve every validation lobe Dice value,
+  and label P2e CUDA 11.8 versus FireANTs CUDA 12.1 environments. Do not use
+  these timings as a direct cross-container method-runtime ranking, select a
+  winner, or create a submission.
+- QC: execute all-case inline `2 x 9` accepted-orientation coronal notebooks.
+  COPD displays CT/R231 QC masks; validation displays CT/discrete lobe masks.
+  FireANTs uses the challenge sampler; P2e retains established historical
+  sampling for COPD and challenge sampling for validation.
+- Preflight/compatibility record: both exact-schedule smokes completed with
+  finite cohort metrics, and the immutable production manifest's 40 rows all
+  passed geometry, provenance, landmark/lobe, and evaluator gates. The original
+  `learn2breath26-fireants:e7a613c-cu121` image hangs on physical GPU 0 for a
+  basic full-grid CUDA allocation, including in a fresh container. GPU 0 itself
+  is healthy in `fireants-devhj:v1_0`; a recovery smoke using the identical
+  current FireANTs source mounted into that CUDA-12.1 base completed with a
+  finite field, zero folding, and COPD TRE improvement. The relaunch uses this
+  recovery runtime only for GPU 0, tagged
+  `fireants_current_source_on_devhj_v1_cuda12.1`; GPUs 1--3 retain the original
+  image that passed their prior smokes, tagged
+  `learn2breath26_fireants_e7a613c_cuda12.1`. It retains the method source and
+  protocol but introduces a base-runtime asymmetry, recorded per case and
+  explicitly distinguished from P31's CUDA-11.8 environment.
