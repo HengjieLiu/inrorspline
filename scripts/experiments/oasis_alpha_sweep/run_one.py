@@ -40,6 +40,15 @@ METHODS = [
 ]
 
 
+def parse_bool_option(value: str) -> bool:
+    normalized = str(value).strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise argparse.ArgumentTypeError(f"Expected true/false, got {value!r}")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--method", choices=METHODS, required=True)
@@ -75,6 +84,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stage-min-delta", type=str, default="")
     parser.add_argument("--runtime-candidate", type=str, default="")
     parser.add_argument("--timing-detail", choices=["off", "coarse", "deep"], default="off")
+    parser.add_argument("--cudnn-benchmark", type=parse_bool_option, default=True)
+    parser.add_argument("--cudnn-deterministic", type=parse_bool_option, default=False)
     parser.add_argument("--output-mode", choices=["full", "dvf_only"], default="full")
     parser.add_argument("--prolongation-preserve-check", action="store_true")
     parser.add_argument("--save-intermediate-dense", action="store_true")
@@ -451,6 +462,11 @@ class TimingRecorder:
             "runtime_candidate": str(args.runtime_candidate) or None,
             "output_mode": str(getattr(args, "output_mode", "full")),
             "case_rank": int(args.case_rank),
+            "cudnn_requested": {
+                "benchmark": bool(getattr(args, "cudnn_benchmark", True)),
+                "deterministic": bool(getattr(args, "cudnn_deterministic", False)),
+            },
+            "cuda_backend": c.cuda_backend_metadata(self.device),
             "script_total_sec": float(root_elapsed),
             "events": sorted(self.events, key=lambda row: float(row["start_offset_sec"])),
             "marks": sorted(self.marks, key=lambda row: float(row["offset_sec"])),
@@ -3297,6 +3313,9 @@ def write_dvf_only_metadata(
         "foreground_metric_mask": "fixed_image_positive",
         "segmentation_mask_role": "loaded_but_not_evaluated_in_dvf_only_mode",
         "timing_detail": str(args.timing_detail),
+        "cudnn_benchmark": bool(torch.backends.cudnn.benchmark),
+        "cudnn_deterministic": bool(torch.backends.cudnn.deterministic),
+        "cuda_backend": c.cuda_backend_metadata(),
         **dvf_info,
     }
     summary.update(batch["mask_audit"])  # type: ignore[arg-type]
@@ -3353,7 +3372,11 @@ def main() -> None:
     started_at = c.now_text()
     setup_token = timer.start("setup", category="setup")
     with timer.section("setup.device", category="setup"):
-        device = c.set_cuda_device(args.gpu)
+        device = c.set_cuda_device(
+            args.gpu,
+            cudnn_benchmark=bool(args.cudnn_benchmark),
+            cudnn_deterministic=bool(args.cudnn_deterministic),
+        )
         timer.set_device(device)
     with timer.section("setup.seed", category="setup"):
         torch.manual_seed(int(args.seed))

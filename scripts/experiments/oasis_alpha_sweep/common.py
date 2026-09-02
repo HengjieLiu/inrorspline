@@ -207,14 +207,43 @@ def load_oasis_case(
     }
 
 
-def set_cuda_device(gpu: str) -> torch.device:
+def set_cuda_device(
+    gpu: str,
+    *,
+    cudnn_benchmark: bool = True,
+    cudnn_deterministic: bool = False,
+) -> torch.device:
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
-    torch.backends.cudnn.deterministic = False
-    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.deterministic = bool(cudnn_deterministic)
+    torch.backends.cudnn.benchmark = bool(cudnn_benchmark)
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA is required for this runner.")
     torch.cuda.set_device(0)
     return torch.device("cuda")
+
+
+def cuda_backend_metadata(device: Optional[torch.device] = None) -> Dict[str, object]:
+    """Return reproducibility metadata for the active CUDA/cuDNN backend."""
+
+    metadata: Dict[str, object] = {
+        "torch_version": str(torch.__version__),
+        "cuda_runtime_version": None if torch.version.cuda is None else str(torch.version.cuda),
+        "cudnn_version": None,
+        "cudnn_benchmark": bool(torch.backends.cudnn.benchmark),
+        "cudnn_deterministic": bool(torch.backends.cudnn.deterministic),
+        "cuda_device_index": None,
+        "cuda_device_name": None,
+    }
+    try:
+        metadata["cudnn_version"] = torch.backends.cudnn.version()
+    except Exception:
+        metadata["cudnn_version"] = None
+    target = device
+    if target is not None and target.type == "cuda" and torch.cuda.is_available():
+        index = int(torch.cuda.current_device())
+        metadata["cuda_device_index"] = index
+        metadata["cuda_device_name"] = str(torch.cuda.get_device_name(index))
+    return metadata
 
 
 def make_coordinate_tensor(shape: Tuple[int, int, int], device: torch.device) -> torch.Tensor:
