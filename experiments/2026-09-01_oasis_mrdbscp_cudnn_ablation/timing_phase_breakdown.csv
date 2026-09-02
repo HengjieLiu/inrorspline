@@ -1,0 +1,21 @@
+config,config_label,phase,cold_sec,warm_mean_sec,cold_minus_warm_sec
+benchmark_true_deterministic_false,"benchmark=True, deterministic=False",expand,44.365931945204736,0.7033266405314207,43.66260530467331
+benchmark_true_deterministic_false,"benchmark=True, deterministic=False",backward_step,32.132835204601285,5.602410702347756,26.53042450225353
+benchmark_true_deterministic_false,"benchmark=True, deterministic=False",regularizer,7.699730658054351,4.051343392729759,3.648387265324592
+benchmark_true_deterministic_false,"benchmark=True, deterministic=False",warp_ncc,0.6723658306002616,0.25934621596336366,0.4130196146368979
+benchmark_true_deterministic_false,"benchmark=True, deterministic=False",logging_early_stop_wall_sec,2.739806942641735,3.1720465272665024,-0.4322395846247673
+benchmark_false_deterministic_false,"benchmark=False, deterministic=False",expand,0.9386593169569969,0.5065219760388135,0.43213734091818334
+benchmark_false_deterministic_false,"benchmark=False, deterministic=False",backward_step,6.579804691314697,5.547797481060028,1.032007210254669
+benchmark_false_deterministic_false,"benchmark=False, deterministic=False",regularizer,6.8702337970733645,3.658735487163067,3.2114983099102976
+benchmark_false_deterministic_false,"benchmark=False, deterministic=False",warp_ncc,0.2824500804841519,0.250379264511168,0.03207081597298389
+benchmark_false_deterministic_false,"benchmark=False, deterministic=False",logging_early_stop_wall_sec,3.051030747592449,3.147826476022601,-0.09679572843015194
+benchmark_true_deterministic_true,"benchmark=True, deterministic=True",expand,64.34466012376546,0.6437196987122298,63.70094042505323
+benchmark_true_deterministic_true,"benchmark=True, deterministic=True",backward_step,33.57304307413101,5.665282304525375,27.90776076960563
+benchmark_true_deterministic_true,"benchmark=True, deterministic=True",regularizer,12.226332069158556,3.755404886484146,8.470927182674409
+benchmark_true_deterministic_true,"benchmark=True, deterministic=True",warp_ncc,0.5444341403841972,0.26427049650996925,0.280163643874228
+benchmark_true_deterministic_true,"benchmark=True, deterministic=True",logging_early_stop_wall_sec,2.90954902023077,2.906428017653525,0.0031210025772452354
+benchmark_false_deterministic_true,"benchmark=False, deterministic=True",expand,1.244289145231247,0.538891535922885,0.705397609308362
+benchmark_false_deterministic_true,"benchmark=False, deterministic=True",backward_step,6.1603053603172295,5.657152851939202,0.5031525083780277
+benchmark_false_deterministic_true,"benchmark=False, deterministic=True",regularizer,7.462664558172226,3.743093044400215,3.719571513772011
+benchmark_false_deterministic_true,"benchmark=False, deterministic=True",warp_ncc,0.2725059206187725,0.2621804486811161,0.010325471937656372
+benchmark_false_deterministic_true,"benchmark=False, deterministic=True",logging_early_stop_wall_sec,3.014034353196621,3.2072187401354313,-0.19318438693881035
