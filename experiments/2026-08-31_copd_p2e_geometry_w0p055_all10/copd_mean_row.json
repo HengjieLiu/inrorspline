@@ -1,0 +1,23 @@
+{
+  "dataset": "copd",
+  "method": "direct_cp_32_16_8_4_ptv_lcc_isotv",
+  "display_name": "MR-D-BSCP P2e geometry w=0.055 candidate",
+  "n_completed": 10,
+  "requested_cases": "1,2,3,4,5,6,7,8,9,10",
+  "missing_cases": "",
+  "native_crop_snap_tre_mean_mm": 1.050090966287704,
+  "native_crop_snap_tre_std_across_cases_mm": 0.6954816880028752,
+  "native_crop_sub_tre_mean_mm": 1.1398446293094886,
+  "native_crop_sub_tre_std_across_cases_mm": 0.6552641324844404,
+  "reg1mm_snap_tre_mean_mm": 1.2781425597325695,
+  "reg1mm_snap_tre_std_across_cases_mm": 0.6406265301074812,
+  "reg1mm_sub_tre_mean_mm": 1.1351692618032296,
+  "reg1mm_sub_tre_std_across_cases_mm": 0.6559055729589603,
+  "fg_log_jdet_std_mean": 0.4838252394346362,
+  "fg_log_jdet_std_across_cases": 0.12710125662797583,
+  "fg_jdet_le0_pct_mean": 1.437125212483016,
+  "fg_bending_energy_mean": 0.016769697692873627,
+  "fg_diffusion_l2_mean": 0.04954162195029606,
+  "elapsed_sec_mean": 164.52662045955657,
+  "peak_mem_gb_mean": 6.250943803787232
+}
