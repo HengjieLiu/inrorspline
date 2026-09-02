@@ -108,6 +108,27 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--finest-loss-diagnostic", action="store_true")
     parser.add_argument("--finest-loss-every", type=int, default=1)
     parser.add_argument("--prolongation-diagnostics", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument(
+        "--timing-mode",
+        choices=("none", "input_to_dvf"),
+        default="none",
+        help="Enable the synchronized loaded-images-to-saved-DVF timing contract.",
+    )
+    parser.add_argument(
+        "--timing-condition",
+        choices=("unspecified", "cold", "warm", "warm_continuation"),
+        default="unspecified",
+    )
+    parser.add_argument("--timing-sequence-index", type=int, default=None)
+    parser.add_argument("--timing-worker-id", type=str, default="")
+    parser.add_argument("--variant-id", type=str, default="")
+    parser.add_argument("--stage-early-stop-mode", choices=("disabled", "adaptive"), default="disabled")
+    parser.add_argument("--stage-min-epochs", type=str, default="0")
+    parser.add_argument("--stage-patience", type=str, default="0")
+    parser.add_argument("--stage-check-interval", type=int, default=25)
+    parser.add_argument("--stage-window", type=int, default=25)
+    parser.add_argument("--stage-total-thresholds", type=str, default="0")
+    parser.add_argument("--stage-data-thresholds", type=str, default="0")
     parser.add_argument("--sample-checkpoints", action="store_true")
     parser.add_argument("--checkpoint-sample-count", type=int, default=100000)
     parser.add_argument("--checkpoint-sample-seed", type=int, default=1729)
@@ -115,6 +136,17 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     if int(args.finest_loss_every) < 1:
         raise ValueError("--finest-loss-every must be >= 1")
+    if int(args.stage_check_interval) < 1 or int(args.stage_window) < 1:
+        raise ValueError("--stage-check-interval and --stage-window must be >= 1")
+    if str(args.timing_mode) == "input_to_dvf":
+        if not bool(args.save_dense_dvf):
+            raise ValueError("input_to_dvf timing requires --save-dense-dvf")
+        if bool(args.prolongation_diagnostics):
+            raise ValueError("input_to_dvf timing requires --no-prolongation-diagnostics")
+        if bool(args.finest_loss_diagnostic) or int(args.global_ncc_diagnostic_interval) > 0:
+            raise ValueError("input_to_dvf timing forbids full-grid diagnostic expansions")
+        if bool(args.sample_checkpoints):
+            raise ValueError("input_to_dvf timing forbids checkpoint full-grid expansions")
     return args
 
 
@@ -354,6 +386,61 @@ def should_global_ncc_diagnostic(args: argparse.Namespace, epoch: int, epochs: i
     if interval <= 0:
         return False
     return int(epoch) == 1 or int(epoch) % interval == 0 or int(epoch) == int(epochs)
+
+
+def adaptive_stage_stop_decision(
+    rows: Sequence[Dict[str, object]],
+    *,
+    minimum_epochs: int,
+    patience_epochs: int,
+    check_interval: int,
+    window_epochs: int,
+    total_threshold: float,
+    data_threshold: float,
+) -> Optional[Dict[str, object]]:
+    """Apply the frozen OASIS dual-median stage-local stopping rule."""
+
+    epoch = len(rows)
+    if epoch < int(minimum_epochs) or epoch % int(check_interval) != 0:
+        return None
+    window = max(1, int(window_epochs))
+    patience = max(window, int(patience_epochs))
+    if len(rows) < patience + window:
+        return None
+    recent_rows = rows[-window:]
+    previous_stop = len(rows) - patience
+    previous_rows = rows[previous_stop - window : previous_stop]
+    if len(previous_rows) != window:
+        return None
+    recent_total = float(np.median([float(row["loss"]) for row in recent_rows]))
+    previous_total = float(np.median([float(row["loss"]) for row in previous_rows]))
+    recent_data = float(np.median([float(row["data_loss"]) for row in recent_rows]))
+    previous_data = float(np.median([float(row["data_loss"]) for row in previous_rows]))
+    total_relative = (previous_total - recent_total) / max(abs(previous_total), 1.0e-8)
+    data_relative = (previous_data - recent_data) / max(abs(previous_data), 1.0e-8)
+    should_stop = total_relative < float(total_threshold) and data_relative < float(data_threshold)
+    decision: Dict[str, object] = {
+        "stop": bool(should_stop),
+        "epoch": int(epoch),
+        "window_epochs": int(window),
+        "effective_patience_epochs": int(patience),
+        "total_relative_improvement": float(total_relative),
+        "data_relative_improvement": float(data_relative),
+        "recent_total_median": float(recent_total),
+        "previous_total_median": float(previous_total),
+        "recent_data_median": float(recent_data),
+        "previous_data_median": float(previous_data),
+        "total_threshold": float(total_threshold),
+        "data_threshold": float(data_threshold),
+    }
+    if should_stop:
+        decision["reason"] = (
+            "adaptive_dual_median_relative_improvement_below_threshold"
+            f";epoch={epoch};window={window};effective_patience={patience}"
+            f";total_relative={total_relative:.9g};total_threshold={float(total_threshold):.9g}"
+            f";data_relative={data_relative:.9g};data_threshold={float(data_threshold):.9g}"
+        )
+    return decision
 
 
 def global_ncc_diagnostic_row(
@@ -1336,6 +1423,14 @@ def optimize_stage(
     global_ncc_diagnostic: List[Dict[str, float | str | bool]],
     sampler: Optional[CheckpointSampler] = None,
     return_dense_full: bool = True,
+    materialization_trace: Optional[List[bool]] = None,
+    stage_early_stop_mode: str = "disabled",
+    stage_min_epochs: int = 0,
+    stage_patience: int = 0,
+    stage_check_interval: int = 25,
+    stage_window: int = 25,
+    stage_total_threshold: float = 0.0,
+    stage_data_threshold: float = 0.0,
 ) -> Tuple[Optional[torch.Tensor], Dict[str, object], List[Dict[str, object]]]:
     fixed_l, blur_sigma, blur_kernel = c.make_loss_volume(
         fixed_t, downsample, args.antialias_sigma_scale, args.antialias_radius_sigma
@@ -1398,6 +1493,9 @@ def optimize_stage(
         )
     optimizer = torch.optim.Adam([control], lr=lr)
     rows: List[Dict[str, object]] = []
+    stop_reason = "epoch_cap_reached"
+    last_stop_decision: Optional[Dict[str, object]] = None
+    stage_full_grid_materialized = False
     start = time.time()
     print(
         json.dumps(
@@ -1534,6 +1632,7 @@ def optimize_stage(
             assert full_id_grid is not None
             with torch.no_grad():
                 dense_full_diag = c.expand_on_shape(control, control_shape, int(full_cps), fixed_t.shape, 1)
+            stage_full_grid_materialized = True
             diag_row = global_ncc_diagnostic_row(
                 fixed_t=fixed_t,
                 moving_t=moving_t,
@@ -1557,6 +1656,7 @@ def optimize_stage(
         if sampler is not None and sampler.should_record(int(row["global_epoch"])):
             with torch.no_grad():
                 sample_dense_full = c.expand_on_shape(control, control_shape, int(full_cps), fixed_t.shape, 1)
+            stage_full_grid_materialized = True
             sampler.record_dense(
                 epoch=int(row["global_epoch"]),
                 dense_disp_norm_xyz=sample_dense_full,
@@ -1574,10 +1674,26 @@ def optimize_stage(
             )
         if epoch == 1 or epoch % int(args.eval_interval) == 0 or epoch == int(epochs):
             print(json.dumps(row), flush=True)
+        if str(stage_early_stop_mode) == "adaptive":
+            last_stop_decision = adaptive_stage_stop_decision(
+                rows,
+                minimum_epochs=int(stage_min_epochs),
+                patience_epochs=int(stage_patience),
+                check_interval=int(stage_check_interval),
+                window_epochs=int(stage_window),
+                total_threshold=float(stage_total_threshold),
+                data_threshold=float(stage_data_threshold),
+            )
+            if last_stop_decision is not None and bool(last_stop_decision["stop"]):
+                stop_reason = str(last_stop_decision["reason"])
+                break
     dense_full: Optional[torch.Tensor] = None
     if bool(return_dense_full):
         with torch.no_grad():
             dense_full = c.expand_on_shape(control, control_shape, full_cps, fixed_t.shape, 1)
+        stage_full_grid_materialized = True
+    if materialization_trace is not None:
+        materialization_trace.append(bool(stage_full_grid_materialized))
     elapsed = time.time() - start
     ctrl_abs = control.detach().abs().reshape(-1)
     summary = {
@@ -1590,6 +1706,9 @@ def optimize_stage(
         "stage_pix_zyx_mm": list(cur_pix_zyx),
         "n_control": int(np.prod(control_shape)),
         "epochs": int(epochs),
+        "actual_epochs": int(len(rows)),
+        "stop_reason": stop_reason,
+        "adaptive_last_decision": last_stop_decision,
         "lr": float(lr),
         "reg_weight": float(args.alpha if is_be_loss else args.ptv_isotv_weight),
         "alpha": float(args.alpha) if is_be_loss else None,
@@ -1616,7 +1735,8 @@ def optimize_stage(
         "control_abs_p95_norm": float(torch.quantile(ctrl_abs, 0.95).detach().cpu()),
         "masked_train_coords": int(masked_train_count or 0),
         "masked_batch_size": int(masked_batch_size or 0),
-        "dense_full_expanded": bool(return_dense_full),
+        "dense_full_expanded": bool(stage_full_grid_materialized),
+        "full_grid_dvf_materialized": bool(stage_full_grid_materialized),
     }
     return None if dense_full is None else dense_full.detach(), summary, rows
 
@@ -1632,6 +1752,17 @@ def train_multistage(
     stage_downsample = c.parse_stage_ints(args.stage_downsample, len(stage_cps))
     stage_epochs = c.parse_stage_ints(args.stage_epochs, len(stage_cps))
     stage_lr = c.parse_float_list(args.stage_lr, len(stage_cps), float(args.lr if args.lr is not None else 1e-3))
+    stage_min_epochs = c.parse_stage_ints(args.stage_min_epochs, len(stage_cps))
+    stage_patience = c.parse_stage_ints(args.stage_patience, len(stage_cps))
+    stage_total_thresholds = c.parse_float_list(args.stage_total_thresholds, len(stage_cps), 0.0)
+    stage_data_thresholds = c.parse_float_list(args.stage_data_thresholds, len(stage_cps), 0.0)
+    if str(args.stage_early_stop_mode) == "adaptive":
+        if any(int(value) < 1 for value in stage_min_epochs):
+            raise ValueError("Adaptive stopping requires positive --stage-min-epochs for every stage.")
+        if any(int(value) < 1 for value in stage_patience):
+            raise ValueError("Adaptive stopping requires positive --stage-patience for every stage.")
+        if any(float(value) <= 0.0 for value in (*stage_total_thresholds, *stage_data_thresholds)):
+            raise ValueError("Adaptive stopping requires positive relative-improvement thresholds.")
     base_spacing = int(stage_cps[0])
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -1655,6 +1786,8 @@ def train_multistage(
     final_control: Optional[torch.Tensor] = None
     final_control_shape: Optional[Tuple[int, int, int]] = None
     final_domain_cps: Optional[int] = None
+    materialization_trace: List[bool] = []
+    global_epoch_offset = 0
     if device.type == "cuda":
         torch.cuda.empty_cache()
         torch.cuda.reset_peak_memory_stats()
@@ -1669,7 +1802,6 @@ def train_multistage(
     for stage_idx, (full_cps, downsample, epochs, lr) in enumerate(
         zip(stage_cps, stage_downsample, stage_epochs, stage_lr)
     ):
-        global_epoch_offset = int(sum(stage_epochs[:stage_idx]))
         control_shape = tuple(int(v) for v in nested_shapes[int(full_cps)])
         control = torch.nn.Parameter(torch.zeros(int(np.prod(control_shape)), 3, device=device, dtype=torch.float32))
         if prev_control is not None and prev_shape is not None:
@@ -1705,6 +1837,14 @@ def train_multistage(
             global_ncc_diagnostic,
             sampler=sampler,
             return_dense_full=use_prolongation_diagnostics or int(stage_idx) == len(stage_cps) - 1,
+            materialization_trace=materialization_trace,
+            stage_early_stop_mode=str(args.stage_early_stop_mode),
+            stage_min_epochs=int(stage_min_epochs[stage_idx]),
+            stage_patience=int(stage_patience[stage_idx]),
+            stage_check_interval=int(args.stage_check_interval),
+            stage_window=int(args.stage_window),
+            stage_total_threshold=float(stage_total_thresholds[stage_idx]),
+            stage_data_threshold=float(stage_data_thresholds[stage_idx]),
         )
         prev_control = control.detach()
         prev_shape = control_shape
@@ -1716,6 +1856,19 @@ def train_multistage(
         final_domain_cps = int(full_cps)
         stage_summaries.append(summary)
         history.extend(rows)
+        global_epoch_offset += int(len(rows))
+    expected_materialization_trace = [False] * max(0, len(stage_cps) - 1) + [True]
+    if not use_prolongation_diagnostics and not bool(args.finest_loss_diagnostic) and int(args.global_ncc_diagnostic_interval) <= 0 and not bool(args.sample_checkpoints):
+        if materialization_trace != expected_materialization_trace:
+            raise RuntimeError(
+                "Final-only full-grid materialization invariant failed: "
+                f"observed={materialization_trace}, expected={expected_materialization_trace}"
+            )
+    if str(args.timing_mode) == "input_to_dvf" and materialization_trace != expected_materialization_trace:
+        raise RuntimeError(
+            "input_to_dvf timing requires final-stage-only full-grid materialization: "
+            f"observed={materialization_trace}, expected={expected_materialization_trace}"
+        )
     if final_dense is None:
         final_dense = torch.zeros((*image_shape, 3), dtype=torch.float32, device=device)
     if device.type == "cuda":
@@ -1772,6 +1925,8 @@ def train_multistage(
             "stage_full_cps": stage_cps,
             "stage_downsample": stage_downsample,
             "stage_epochs": stage_epochs,
+            "actual_stage_epochs": [int(summary["actual_epochs"]) for summary in stage_summaries],
+            "stage_stop_reasons": [str(summary["stop_reason"]) for summary in stage_summaries],
             "stage_lr": stage_lr,
             "optimizer": "Adam",
             "loss": (
@@ -1807,6 +1962,15 @@ def train_multistage(
             "ptv_csqrt": None if is_be_loss else float(args.ptv_csqrt),
             "border_mask_voxels": 0 if is_be_loss else int(args.border_mask_voxels),
             "prolongation": "exact crop-aligned cubic B-spline dyadic knot insertion",
+            "stage_early_stop_mode": str(args.stage_early_stop_mode),
+            "stage_min_epochs": stage_min_epochs,
+            "stage_patience": stage_patience,
+            "stage_check_interval": int(args.stage_check_interval) if str(args.stage_early_stop_mode) == "adaptive" else None,
+            "stage_window": int(args.stage_window) if str(args.stage_early_stop_mode) == "adaptive" else None,
+            "stage_total_thresholds": stage_total_thresholds if str(args.stage_early_stop_mode) == "adaptive" else None,
+            "stage_data_thresholds": stage_data_thresholds if str(args.stage_early_stop_mode) == "adaptive" else None,
+            "full_grid_materialization_policy": "final_stage_only_when_timing_mode_input_to_dvf",
+            "full_grid_materialization_trace": materialization_trace,
             "finest_loss_diagnostic": bool(args.finest_loss_diagnostic),
             "finest_loss_every": int(args.finest_loss_every) if bool(args.finest_loss_diagnostic) else None,
             "finest_loss_domain": "full_1mm_crop" if bool(args.finest_loss_diagnostic) else None,
@@ -1833,10 +1997,21 @@ def train_multistage(
         },
         "elapsed_sec": elapsed,
         "peak_mem_gb": peak,
+        "full_grid_materialization_trace": materialization_trace,
     }
 
 
 def main() -> None:
+    full_case_start = time.perf_counter()
+    timing_marks: List[Dict[str, object]] = []
+
+    def mark_timing(name: str, *, synchronize: bool = False) -> float:
+        if synchronize and torch.cuda.is_available():
+            torch.cuda.synchronize()
+        offset = float(time.perf_counter() - full_case_start)
+        timing_marks.append({"name": name, "offset_sec": offset})
+        return offset
+
     args = parse_args()
     if args.audit_loader:
         audit = c.loader_audit(args.data_root, c.parse_int_list(args.audit_cases), dataset=args.dataset)
@@ -1861,6 +2036,7 @@ def main() -> None:
 
     device = c.set_cuda_device(args.gpu)
     case = c.load_case(args.data_root, args.case_id, dataset=args.dataset)
+    case_load_complete_sec = mark_timing("case_load_complete")
     sampler = CheckpointSampler(args=args, case=case, device=device, out_dir=out_dir)
     if method == METHOD_IDIR:
         result = train_idir(args, case, device, out_dir, sampler=sampler)
@@ -2006,6 +2182,8 @@ def main() -> None:
     else:
         raise ValueError(f"Unknown method: {method}")
 
+    dvf_in_memory_ready_sec = mark_timing("dvf_in_memory_ready", synchronize=True)
+
     fixed_mask_token = "fixed_t00" if case.dataset == "4dct" else f"fixed_{case.fixed_label.lower()}"
     fixed_label_text = case.fixed_label
     moving_label_text = case.moving_label
@@ -2016,13 +2194,43 @@ def main() -> None:
         method_note = method_note.replace("T00", fixed_label_text).replace("T50", moving_label_text)
 
     sampler.save()
+    dvf_file_ready_holder: Dict[str, float] = {}
+
+    def mark_dvf_file_ready() -> None:
+        dvf_file_ready_holder["offset_sec"] = mark_timing("dvf_file_ready", synchronize=True)
+
     metrics = c.final_metrics_from_dense(
         result["dense_disp_norm_xyz"],
         case,
         out_dir,
         bool(args.save_dense_dvf),
         args.log_base,
+        dvf_file_ready_callback=mark_dvf_file_ready,
     )
+    dvf_file_ready_sec = dvf_file_ready_holder.get("offset_sec")
+    if dvf_file_ready_sec is None:
+        dvf_file_ready_sec = mark_timing("dvf_file_ready", synchronize=True)
+    timing = {
+        "timing_endpoint": "loaded input images to saved dense DVF",
+        "output_mode": "dense_dvf" if bool(args.save_dense_dvf) else "in_memory_only",
+        "script_total_sec": float(dvf_file_ready_sec),
+        "full_script_to_dvf_in_memory_sec": float(dvf_in_memory_ready_sec),
+        "loaded_images_to_dvf_in_memory_sec": float(dvf_in_memory_ready_sec - case_load_complete_sec),
+        "full_script_to_dvf_file_sec": float(dvf_file_ready_sec),
+        "loaded_images_to_dvf_file_sec": float(dvf_file_ready_sec - case_load_complete_sec),
+        "optimizer_elapsed_sec": float(result["elapsed_sec"]),
+        "post_dvf_evaluation_sec": float(max(0.0, time.perf_counter() - (full_case_start + dvf_file_ready_sec))),
+        "timing_mode": str(args.timing_mode),
+        "timing_condition": str(args.timing_condition),
+        "timing_sequence_index": args.timing_sequence_index,
+        "timing_worker_id": str(args.timing_worker_id),
+        "variant_id": str(args.variant_id),
+        "marks": timing_marks,
+        "cuda_synchronized_boundaries": ["dvf_in_memory_ready", "dvf_file_ready"],
+    }
+    timing["full_case_elapsed_sec"] = float(time.perf_counter() - full_case_start)
+    timing["post_dvf_evaluation_sec"] = float(max(0.0, timing["full_case_elapsed_sec"] - dvf_file_ready_sec))
+    timing_path = out_dir / "timing.json"
     summary: Dict[str, object] = {
         "run_name": out_dir.name,
         "status": "completed",
@@ -2049,6 +2257,15 @@ def main() -> None:
         "training": result["training"],
         "elapsed_sec": float(result["elapsed_sec"]),
         "peak_mem_gb": float(result["peak_mem_gb"]),
+        "variant_id": str(args.variant_id),
+        "timing": timing,
+        "timing_path": str(timing_path),
+        "loaded_images_to_dvf_file_sec": float(timing["loaded_images_to_dvf_file_sec"]),
+        "loaded_images_to_dvf_in_memory_sec": float(timing["loaded_images_to_dvf_in_memory_sec"]),
+        "full_script_to_dvf_file_sec": float(timing["full_script_to_dvf_file_sec"]),
+        "full_script_to_dvf_in_memory_sec": float(timing["full_script_to_dvf_in_memory_sec"]),
+        "optimizer_elapsed_sec": float(timing["optimizer_elapsed_sec"]),
+        "full_case_elapsed_sec": float(timing["full_case_elapsed_sec"]),
         "history_tail": result.get("history_tail", []),
         "global_ncc_diagnostic_tail": result.get("global_ncc_diagnostic_tail", []),
         "notes": [
@@ -2062,11 +2279,17 @@ def main() -> None:
         {
             k: v
             for k, v in result.items()
-            if k in ("stage_summaries", "prolongation_diagnostics", "analytic_bspline_regularity_fg_registration_crop")
+            if k in (
+                "stage_summaries",
+                "prolongation_diagnostics",
+                "analytic_bspline_regularity_fg_registration_crop",
+                "full_grid_materialization_trace",
+            )
         }
     )
     summary.update(metrics)
     c.write_json(summary_path, summary)
+    c.write_json(timing_path, timing)
     headline_tre = summary.get("native_crop_tre_snap_to_voxel", summary["tre_snap_to_voxel"])
     assert isinstance(headline_tre, dict)
     print(

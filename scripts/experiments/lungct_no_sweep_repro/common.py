@@ -10,7 +10,7 @@ import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch
@@ -1528,8 +1528,14 @@ def final_metrics_from_dense(
     out_dir: Path,
     save_dense_dvf: bool,
     log_base: str,
+    dvf_file_ready_callback: Optional[Callable[[], None]] = None,
 ) -> Dict[str, object]:
     disp_vox_reg_zyx = dense_norm_xyz_to_vox_zyx(dense_disp_norm_xyz)
+    if save_dense_dvf:
+        np.save(out_dir / "disp_vox_reg1mm_zyx.npy", disp_vox_reg_zyx.astype(np.float32))
+        np.save(out_dir / "disp_norm_xyz_reg1mm.npy", dense_disp_norm_xyz.detach().cpu().numpy().astype(np.float32))
+        if dvf_file_ready_callback is not None:
+            dvf_file_ready_callback()
     tre_snap = landmark_tre_from_dense_disp(
         disp_vox_reg_zyx, case.landmarks_fixed, case.landmarks_moving, sample_mode="nearest", snap_output=True
     )
@@ -1569,9 +1575,6 @@ def final_metrics_from_dense(
         spacing_zyx=case.native_spacing_zyx,
         dense_disp_units="native_crop_voxel",
     )
-    if save_dense_dvf:
-        np.save(out_dir / "disp_vox_reg1mm_zyx.npy", disp_vox_reg_zyx.astype(np.float32))
-        np.save(out_dir / "disp_norm_xyz_reg1mm.npy", dense_disp_norm_xyz.detach().cpu().numpy().astype(np.float32))
     return {
         "identity_tre": compute_tre_mm(case.landmarks_fixed, case.landmarks_moving, (1.0, 1.0, 1.0)),
         "tre_snap_to_voxel": tre_snap,

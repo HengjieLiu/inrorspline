@@ -204,3 +204,14 @@ Trilinear resizing is not the canonical prolongation because it resizes control
 values as an image-like array. Exact cubic knot insertion preserves the
 continuous B-spline field under the nested-grid assumptions, which is the
 behavior needed for a fair coarse-to-fine optimization path.
+
+## Timed final-only materialization
+
+The LungCT timing runner keeps the per-epoch expansion on the current stage
+loss grid, but does not expand an intermediate stage to the full 1-mm grid.
+The full-resolution displacement field is materialized only after the final
+stage. The runner records and validates this trace as
+`[false, ..., false, true]`. Optional global, finest-loss, prolongation, and
+checkpoint diagnostics are rejected in `input_to_dvf` timing mode so the
+reported `loaded_images_to_dvf_file_sec` measures the same endpoint for every
+case.
