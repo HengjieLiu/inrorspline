@@ -40,6 +40,63 @@ Next decision:
 
 ## Planned Priority Runs
 
+### P2x: COPD P2e-Geometry isoTV `0.055` All10 Screen
+
+- Run ID: `copd_p2e_geometry_w0p055_all10_v1`.
+- Status: completed 2026-08-31; isolated candidate screen, not a replacement
+  for the completed COPD P2e `w=0.11` reference.
+- Owner/agent: Codex.
+- Date planned: 2026-08-31.
+- Date started: 2026-08-31.
+- Date completed: 2026-08-31.
+- Server: local project GPU server; no private hostname recorded.
+- GPU model/count: GPU `0` only; all ten cases run sequentially.
+- Git commit: `8302f7b9d244` plus unrelated dirty worktree; execution-script
+  SHA-256 hashes are recorded in the experiment specification.
+- Branch: `gpu8`.
+- Docker image/container: `hengjieliu96/dl_dir:py310sitreg_v1` /
+  `py310sitreg_v1_test1`.
+- Dataset root: `${LUNGCT_PTVREG_ISO1MM}`.
+- Dataset manifest: canonical pTVReg-style 1-mm COPD cases `01-10`.
+- Split config: all COPD cases `01-10`; moving `eBHCT` to fixed `iBHCT`.
+- Standards preflight: reviewed `docs/standards/README.md`,
+  `docs/standards/fair_experiment_checklist.md`,
+  `docs/standards/lungct_protocol_tags.md`,
+  `docs/standards/lungct_tre_metric_conventions.md`, and the LungCT protocol
+  warnings.
+- Protocol tag:
+  `ptv_landmark_crop_1mm_no_lungmask+directcp_p2e_geometry_w0p055_candidate`.
+- Method/objective: direct cubic B-spline control-point optimization without an
+  INR; pTV local CC (`sigma=2.1 mm`) plus physical isoTV `0.055`,
+  `csqrt=5e-3`, and a five-voxel border domain.
+- Frozen geometry/schedule: controls `64,32,16,8,4`; image downsampling
+  `16,8,4,2,1`; stage epochs `400,400,400,400,900`; Adam `lr=1e-3`; seed `1`.
+- Command: launcher/runner/aggregator compiled; GPU-`0` was idle; dry-run
+  queued exactly ten sequential GPU-`0` jobs with the frozen settings. The
+  isolated case-01 `1,1,1,1,1` smoke completed with finite fields/TRE and the
+  recorded `0.055` weight. The full all-ten-case sequential GPU-`0` cohort
+  completed and was aggregated in the dedicated review folder.
+- Output root: `${SCRATCH_ROOT}/runs/copd_p2e_geometry_w0p055_all10_v1`.
+- Review root:
+  `experiments/2026-08-31_copd_p2e_geometry_w0p055_all10/`.
+- Primary metrics: native-crop snap-to-voxel TRE, native-crop subvoxel TRE,
+  registration-grid diagnostics, posthoc regularity, elapsed time, and peak
+  memory.
+- Known limitations: this is a new COPD regularization candidate.  It is not a
+  method-only comparison with pTVReg and will not update the frozen P2e or the
+  cross-dataset report unless explicitly selected after review.
+- Acceptance: smoke must produce finite loss/field/TRE outputs with the exact
+  requested settings; full cohort requires `10/10` completed case summaries,
+  finite metrics, expected final field grids, and a separately labelled
+  aggregate.
+- Result: all `10/10` summaries/fields passed the frozen-setting, 300-landmark,
+  finite-metric, and final-grid checks. Native snap TRE is `1.0501 +/- 0.7331`
+  mm using sample SD across case means, versus P2e `w=0.11`
+  `1.0505 +/- 0.8088` mm. Mean paired candidate-minus-P2e change is
+  `-0.0004 +/- 0.1325` mm (sample SD across cases).
+- Next decision: review the completed candidate casewise TRE before deciding
+  whether to add it to any comparison report.
+
 ### P2w: ptvreg-python COPD Fixed All10 Trial
 
 - Run ID: `ptvreg_python_copd_fixed_all10_v1`.
@@ -169,6 +226,62 @@ Next decision:
   `experiments/2026-08-15_oasis_paper_cold_warm_timing/paper_runtime_table_values.csv`.
 - Next decision: paste the refreshed compact runtime table into the camera-ready
   LaTeX source.
+
+### P2y: OASIS MR-D-BSCP cuDNN Cold/Warm Ablation
+
+- Run ID: oasis_mrdbscp_cudnn_ablation_20260901_v1.
+- Status: completed and technically accepted 2026-09-01 (`20/20` timing,
+  `20/20` Dice).
+- Owner/agent: Codex.
+- Date planned: 2026-09-01.
+- Date started: 2026-09-01.
+- Date completed: 2026-09-01.
+- Server: local project GPU server; no private hostname recorded.
+- GPU model/count: physical GPU 2 only; four configurations run sequentially.
+- Git commit: recorded in the execution manifest; worktree was already dirty.
+- Branch: gpu8.
+- Docker image/container: hengjieliu96/dl_dir:py310sitreg_v1 /
+  py310sitreg_v1_test1.
+- Dataset root: OASIS_ROOT / default container OASIS split root.
+- Dataset manifest: OASIS BrainMR seed-3 shuffled pair_test_200, ranks 0-4.
+- Split config:
+  configs/splits/oasis/pair_test_200_shuffled_seed000003.txt.
+- Standards preflight: reviewed docs/standards/README.md,
+  docs/standards/fair_experiment_checklist.md, and
+  docs/standards/oasis_brainmr_protocol.md.
+- Protocol tag:
+  oasis_seed3_first5_dvf_only_mrdbscp_cudnn_matrix_cold_warm.
+- Method: MR_A_fast_decay / direct MR-D-BSCP 8-4-2, alpha 1000, seed 1,
+  using the existing candidate schedule.
+- Timing matrix: all combinations of cuDNN benchmark and deterministic flags;
+  rank 0 cold and ranks 1-4 warm in one persistent worker per arm.
+- Command: syntax check and dry-run first; then the focused sequential GPU-2
+  controller with deep DVF-only timing; posthoc Dice evaluation starts only
+  after all timing summaries pass.
+- Output root:
+  `${SCRATCH_ROOT}/runs/oasis_mrdbscp_cudnn_ablation_20260901_v1`.
+- Review root:
+  experiments/2026-09-01_oasis_mrdbscp_cudnn_ablation/.
+- Primary metrics: loaded-images-to-saved-DVF cold/warm time and gap,
+  expansion/backward/loss-volume phase timings, setup.device time, actual
+  optimizer steps, peak memory, effective backend metadata, and posthoc Dice.
+- Result: benchmark=True/deterministic=False had cold 95.94 s, warm mean
+  10.88 s, and gap 85.06 s; benchmark=False/deterministic=False had cold
+  23.68 s, warm mean 10.25 s, and gap 13.43 s. Disabling benchmark reduced
+  the gap by 84.2%; expansion and backward explained 70.19 s of the reference
+  gap. Deterministic=True completed successfully; its gaps were 108.71 s with
+  benchmark=True and 11.86 s with benchmark=False. All four Dice means were
+  0.7838778 (SD 0.0490037).
+- Known limitations: five-case diagnostic only; cold and warm use different
+  cases; evaluation is separate from timing; no profiler is included unless
+  the clean 2x2 result leaves the benchmark attribution inconclusive.
+- Acceptance: passed 20/20 timing cases across four arms, one cold plus four
+  warm cases per arm, complete timing summaries, 20 finite dense DVFs with
+  shape and coordinate-convention checks, and 20/20 posthoc Dice evaluations.
+- Next decision: the clean batch attributes most of the observed gap to
+  benchmark-dependent first-use work in expansion/backward; no profiler is
+  required for this batch because disabling benchmark reduced the gap by more
+  than 20%. A profiler remains optional for kernel-level attribution.
 
 ### P2s: LungCT FD-BE cps4 Alpha Extension for Expanded TRE/SDlogJ Panel
 
@@ -3550,6 +3663,37 @@ Next decision:
   COPD displays CT/R231 QC masks; validation displays CT/discrete lobe masks.
   FireANTs uses the challenge sampler; P2e retains established historical
   sampling for COPD and challenge sampling for validation.
+
+### P33: LungCT MR-D-BSCP 1 mm Acceleration and Cold/Warm Timing
+
+- Run ID: `2026-09-01_lungct_mrdbscp_acceleration_best1mm`.
+- Status: completed and technically accepted 2026-09-01 (`120/120` case
+  registrations; six variants across 4DCT and COPD cohorts).
+- Owner/agent: Codex.
+- Date planned: 2026-09-01.
+- Date completed: 2026-09-01.
+- Dataset: best 1-mm 4DCT cases `01-10` and canonical 1-mm COPD cases `01-10`.
+- Protocol: DirectCP cubic B-spline controls with pTV local CC (`sigma=2.1`),
+  isoTV weight `0.055`, `csqrt=5e-3`, five-voxel border, seed `1`.
+- Variants: the six frozen Learn2Breath schedules
+  `original_corrected`, `frontloaded_fixed`, balanced/fast cumulative, and
+  balanced/fast ordinal. Ordinal variants are independently cold-started for
+  this timing campaign, as explicitly selected for direct cold/warm comparison.
+- 4DCT schedule: existing anchor controls `32,16,8,4`, downsampling
+  `8,4,2,1`, and original `[400,400,800,900]` 2500-epoch rerun. Accelerated
+  schedules use the documented 64+32-to-32 four-stage projection.
+- COPD schedule: exact five-stage L2B controls `64,32,16,8,4`, downsampling
+  `16,8,4,2,1`, and variant-specific epoch/LR/stopping schedules.
+- Timing: `loaded_images_to_dvf_file_sec` from loaded inputs to saved dense DVF;
+  each variant/dataset cohort has case 1 cold and cases 2-10 warm in one
+  persistent worker. Queue time is excluded; controls and optimizer state are
+  reset for every case.
+- Materialization: per-epoch stage-grid expansion is retained; non-final
+  full-grid expansion is disabled and the expected trace is final-stage-only.
+- Scale/result: 120 case registrations completed across GPUs `0,1,2,3`, with
+  casewise TRE, ten-case mean/sample-SD TRE, and cold/warm/all-ten timing
+  tables.
+- Execution spec: `experiments/2026-09-01_lungct_mrdbscp_acceleration_best1mm/`.
 - Preflight/compatibility record: both exact-schedule smokes completed with
   finite cohort metrics, and the immutable production manifest's 40 rows all
   passed geometry, provenance, landmark/lobe, and evaluator gates. The original
