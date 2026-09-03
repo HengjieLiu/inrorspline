@@ -1,0 +1,262 @@
+{
+  "artifact": "landmark_residual_atlas",
+  "created_by": "landmark_residual_atlas.py",
+  "datasets": [
+    "4dct",
+    "copd"
+  ],
+  "cases": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+  ],
+  "p2e_experiment_id": "2026-09-01_lungct_mrdbscp_acceleration_best1mm_v1",
+  "p2e_case_run_prefix": "2026-09-01_lungct_mrdbscp_acceleration_best1mm",
+  "p2e_method_dir": "direct_cp_32_16_8_4_ptv_lcc_isotv",
+  "p2e_variants": {
+    "4dct": "original_corrected",
+    "copd": "oasis_bal_decay_ordinal"
+  },
+  "metric": {
+    "headline_domain": "native_full_or_crop",
+    "headline_mode": "snap_to_voxel",
+    "registered_tre_ecdf_x_limit": "pooled_dataset_p99_across_pTVReg_and_P2e",
+    "applied_motion_domain": "fixed_lung_mask_on_canonical_reg1mm_grid",
+    "vector_projection": "coronal_display_x_plus_x_z_minus_z",
+    "orientation": {
+      "source_frame": "canonical pTVReg raw zyx crop",
+      "horizontal_display_sign": 1.0,
+      "vertical_display_sign": -1.0,
+      "horizontal_left": "R",
+      "horizontal_right": "L",
+      "vertical_bottom": "I",
+      "vertical_top": "S",
+      "projection": "display=[+x,-z] from local physical xyz"
+    },
+    "vector_magnitude": "full_3d_physical_mm"
+  },
+  "required_environment": {
+    "INRORSPLINE_DIRLAB_PTVREG_ISO1MM_ROOT": true,
+    "PTVREG_4DCT_ROOT": true,
+    "PTVREG_COPD_ROOT": true,
+    "MRDBSCP_P2E_ACCEL_ROOT": true
+  },
+  "source_manifest": [
+    {
+      "dataset": "4dct",
+      "case_id": 1,
+      "pTVReg_source_ref": "PTVREG_4DCT_ROOT/case01_T50_to_T00_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_4dct_original_corrected_case01",
+      "p2e_variant": "original_corrected",
+      "landmarks": 300
+    },
+    {
+      "dataset": "4dct",
+      "case_id": 2,
+      "pTVReg_source_ref": "PTVREG_4DCT_ROOT/case02_T50_to_T00_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_4dct_original_corrected_case02",
+      "p2e_variant": "original_corrected",
+      "landmarks": 300
+    },
+    {
+      "dataset": "4dct",
+      "case_id": 3,
+      "pTVReg_source_ref": "PTVREG_4DCT_ROOT/case03_T50_to_T00_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_4dct_original_corrected_case03",
+      "p2e_variant": "original_corrected",
+      "landmarks": 300
+    },
+    {
+      "dataset": "4dct",
+      "case_id": 4,
+      "pTVReg_source_ref": "PTVREG_4DCT_ROOT/case04_T50_to_T00_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_4dct_original_corrected_case04",
+      "p2e_variant": "original_corrected",
+      "landmarks": 300
+    },
+    {
+      "dataset": "4dct",
+      "case_id": 5,
+      "pTVReg_source_ref": "PTVREG_4DCT_ROOT/case05_T50_to_T00_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_4dct_original_corrected_case05",
+      "p2e_variant": "original_corrected",
+      "landmarks": 300
+    },
+    {
+      "dataset": "4dct",
+      "case_id": 6,
+      "pTVReg_source_ref": "PTVREG_4DCT_ROOT/case06_T50_to_T00_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_4dct_original_corrected_case06",
+      "p2e_variant": "original_corrected",
+      "landmarks": 300
+    },
+    {
+      "dataset": "4dct",
+      "case_id": 7,
+      "pTVReg_source_ref": "PTVREG_4DCT_ROOT/case07_T50_to_T00_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_4dct_original_corrected_case07",
+      "p2e_variant": "original_corrected",
+      "landmarks": 300
+    },
+    {
+      "dataset": "4dct",
+      "case_id": 8,
+      "pTVReg_source_ref": "PTVREG_4DCT_ROOT/case08_T50_to_T00_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_4dct_original_corrected_case08",
+      "p2e_variant": "original_corrected",
+      "landmarks": 300
+    },
+    {
+      "dataset": "4dct",
+      "case_id": 9,
+      "pTVReg_source_ref": "PTVREG_4DCT_ROOT/case09_T50_to_T00_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_4dct_original_corrected_case09",
+      "p2e_variant": "original_corrected",
+      "landmarks": 300
+    },
+    {
+      "dataset": "4dct",
+      "case_id": 10,
+      "pTVReg_source_ref": "PTVREG_4DCT_ROOT/case10_T50_to_T00_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_4dct_original_corrected_case10",
+      "p2e_variant": "original_corrected",
+      "landmarks": 300
+    },
+    {
+      "dataset": "copd",
+      "case_id": 1,
+      "pTVReg_source_ref": "PTVREG_COPD_ROOT/case01/case01_eBH_to_iBH_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_copd_oasis_bal_decay_ordinal_case01",
+      "p2e_variant": "oasis_bal_decay_ordinal",
+      "landmarks": 300
+    },
+    {
+      "dataset": "copd",
+      "case_id": 2,
+      "pTVReg_source_ref": "PTVREG_COPD_ROOT/case02/case02_eBH_to_iBH_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_copd_oasis_bal_decay_ordinal_case02",
+      "p2e_variant": "oasis_bal_decay_ordinal",
+      "landmarks": 300
+    },
+    {
+      "dataset": "copd",
+      "case_id": 3,
+      "pTVReg_source_ref": "PTVREG_COPD_ROOT/case03/case03_eBH_to_iBH_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_copd_oasis_bal_decay_ordinal_case03",
+      "p2e_variant": "oasis_bal_decay_ordinal",
+      "landmarks": 300
+    },
+    {
+      "dataset": "copd",
+      "case_id": 4,
+      "pTVReg_source_ref": "PTVREG_COPD_ROOT/case04/case04_eBH_to_iBH_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_copd_oasis_bal_decay_ordinal_case04",
+      "p2e_variant": "oasis_bal_decay_ordinal",
+      "landmarks": 300
+    },
+    {
+      "dataset": "copd",
+      "case_id": 5,
+      "pTVReg_source_ref": "PTVREG_COPD_ROOT/case05/case05_eBH_to_iBH_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_copd_oasis_bal_decay_ordinal_case05",
+      "p2e_variant": "oasis_bal_decay_ordinal",
+      "landmarks": 300
+    },
+    {
+      "dataset": "copd",
+      "case_id": 6,
+      "pTVReg_source_ref": "PTVREG_COPD_ROOT/case06/case06_eBH_to_iBH_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_copd_oasis_bal_decay_ordinal_case06",
+      "p2e_variant": "oasis_bal_decay_ordinal",
+      "landmarks": 300
+    },
+    {
+      "dataset": "copd",
+      "case_id": 7,
+      "pTVReg_source_ref": "PTVREG_COPD_ROOT/case07/case07_eBH_to_iBH_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_copd_oasis_bal_decay_ordinal_case07",
+      "p2e_variant": "oasis_bal_decay_ordinal",
+      "landmarks": 300
+    },
+    {
+      "dataset": "copd",
+      "case_id": 8,
+      "pTVReg_source_ref": "PTVREG_COPD_ROOT/case08/case08_eBH_to_iBH_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_copd_oasis_bal_decay_ordinal_case08",
+      "p2e_variant": "oasis_bal_decay_ordinal",
+      "landmarks": 300
+    },
+    {
+      "dataset": "copd",
+      "case_id": 9,
+      "pTVReg_source_ref": "PTVREG_COPD_ROOT/case09/case09_eBH_to_iBH_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_copd_oasis_bal_decay_ordinal_case09",
+      "p2e_variant": "oasis_bal_decay_ordinal",
+      "landmarks": 300
+    },
+    {
+      "dataset": "copd",
+      "case_id": 10,
+      "pTVReg_source_ref": "PTVREG_COPD_ROOT/case10/case10_eBH_to_iBH_deformation.mat",
+      "P2e_source_ref": "MRDBSCP_P2E_ACCEL_ROOT/2026-09-01_lungct_mrdbscp_acceleration_best1mm_copd_oasis_bal_decay_ordinal_case10",
+      "p2e_variant": "oasis_bal_decay_ordinal",
+      "landmarks": 300
+    }
+  ],
+  "atlas_info": [
+    {
+      "dataset": "4dct",
+      "rows": 10,
+      "columns": 6,
+      "vector_panel_count": 30,
+      "colorbar_count": 30,
+      "orientation": {
+        "source_frame": "canonical pTVReg raw zyx crop",
+        "horizontal_display_sign": 1.0,
+        "vertical_display_sign": -1.0,
+        "horizontal_left": "R",
+        "horizontal_right": "L",
+        "vertical_bottom": "I",
+        "vertical_top": "S",
+        "projection": "display=[+x,-z] from local physical xyz"
+      },
+      "initial_color_limit_mm": 30.63620244090315,
+      "residual_color_limit_mm": 15.95900999435742,
+      "registered_p99_limit_mm": 3.398060822161702,
+      "full_tre_x_limit_mm": 31.555288514130247,
+      "applied_motion_x_limit_mm": 33.850869216918944,
+      "output_path": "4dct_ptvreg_vs_mrdbscp_p2e_landmark_atlas.png"
+    },
+    {
+      "dataset": "copd",
+      "rows": 10,
+      "columns": 6,
+      "vector_panel_count": 30,
+      "colorbar_count": 30,
+      "orientation": {
+        "source_frame": "canonical pTVReg raw zyx crop",
+        "horizontal_display_sign": 1.0,
+        "vertical_display_sign": -1.0,
+        "horizontal_left": "R",
+        "horizontal_right": "L",
+        "vertical_bottom": "I",
+        "vertical_top": "S",
+        "projection": "display=[+x,-z] from local physical xyz"
+      },
+      "initial_color_limit_mm": 66.49971578886634,
+      "residual_color_limit_mm": 32.84002512179307,
+      "registered_p99_limit_mm": 8.786580814668795,
+      "full_tre_x_limit_mm": 68.49470726253233,
+      "applied_motion_x_limit_mm": 77.52648559570312,
+      "output_path": "copd_ptvreg_vs_mrdbscp_p2e_landmark_atlas.png"
+    }
+  ],
+  "summary_csv": "casewise_landmark_atlas_summary.csv"
+}
