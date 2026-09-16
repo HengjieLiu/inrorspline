@@ -63,7 +63,9 @@ The Git worktree will remain source-only. It may contain code, configuration,
 documentation, hand-authored execution specifications/logs, and output-free
 notebook sources. Generated figures, PDFs, result tables, reports, monitor
 files, checkpoints, dense fields, and executed notebooks belong only in the
-external artifact store.
+external artifact store. The sole exception is the two canonical submitted-paper
+PDFs under `docs/offgrid_submission/submitted_files/`; they are intentionally
+tracked archival records and are not targets for migration cleanup.
 
 Historical registry rows deliberately keep the paths they recorded at execution
 time. They should not be mass-rewritten; a symbolic migration manifest is the

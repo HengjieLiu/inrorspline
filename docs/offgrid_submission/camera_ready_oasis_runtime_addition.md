@@ -1,10 +1,10 @@
 # Camera-Ready OASIS Runtime Addition
 
 This note records the compact runtime text and table intended for the MICCAI
-camera-ready paper. The editable LaTeX source corresponding to
-`MICCAI_2026_Off_grid_CameraReady_v01.pdf` was not present under
-`docs/offgrid_submission/`, so the actual paper-ready LaTeX insert is provided
-in `camera_ready_oasis_runtime_addition.tex`.
+camera-ready paper. The canonical camera-ready archival PDF is retained at
+`submitted_files/camera_ready_off-grid_30.pdf`. Its editable paper source is
+not retained here, so the actual paper-ready LaTeX insert is provided in
+`camera_ready_oasis_runtime_addition.tex`.
 
 ## Insertion Point
 

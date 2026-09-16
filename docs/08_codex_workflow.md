@@ -22,6 +22,11 @@ status: active
 - Keep source notebooks output-free in Git. Execute review copies and write
   figures, tables, reports, monitors, and embedded notebook output beneath
   `${ARTIFACT_ROOT}/repo_experiments/<experiment-key>/`.
+- The two canonical submission PDFs in
+  `docs/offgrid_submission/submitted_files/` are the sole archival exception
+  to the external-only PDF rule. Follow their README for exact roles,
+  checksums, and replacement rules; never include that directory in an
+  anonymous-release bundle.
 - Before a source-only audit or commit, run
   `python -B scripts/experiments/check_tracked_notebook_outputs.py`; it must
   report no Git-tracked notebook cell outputs.

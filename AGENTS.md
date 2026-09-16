@@ -49,7 +49,7 @@ PROJECT_OBJECT = {
   raw_data_mode: "read-only by default",
   rsync_policy: "explain impact first, dry-run first, real sync only after approval",
   docker_policy: "normal requested operation; no rsync-style impact explanation required",
-  artifact_policy: "source-only Git worktree; generated artifacts and executed notebooks are external-only",
+  artifact_policy: "source-only Git worktree; generated artifacts and executed notebooks are external-only except the two canonical Off-Grid submission PDFs explicitly named below",
   public_review_policy: "anonymous-safe code and docs from day one"
 }
 ```
@@ -328,6 +328,26 @@ when they are small. Keep the narrow `.gitignore` policy so accidental
 repo-local artifacts remain visible for review rather than being silently
 hidden.
 
+### Canonical Submission-PDF Exception
+
+The only exception to the generated-PDF externalization rule is the pair of
+canonical Off-Grid paper records in
+docs/offgrid_submission/submitted_files/:
+
+- submit_30_The_Right_Prior_for_the_Rig.pdf is the initial anonymized
+  submission.
+- camera_ready_off-grid_30.pdf is the camera-ready submission and contains
+  identifying author information.
+
+These exact paths are intentionally Git-tracked archival records, not
+experiment or review outputs. Do not move them to ARTIFACT_ROOT or remove
+them during source-only cleanup. Do not overwrite, rename, replace, or add a
+submission PDF without explicit user approval. An approved replacement must
+update the checksum and replacement record in
+docs/offgrid_submission/submitted_files/README.md and be committed as a
+reviewable archival change. Exclude the entire submitted_files directory from
+anonymous-release bundles; its camera-ready record is not anonymous-safe.
+
 Expected container layout:
 
 ```text
@@ -448,7 +468,9 @@ Before launching a real run:
 
 Do not commit raw data, checkpoints, generated outputs (including figures,
 tables, reports, or notebook outputs), Docker image archives, private hostnames,
-credentials, or identity-breaking metadata.
+credentials, or identity-breaking metadata. The sole exception is the exact
+camera-ready archival PDF named in the Canonical Submission-PDF Exception; it
+must remain excluded from anonymous-release bundles.
 
 ## LungCT Interpretation Rule
 

@@ -65,7 +65,7 @@ Experiment/documentation records:
 - `docs/implementation/idir_sinr_architecture_training.md`
 - `docs/implementation/directcp_bspline_optimization.md`
 - `docs/reports/protocol_warnings/`
-- `docs/offgrid_submission/30_The_Right_Prior_for_the_Rig.pdf`
+- `docs/offgrid_submission/submitted_files/submit_30_The_Right_Prior_for_the_Rig.pdf`
 - `docs/offgrid_submission/review.md`
 
 ## Definitions Used in This Audit

@@ -7,6 +7,9 @@ Status: scaffold.
 - Repo scaffold created with public-safe placeholders where possible.
 - Carried-forward reports may contain private absolute paths from the previous workspace and need review before public release.
 - `private/`, raw data, generated outputs, checkpoints, and Docker image archives are ignored.
+- `docs/offgrid_submission/submitted_files/` is intentionally tracked as a
+  canonical submission archive but must be excluded from anonymous-release
+  bundles because its camera-ready PDF identifies authors.
 
 ## TODO
 

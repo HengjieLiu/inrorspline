@@ -15,4 +15,6 @@ Status: scaffold.
 - Generated outputs and checkpoints.
 - Docker image archives.
 - Private server maps and credentials.
+- `docs/offgrid_submission/submitted_files/`: canonical submission archive;
+  excluded as a whole because the camera-ready PDF is identity-bearing.
 - Python package/test scaffold, not created yet.

@@ -19,7 +19,11 @@ The working thesis is that continuous/off-grid deformation evaluation is not eno
 Code, docs, configs, tests, hand-authored experiment specifications, and
 output-free notebook sources live in Git. Generated experiment and review
 artifacts do not: figures, PDFs, result tables, reports, monitors, checkpoints,
-dense fields, and executed notebooks belong in the external artifact store.
+dense fields, and executed notebooks belong in the external artifact store. The
+only exception is the two canonical archival paper records in
+[docs/offgrid_submission/submitted_files/](docs/offgrid_submission/submitted_files/);
+they remain tracked by design. The camera-ready record is identity-bearing and
+must not be included in an anonymous-release bundle.
 
 Default path model:
 

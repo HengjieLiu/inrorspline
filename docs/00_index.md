@@ -29,6 +29,8 @@ authorized during that retention period.
 - `docs/standards/`: experiment preflight standards for fair comparisons.
 - `docs/todos/camera_ready_checklist.md`: blocking experiment, figure, and
   manuscript checks for the camera-ready version.
+- `docs/offgrid_submission/submitted_files/README.md`: canonical initial and
+  camera-ready paper records, retention/replacement policy, and checksums.
 - `docs/reports/current_results_audit_and_plan.md`: detailed carried-forward audit.
 - `docs/reports/reorganized_paper_points.md`: paper narrative plan.
 - `docs/reports/protocol_warnings/`: warnings that must be read before LungCT comparison.

@@ -82,6 +82,25 @@ Rationale:
 - The final styling keeps pTVReg-loss methods marked with a dagger and defines
   `† pTVReg loss` as a bottom legend entry.
 
+## 2026-09-16: Retain Canonical Off-Grid Submission PDFs In Git
+
+Decision:
+
+- Retain exactly two submitted-paper records under
+  `docs/offgrid_submission/submitted_files/`: the initial anonymized submission
+  and the named camera-ready submission.
+- Treat them as a narrow archival override to the external-only generated-PDF
+  policy, with checksums and replacement rules maintained next to the files.
+- Exclude the entire archive directory from anonymous-review and
+  anonymous-release bundles because the camera-ready record identifies authors.
+
+Rationale:
+
+- The two PDFs are canonical historical submission records, not reproducible
+  experiment output or a manuscript-build destination.
+- Tracking their exact bytes and documented roles preserves paper provenance
+  while keeping ordinary generated PDFs in ARTIFACT_ROOT.
+
 ## Pending Decisions
 
 - Final public dataset handles that avoid private host paths.

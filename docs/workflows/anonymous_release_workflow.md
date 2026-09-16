@@ -34,4 +34,13 @@ Build review-safe code and docs continuously, not only at submission time.
 - credentials
 - raw data and generated outputs
 
+## Canonical Submission Archive
+
+The exact two PDFs in `docs/offgrid_submission/submitted_files/` are
+intentionally tracked archival records, not general generated-artifact
+exceptions. The camera-ready PDF contains author-identifying information.
+Exclude this entire directory from every anonymous-review or anonymous-release
+payload, even though the initial-submission PDF itself is anonymized. See its
+README before approving any replacement.
+
 Update `public/ANONYMITY_AUDIT.md` and `public/release_manifest.md` before sharing.
