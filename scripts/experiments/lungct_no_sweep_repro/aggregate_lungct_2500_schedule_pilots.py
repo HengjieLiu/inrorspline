@@ -11,14 +11,21 @@ from typing import Dict, Iterable, List, Sequence
 
 import aggregate_report as base
 import common as c
+import sys
+
+EXPERIMENTS_DIR = c.REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths
 from launch_lungct_2500_schedule_pilots import (
     DEFAULT_ALPHA,
-    DEFAULT_MASKED_RUN_ROOT,
-    DEFAULT_PTV_RUN_ROOT,
     DEFAULT_PTV_WEIGHT,
     DEFAULT_STAGE_EPOCHS,
+    MASKED_RUN_KEY,
     PILOT_MASKED,
     PILOT_PTV,
+    PTV_RUN_KEY,
     parse_pilots,
 )
 from run_one import METHOD_DIRECT_CP_32_MASKED_NCC_BSPLINE_BE, METHOD_DIRECT_CP_32_PTV
@@ -39,14 +46,12 @@ METRIC_KEYS = [
     "peak_mem_gb",
 ]
 
-DEFAULT_PTV_REVIEW_ROOT = (
-    c.REPO_ROOT / "experiments/2026-08-12_lungct_directcp32_ptvlcc_w0p11_schedule_standardization"
-)
-DEFAULT_MASKED_REVIEW_ROOT = (
-    c.REPO_ROOT
-    / "experiments/2026-08-12_lungct_directcp4stage_masked_ncc_bspline_be_alpha33333_e400_400_800_900_all10"
-)
-DEFAULT_DECISION_ROOT = c.REPO_ROOT / "experiments/2026-08-12_lungct_2500_schedule_standardization_pilot"
+PTV_REVIEW_EXPERIMENT_KEY = "2026-08-12_lungct_directcp32_ptvlcc_w0p11_schedule_standardization"
+MASKED_REVIEW_EXPERIMENT_KEY = "2026-08-12_lungct_directcp4stage_masked_ncc_bspline_be_alpha33333_e400_400_800_900_all10"
+DECISION_REVIEW_EXPERIMENT_KEY = "2026-08-12_lungct_2500_schedule_standardization_pilot"
+DEFAULT_PTV_REVIEW_ROOT = None
+DEFAULT_MASKED_REVIEW_ROOT = None
+DEFAULT_DECISION_ROOT = None
 DEFAULT_PTV_BASELINE = c.REPO_ROOT / "experiments/2026-06-25_lungct_ptvprep_no_sweep_repro/summary_runs.csv"
 DEFAULT_MASKED_BASELINE = (
     c.REPO_ROOT / "experiments/2026-08-12_lungct_directcp4stage_masked_ncc_bspline_be_alpha_sweep/mean_rows.csv"
@@ -55,11 +60,11 @@ DEFAULT_MASKED_BASELINE = (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ptv-run-root", type=Path, default=DEFAULT_PTV_RUN_ROOT)
-    parser.add_argument("--masked-run-root", type=Path, default=DEFAULT_MASKED_RUN_ROOT)
-    parser.add_argument("--ptv-review-root", type=Path, default=DEFAULT_PTV_REVIEW_ROOT)
-    parser.add_argument("--masked-review-root", type=Path, default=DEFAULT_MASKED_REVIEW_ROOT)
-    parser.add_argument("--decision-root", type=Path, default=DEFAULT_DECISION_ROOT)
+    parser.add_argument("--ptv-run-root", type=Path, default=None)
+    parser.add_argument("--masked-run-root", type=Path, default=None)
+    parser.add_argument("--ptv-review-root", type=Path, default=None)
+    parser.add_argument("--masked-review-root", type=Path, default=None)
+    parser.add_argument("--decision-root", type=Path, default=None)
     parser.add_argument("--ptv-baseline", type=Path, default=DEFAULT_PTV_BASELINE)
     parser.add_argument("--masked-baseline", type=Path, default=DEFAULT_MASKED_BASELINE)
     parser.add_argument("--stage-epochs", type=str, default=DEFAULT_STAGE_EPOCHS)
@@ -67,6 +72,27 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--alpha", type=float, default=DEFAULT_ALPHA)
     parser.add_argument("--pilots", type=str, default=f"{PILOT_PTV},{PILOT_MASKED}")
     return parser.parse_args()
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Resolve run inputs and all generated reviews under the artifact store."""
+
+    args.ptv_run_root = artifact_paths.resolve_run_root(
+        PTV_RUN_KEY, args.ptv_run_root, repo_root=c.REPO_ROOT
+    )
+    args.masked_run_root = artifact_paths.resolve_run_root(
+        MASKED_RUN_KEY, args.masked_run_root, repo_root=c.REPO_ROOT
+    )
+    args.ptv_review_root = artifact_paths.resolve_review_root(
+        PTV_REVIEW_EXPERIMENT_KEY, args.ptv_review_root, repo_root=c.REPO_ROOT
+    )
+    args.masked_review_root = artifact_paths.resolve_review_root(
+        MASKED_REVIEW_EXPERIMENT_KEY, args.masked_review_root, repo_root=c.REPO_ROOT
+    )
+    args.decision_root = artifact_paths.resolve_review_root(
+        DECISION_REVIEW_EXPERIMENT_KEY, args.decision_root, repo_root=c.REPO_ROOT
+    )
+    return args
 
 
 def fmt(value: object, digits: int = 3) -> str:
@@ -375,7 +401,7 @@ def write_decision_report(
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     pilots = parse_pilots(args.pilots)
     expected_stage_epochs = as_stage_epochs(args.stage_epochs)
     if expected_stage_epochs != EXPECTED_STAGE_EPOCHS:

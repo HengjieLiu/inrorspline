@@ -12,12 +12,17 @@ import time
 from pathlib import Path
 from typing import Dict, List
 
+THIS_DIR = Path(__file__).resolve().parent
+EXPERIMENTS_DIR = THIS_DIR.parent
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths
 import run_copd_case as runner
 
 
-DEFAULT_REVIEW_ROOT = runner.REPO_ROOT / "experiments" / "2026-08-28_ptvreg_python_copd_fixed_all10"
-DEFAULT_LOG_ROOT = runner.REPO_ROOT / "logs" / "ptvreg_python_copd_fixed_all10_v1"
-RUNNER = Path(__file__).resolve().parent / "run_copd_case.py"
+EXPERIMENT_KEY = "2026-08-28_ptvreg_python_copd_fixed_all10"
+RUNNER = THIS_DIR / "run_copd_case.py"
 
 
 def parse_args() -> argparse.Namespace:
@@ -29,9 +34,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--raw-data-root", type=Path, default=None)
     parser.add_argument("--paper-hu-root", type=Path, default=None)
     parser.add_argument("--mask-root", type=Path, default=None)
-    parser.add_argument("--out-root", type=Path, default=runner.DEFAULT_RUN_ROOT)
-    parser.add_argument("--review-root", type=Path, default=DEFAULT_REVIEW_ROOT)
-    parser.add_argument("--log-root", type=Path, default=DEFAULT_LOG_ROOT)
+    parser.add_argument("--out-root", type=Path, default=None)
+    parser.add_argument("--review-root", type=Path, default=None)
+    parser.add_argument("--log-root", type=Path, default=None)
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--smoke", action="store_true")
@@ -45,6 +50,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dtype", choices=("float64", "float32"), default="float64")
     parser.add_argument("--verbose", action="store_true")
     return parser.parse_args()
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    args.out_root = runner.resolve_run_root(args.out_root)
+    args.paper_hu_root = runner.resolve_paper_hu_root(str(args.protocol), args.paper_hu_root)
+    args.review_root = artifact_paths.resolve_review_root(
+        EXPERIMENT_KEY,
+        args.review_root,
+        repo_root=runner.REPO_ROOT,
+    )
+    if args.log_root is None:
+        args.log_root = args.review_root / "logs"
+    else:
+        args.log_root = artifact_paths.resolve_managed_path(
+            args.log_root,
+            allowed_root=args.review_root,
+            label="--log-root",
+        )
+    return args
 
 
 def is_completed(path: Path) -> bool:
@@ -206,7 +230,7 @@ def maybe_smoke_defaults(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     maybe_smoke_defaults(args)
     gpus = [str(v) for v in runner.c.parse_int_list(args.gpus)]
     if not gpus:

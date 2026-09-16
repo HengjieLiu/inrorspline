@@ -15,8 +15,10 @@ if str(THIS_DIR) not in sys.path:
 import aggregate_fdbe_cps4_alpha_extension_all10 as base  # noqa: E402
 
 
-DEFAULT_RUN_ROOT = Path("/database/inrorspline/runs/lungct_fdbe_cps4_alpha_landscape_all10_v1")
-DEFAULT_REVIEW_DIR = base.REPO_ROOT / "experiments/2026-08-14_lungct_fdbe_cps4_alpha_landscape_all10"
+RUN_KEY = "lungct_fdbe_cps4_alpha_landscape_all10_v1"
+EXPERIMENT_KEY = "2026-08-14_lungct_fdbe_cps4_alpha_landscape_all10"
+DEFAULT_RUN_ROOT = None
+DEFAULT_REVIEW_DIR = None
 LANDSCAPE_ALPHAS = (10000.0, 20000.0, 50000.0, 200000.0, 500000.0)
 
 
@@ -88,12 +90,25 @@ def write_report(path: Path, manifest: dict[str, Any], mean_rows: Sequence[dict[
     path.write_text("\n".join(lines) + "\n")
 
 
+def resolve_artifact_paths(args: Any) -> Any:
+    """Use landscape-specific keys when reusing the shared aggregator."""
+
+    args.run_root = base.artifact_paths.resolve_run_root(
+        RUN_KEY, args.run_root, repo_root=base.REPO_ROOT
+    )
+    args.review_dir = base.artifact_paths.resolve_review_root(
+        EXPERIMENT_KEY, args.review_dir, repo_root=base.REPO_ROOT
+    )
+    return args
+
+
 _ORIGINAL_AGGREGATE_MEAN_ROWS = base.aggregate_mean_rows
 base.DEFAULT_RUN_ROOT = DEFAULT_RUN_ROOT
 base.DEFAULT_REVIEW_DIR = DEFAULT_REVIEW_DIR
 base.LANES = make_lanes()
 base.aggregate_mean_rows = aggregate_mean_rows
 base.write_report = write_report
+base.resolve_artifact_paths = resolve_artifact_paths
 
 
 if __name__ == "__main__":

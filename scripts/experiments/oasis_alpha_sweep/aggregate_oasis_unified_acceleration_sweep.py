@@ -21,18 +21,17 @@ if str(THIS_DIR) not in sys.path:
 import common as c  # noqa: E402
 from launch_first10_be_2500e import parse_case_ranks  # noqa: E402
 from launch_oasis_unified_acceleration_sweep import (  # noqa: E402
-    DEFAULT_OUT_ROOT,
-    DEFAULT_REVIEW_ROOT,
     VARIANT,
     candidate_map,
     phase_candidates,
+    resolve_artifact_paths,
 )
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--out-root", type=Path, default=DEFAULT_OUT_ROOT)
-    parser.add_argument("--review-root", type=Path, default=DEFAULT_REVIEW_ROOT)
+    parser.add_argument("--out-root", type=Path, default=None)
+    parser.add_argument("--review-root", type=Path, default=None)
     parser.add_argument("--phase", choices=["primary", "cps4", "all", "smoke"], default="primary")
     parser.add_argument("--case-ranks", type=str, default="0-9")
     parser.add_argument("--candidates", type=str, default="phase")
@@ -337,7 +336,7 @@ def write_report(args: argparse.Namespace, rows: Sequence[Mapping[str, object]],
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     names = selected_candidate_names(args)
     unknown = [name for name in names if name not in candidate_map()]
     if unknown:

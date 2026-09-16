@@ -12,22 +12,30 @@ from typing import Dict, Iterable, List, Sequence, Tuple
 
 import aggregate_report as base
 import common as c
+import sys
+
+EXPERIMENTS_DIR = c.REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths
 from launch_lungct_fig2_mrdbscp_2500_schedule_refresh import (
     DEFAULT_ALPHAS,
-    DEFAULT_IDIR_OUT_ROOT,
     DEFAULT_PTV_ANCHOR_ROOT,
-    DEFAULT_PTV_OUT_ROOT,
     DEFAULT_PTV_WEIGHTS,
     DEFAULT_STAGE_EPOCHS,
     FAMILY_IDIR_FDBE,
     FAMILY_PTV,
+    IDIR_RUN_KEY,
+    PTV_RUN_KEY,
 )
 from run_one import METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE, METHOD_DIRECT_CP_32_PTV
 
 
 EXPECTED_CASES = list(range(1, 11))
 EXPECTED_STAGE_EPOCHS = [400, 400, 800, 900]
-DEFAULT_REVIEW_ROOT = c.REPO_ROOT / "experiments/2026-08-13_lungct_fig2_mrdbscp_2500_schedule_refresh"
+REVIEW_EXPERIMENT_KEY = "2026-08-13_lungct_fig2_mrdbscp_2500_schedule_refresh"
+DEFAULT_REVIEW_ROOT = None
 DEFAULT_OLD_MIDRATIO_MEAN = (
     c.REPO_ROOT
     / "experiments/2026-06-26_lungct_directcp4stage_midratio_pareto_extension/"
@@ -61,10 +69,10 @@ METRIC_KEYS = [
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--idir-run-root", type=Path, default=DEFAULT_IDIR_OUT_ROOT)
-    parser.add_argument("--ptv-run-root", type=Path, default=DEFAULT_PTV_OUT_ROOT)
+    parser.add_argument("--idir-run-root", type=Path, default=None)
+    parser.add_argument("--ptv-run-root", type=Path, default=None)
     parser.add_argument("--ptv-anchor-root", type=Path, default=DEFAULT_PTV_ANCHOR_ROOT)
-    parser.add_argument("--review-root", type=Path, default=DEFAULT_REVIEW_ROOT)
+    parser.add_argument("--review-root", type=Path, default=None)
     parser.add_argument("--old-midratio-mean", type=Path, default=DEFAULT_OLD_MIDRATIO_MEAN)
     parser.add_argument("--old-midratio-case", type=Path, default=DEFAULT_OLD_MIDRATIO_CASE)
     parser.add_argument("--old-ptv-refined-mean", type=Path, default=DEFAULT_OLD_PTV_REFINED_MEAN)
@@ -73,6 +81,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ptv-weights", type=str, default=DEFAULT_PTV_WEIGHTS)
     parser.add_argument("--stage-epochs", type=str, default=DEFAULT_STAGE_EPOCHS)
     return parser.parse_args()
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Keep generated summaries and review tables outside the worktree."""
+
+    args.idir_run_root = artifact_paths.resolve_run_root(
+        IDIR_RUN_KEY, args.idir_run_root, repo_root=c.REPO_ROOT
+    )
+    args.ptv_run_root = artifact_paths.resolve_run_root(
+        PTV_RUN_KEY, args.ptv_run_root, repo_root=c.REPO_ROOT
+    )
+    args.review_root = artifact_paths.resolve_review_root(
+        REVIEW_EXPERIMENT_KEY, args.review_root, repo_root=c.REPO_ROOT
+    )
+    return args
 
 
 def parse_float_list(value: str) -> List[float]:
@@ -432,7 +455,7 @@ def write_report(review_root: Path, mean_rows: Sequence[Dict[str, object]], comp
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     expected_stage_epochs = parse_stage_epochs(args.stage_epochs)
     if expected_stage_epochs != EXPECTED_STAGE_EPOCHS:
         raise ValueError(f"This refresh expects {EXPECTED_STAGE_EPOCHS}, got {expected_stage_epochs}")

@@ -13,6 +13,12 @@ from pathlib import Path
 from typing import Dict, List
 
 import common as c
+
+EXPERIMENTS_DIR = c.REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths
 from run_one import (
     METHOD_DIRECT_CP_32_MASKED_NCC_BSPLINE_BE,
     METHOD_DIRECT_CP_32_PTV,
@@ -33,11 +39,12 @@ DEFAULT_STAGE_EPOCHS = "400,400,800,900"
 DEFAULT_ALPHA = 33333.333333333336
 DEFAULT_PTV_WEIGHT = 0.11
 
-DEFAULT_PTV_RUN_ROOT = Path("/database/inrorspline/runs/lungct_directcp32_ptvlcc_w0p11_e400_400_800_900_all10_v1")
-DEFAULT_MASKED_RUN_ROOT = Path(
-    "/database/inrorspline/runs/lungct_directcp4stage_masked_ncc_bspline_be_alpha33333_e400_400_800_900_all10_v1"
-)
-DEFAULT_LOG_ROOT = c.REPO_ROOT / "logs/lungct_2500_schedule_standardization_pilot_v1"
+PTV_RUN_KEY = "lungct_directcp32_ptvlcc_w0p11_e400_400_800_900_all10_v1"
+MASKED_RUN_KEY = "lungct_directcp4stage_masked_ncc_bspline_be_alpha33333_e400_400_800_900_all10_v1"
+LOG_EXPERIMENT_KEY = "2026-08-12_lungct_2500_schedule_standardization_pilot/logs"
+DEFAULT_PTV_RUN_ROOT = None
+DEFAULT_MASKED_RUN_ROOT = None
+DEFAULT_LOG_ROOT = None
 
 
 def parse_args() -> argparse.Namespace:
@@ -46,9 +53,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cases", type=str, default=DEFAULT_CASES)
     parser.add_argument("--gpus", type=str, default="0,1,2,3")
     parser.add_argument("--data-root", type=Path, default=c.DEFAULT_PTVPREP_ROOT)
-    parser.add_argument("--ptv-out-root", type=Path, default=DEFAULT_PTV_RUN_ROOT)
-    parser.add_argument("--masked-out-root", type=Path, default=DEFAULT_MASKED_RUN_ROOT)
-    parser.add_argument("--log-root", type=Path, default=DEFAULT_LOG_ROOT)
+    parser.add_argument("--ptv-out-root", type=Path, default=None)
+    parser.add_argument("--masked-out-root", type=Path, default=None)
+    parser.add_argument("--log-root", type=Path, default=None)
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--lr", type=float, default=None)
     parser.add_argument("--ptv-isotv-weight", type=float, default=DEFAULT_PTV_WEIGHT)
@@ -60,6 +67,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Resolve generated run state and logs beneath ``ARTIFACT_ROOT``."""
+
+    args.ptv_out_root = artifact_paths.resolve_run_root(
+        PTV_RUN_KEY, args.ptv_out_root, repo_root=c.REPO_ROOT
+    )
+    args.masked_out_root = artifact_paths.resolve_run_root(
+        MASKED_RUN_KEY, args.masked_out_root, repo_root=c.REPO_ROOT
+    )
+    args.log_root = artifact_paths.resolve_review_root(
+        LOG_EXPERIMENT_KEY, args.log_root, repo_root=c.REPO_ROOT
+    )
+    return args
 
 
 def parse_pilots(value: str) -> List[str]:
@@ -167,7 +189,7 @@ def build_job(args: argparse.Namespace, pilot: str, case_id: int) -> Dict[str, o
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     pilots = parse_pilots(args.pilots)
     cases = c.parse_int_list(args.cases)
     gpus = [str(v) for v in c.parse_int_list(args.gpus)]

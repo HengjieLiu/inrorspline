@@ -26,8 +26,8 @@ DEFAULT_ACCURACY_TABLE = (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--out-root", type=Path, default=runner.DEFAULT_OUT_ROOT)
-    parser.add_argument("--review-root", type=Path, default=runner.DEFAULT_REVIEW_ROOT)
+    parser.add_argument("--out-root", type=Path, default=None)
+    parser.add_argument("--review-root", type=Path, default=None)
     parser.add_argument("--variant", type=str, default=runner.VARIANT)
     parser.add_argument("--accuracy-table", type=Path, default=DEFAULT_ACCURACY_TABLE)
     parser.add_argument("--allow-incomplete", action="store_true")
@@ -478,7 +478,7 @@ def build_report(
 
 
 def main() -> None:
-    args = parse_args()
+    args = runner.resolve_artifact_paths(parse_args())
     Path(args.review_root).mkdir(parents=True, exist_ok=True)
     rows = read_progress_rows(Path(args.review_root))
     case_rows, failures = validated_case_rows(rows)

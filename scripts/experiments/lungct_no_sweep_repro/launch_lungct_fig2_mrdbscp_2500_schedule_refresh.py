@@ -13,6 +13,12 @@ from pathlib import Path
 from typing import Dict, List
 
 import common as c
+
+EXPERIMENTS_DIR = c.REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths
 from run_one import (
     METHOD_DIRECT_CP_32_GLOBAL_NCC_FD_BE,
     METHOD_DIRECT_CP_32_PTV,
@@ -32,10 +38,13 @@ DEFAULT_PTV_WEIGHTS = "0.011,0.033,0.055,0.11,0.33"
 DEFAULT_STAGE_FULL_CPS = "32,16,8,4"
 DEFAULT_STAGE_DOWNSAMPLE = "8,4,2,1"
 DEFAULT_STAGE_EPOCHS = "400,400,800,900"
-DEFAULT_IDIR_OUT_ROOT = Path("/database/inrorspline/runs/lungct_fig2_mrdbscp_idirloss_fdbe_e400_400_800_900_v1")
-DEFAULT_PTV_OUT_ROOT = Path("/database/inrorspline/runs/lungct_fig2_mrdbscp_ptvloss_e400_400_800_900_v1")
+IDIR_RUN_KEY = "lungct_fig2_mrdbscp_idirloss_fdbe_e400_400_800_900_v1"
+PTV_RUN_KEY = "lungct_fig2_mrdbscp_ptvloss_e400_400_800_900_v1"
+LOG_EXPERIMENT_KEY = "2026-08-13_lungct_fig2_mrdbscp_2500_schedule_refresh/logs"
+DEFAULT_IDIR_OUT_ROOT = None
+DEFAULT_PTV_OUT_ROOT = None
 DEFAULT_PTV_ANCHOR_ROOT = Path("/database/inrorspline/runs/lungct_directcp32_ptvlcc_w0p11_e400_400_800_900_all10_v1")
-DEFAULT_LOG_ROOT = c.REPO_ROOT / "logs/lungct_fig2_mrdbscp_2500_schedule_refresh_v1"
+DEFAULT_LOG_ROOT = None
 
 
 def parse_args() -> argparse.Namespace:
@@ -46,10 +55,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ptv-weights", type=str, default=DEFAULT_PTV_WEIGHTS)
     parser.add_argument("--gpus", type=str, default="0,1,2,3")
     parser.add_argument("--data-root", type=Path, default=c.DEFAULT_PTVPREP_ROOT)
-    parser.add_argument("--idir-out-root", type=Path, default=DEFAULT_IDIR_OUT_ROOT)
-    parser.add_argument("--ptv-out-root", type=Path, default=DEFAULT_PTV_OUT_ROOT)
+    parser.add_argument("--idir-out-root", type=Path, default=None)
+    parser.add_argument("--ptv-out-root", type=Path, default=None)
     parser.add_argument("--ptv-anchor-root", type=Path, default=DEFAULT_PTV_ANCHOR_ROOT)
-    parser.add_argument("--log-root", type=Path, default=DEFAULT_LOG_ROOT)
+    parser.add_argument("--log-root", type=Path, default=None)
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--lr", type=float, default=None)
     parser.add_argument("--stage-full-cps", type=str, default=DEFAULT_STAGE_FULL_CPS)
@@ -59,6 +68,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Resolve all generated outputs under the external artifact store."""
+
+    args.idir_out_root = artifact_paths.resolve_run_root(
+        IDIR_RUN_KEY, args.idir_out_root, repo_root=c.REPO_ROOT
+    )
+    args.ptv_out_root = artifact_paths.resolve_run_root(
+        PTV_RUN_KEY, args.ptv_out_root, repo_root=c.REPO_ROOT
+    )
+    args.log_root = artifact_paths.resolve_review_root(
+        LOG_EXPERIMENT_KEY, args.log_root, repo_root=c.REPO_ROOT
+    )
+    return args
 
 
 def parse_families(value: str) -> List[str]:
@@ -212,7 +236,7 @@ def build_jobs(args: argparse.Namespace) -> List[Dict[str, object]]:
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     gpus = [str(v) for v in c.parse_int_list(args.gpus)]
     args.idir_out_root.mkdir(parents=True, exist_ok=True)
     args.ptv_out_root.mkdir(parents=True, exist_ok=True)

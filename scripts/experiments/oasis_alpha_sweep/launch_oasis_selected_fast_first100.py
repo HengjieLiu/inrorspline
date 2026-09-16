@@ -25,10 +25,18 @@ from launch_first10_be_2500e import parse_case_ranks  # noqa: E402
 import launch_oasis_unified_acceleration_sweep as unified  # noqa: E402
 import run_one  # noqa: E402
 
+EXPERIMENTS_DIR = c.REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths  # noqa: E402
+
 
 VARIANT = "oasis_selected_fast_first100_alpha1000_v1"
-DEFAULT_OUT_ROOT = Path("/database/inrorspline/runs/oasis_selected_fast_first100_alpha1000_v1")
-DEFAULT_REVIEW_ROOT = c.REPO_ROOT / "experiments/2026-08-13_oasis_selected_fast_first100"
+RUN_KEY = "oasis_selected_fast_first100_alpha1000_v1"
+EXPERIMENT_KEY = "2026-08-13_oasis_selected_fast_first100"
+DEFAULT_OUT_ROOT = None
+DEFAULT_REVIEW_ROOT = None
 FIRST10_SOURCE_ROOT = Path("/database/inrorspline/runs/oasis_unified_acceleration_sweep_alpha1000_v1")
 SELECTED_CANDIDATES = [
     "MR_A_fast_decay",
@@ -62,8 +70,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--variant", type=str, default=VARIANT)
     parser.add_argument("--eval-interval", type=int, default=250)
     parser.add_argument("--seed", type=int, default=1)
-    parser.add_argument("--out-root", type=Path, default=DEFAULT_OUT_ROOT)
-    parser.add_argument("--review-root", type=Path, default=DEFAULT_REVIEW_ROOT)
+    parser.add_argument("--out-root", type=Path, default=None)
+    parser.add_argument("--review-root", type=Path, default=None)
     parser.add_argument("--first10-source-root", type=Path, default=FIRST10_SOURCE_ROOT)
     parser.add_argument("--oasis-root", type=Path, default=c.DEFAULT_OASIS_ROOT)
     parser.add_argument("--pair-file", type=Path, default=c.DEFAULT_PAIR_FILE)
@@ -75,6 +83,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-aggregate", action="store_true")
     parser.add_argument("--allow-incomplete-aggregate", action="store_true")
     return parser.parse_args()
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Resolve selected-first100 outputs under the external artifact store."""
+
+    args.out_root = artifact_paths.resolve_run_root(
+        RUN_KEY,
+        args.out_root,
+        repo_root=c.REPO_ROOT,
+    )
+    args.review_root = artifact_paths.resolve_review_root(
+        EXPERIMENT_KEY,
+        args.review_root,
+        repo_root=c.REPO_ROOT,
+    )
+    return args
 
 
 def parse_gpus(text: str) -> List[str]:
@@ -418,7 +442,7 @@ def aggregate(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     if args.worker_candidate:
         run_worker(args)
         return

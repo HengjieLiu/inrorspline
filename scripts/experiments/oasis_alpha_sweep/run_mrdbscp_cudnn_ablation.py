@@ -21,10 +21,14 @@ from types import SimpleNamespace
 from typing import Dict, Iterable, List, Mapping, Sequence
 
 THIS_DIR = Path(__file__).resolve().parent
+EXPERIMENTS_DIR = THIS_DIR.parent
 REPO_ROOT = THIS_DIR.parents[2]
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
 if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
 
+import artifact_paths  # noqa: E402
 import common as c  # noqa: E402
 import launch_oasis_unified_acceleration_sweep as unified  # noqa: E402
 
@@ -32,8 +36,8 @@ import launch_oasis_unified_acceleration_sweep as unified  # noqa: E402
 VARIANT = "oasis_seed3_first5_mrdbscp_cudnn_ablation_v1"
 CANDIDATE_NAME = "MR_A_fast_decay"
 METHOD = unified.MR_METHOD
-DEFAULT_OUT_ROOT = Path("/database/inrorspline/runs/oasis_mrdbscp_cudnn_ablation_20260901_v1")
-DEFAULT_REVIEW_ROOT = REPO_ROOT / "experiments/2026-09-01_oasis_mrdbscp_cudnn_ablation"
+EXPERIMENT_KEY = "2026-09-01_oasis_mrdbscp_cudnn_ablation"
+RUN_KEY = "oasis_mrdbscp_cudnn_ablation_20260901_v1"
 
 
 @dataclass(frozen=True)
@@ -63,8 +67,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--eval-interval", type=int, default=250)
     parser.add_argument("--timing-detail", choices=["deep"], default="deep")
     parser.add_argument("--cpu-threads", type=int, default=6)
-    parser.add_argument("--out-root", type=Path, default=DEFAULT_OUT_ROOT)
-    parser.add_argument("--review-root", type=Path, default=DEFAULT_REVIEW_ROOT)
+    parser.add_argument("--out-root", type=Path, default=None)
+    parser.add_argument("--review-root", type=Path, default=None)
     parser.add_argument("--oasis-root", type=Path, default=c.DEFAULT_OASIS_ROOT)
     parser.add_argument("--pair-file", type=Path, default=c.DEFAULT_PAIR_FILE)
     parser.add_argument("--variant", type=str, default=VARIANT)
@@ -72,6 +76,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--skip-dice", action="store_true")
     return parser.parse_args()
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    args.out_root = artifact_paths.resolve_run_root(
+        RUN_KEY,
+        args.out_root,
+        repo_root=REPO_ROOT,
+    )
+    args.review_root = artifact_paths.resolve_review_root(
+        EXPERIMENT_KEY,
+        args.review_root,
+        repo_root=REPO_ROOT,
+    )
+    return args
 
 
 def parse_case_ranks(text: str) -> List[int]:
@@ -645,7 +663,7 @@ def write_report(
 
 
 def main() -> int:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     ranks = parse_case_ranks(str(args.case_ranks))
     if str(args.gpu) != "2":
         raise ValueError("This focused ablation is fixed to physical GPU 2.")

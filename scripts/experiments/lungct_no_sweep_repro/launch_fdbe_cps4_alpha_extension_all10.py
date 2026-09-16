@@ -23,12 +23,21 @@ if str(THIS_DIR) not in sys.path:
 
 import common as c  # noqa: E402
 
+EXPERIMENTS_DIR = REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths  # noqa: E402
+
 
 RUNNER = THIS_DIR / "run_one.py"
-DEFAULT_RUN_ROOT = Path("/database/inrorspline/runs/lungct_fdbe_cps4_alpha1e5_1e6_all10_v1")
-DEFAULT_SMOKE_RUN_ROOT = Path("/database/inrorspline/runs/lungct_fdbe_cps4_alpha1e5_1e6_all10_smoke_v1")
+RUN_KEY = "lungct_fdbe_cps4_alpha1e5_1e6_all10_v1"
+SMOKE_RUN_KEY = "lungct_fdbe_cps4_alpha1e5_1e6_all10_smoke_v1"
+EXPERIMENT_KEY = "2026-08-14_lungct_fdbe_cps4_alpha1e5_1e6_all10"
+DEFAULT_RUN_ROOT = None
+DEFAULT_SMOKE_RUN_ROOT = None
 DEFAULT_DATA_ROOT = Path("/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm")
-DEFAULT_REVIEW_DIR = REPO_ROOT / "experiments/2026-08-14_lungct_fdbe_cps4_alpha1e5_1e6_all10"
+DEFAULT_REVIEW_DIR = None
 DEFAULT_CASES = "1,2,3,4,5,6,7,8,9,10"
 
 
@@ -86,7 +95,7 @@ LANES = (
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-root", type=Path, default=None)
-    parser.add_argument("--review-dir", type=Path, default=DEFAULT_REVIEW_DIR)
+    parser.add_argument("--review-dir", type=Path, default=None)
     parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT)
     parser.add_argument("--cases", default=DEFAULT_CASES)
     parser.add_argument(
@@ -108,16 +117,28 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     if args.epoch_override is not None and int(args.epoch_override) < 1:
         raise ValueError("--epoch-override must be >= 1")
-    if args.run_root is None:
-        args.run_root = DEFAULT_SMOKE_RUN_ROOT if args.smoke else DEFAULT_RUN_ROOT
     if args.smoke:
-        args.review_dir = Path(args.review_dir) / "smoke"
         if str(args.cases) == DEFAULT_CASES:
             args.cases = "1"
         if args.epoch_override is None:
             args.epoch_override = 1
         args.eval_interval = 1
         args.global_ncc_diagnostic_interval = 1
+    return resolve_artifact_paths(args)
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Resolve run and review outputs beneath the external artifact store."""
+
+    run_key = SMOKE_RUN_KEY if args.smoke else RUN_KEY
+    args.run_root = artifact_paths.resolve_run_root(run_key, args.run_root, repo_root=REPO_ROOT)
+    review_key = f"{EXPERIMENT_KEY}/smoke" if args.smoke else EXPERIMENT_KEY
+    requested_review_dir = None if args.review_dir is None else Path(args.review_dir)
+    if requested_review_dir is not None and args.smoke:
+        requested_review_dir = requested_review_dir / "smoke"
+    args.review_dir = artifact_paths.resolve_review_root(
+        review_key, requested_review_dir, repo_root=REPO_ROOT
+    )
     return args
 
 

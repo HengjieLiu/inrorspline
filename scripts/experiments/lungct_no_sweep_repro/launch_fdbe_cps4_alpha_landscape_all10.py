@@ -21,10 +21,19 @@ if str(THIS_DIR) not in sys.path:
 
 import launch_fdbe_cps4_alpha_extension_all10 as base  # noqa: E402
 
+EXPERIMENTS_DIR = base.REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
 
-DEFAULT_RUN_ROOT = Path("/database/inrorspline/runs/lungct_fdbe_cps4_alpha_landscape_all10_v1")
-DEFAULT_SMOKE_RUN_ROOT = Path("/database/inrorspline/runs/lungct_fdbe_cps4_alpha_landscape_all10_smoke_v1")
-DEFAULT_REVIEW_DIR = base.REPO_ROOT / "experiments/2026-08-14_lungct_fdbe_cps4_alpha_landscape_all10"
+import artifact_paths  # noqa: E402
+
+
+RUN_KEY = "lungct_fdbe_cps4_alpha_landscape_all10_v1"
+SMOKE_RUN_KEY = "lungct_fdbe_cps4_alpha_landscape_all10_smoke_v1"
+EXPERIMENT_KEY = "2026-08-14_lungct_fdbe_cps4_alpha_landscape_all10"
+DEFAULT_RUN_ROOT = None
+DEFAULT_SMOKE_RUN_ROOT = None
+DEFAULT_REVIEW_DIR = None
 DEFAULT_DATA_ROOT = base.DEFAULT_DATA_ROOT
 DEFAULT_CASES = base.DEFAULT_CASES
 
@@ -52,7 +61,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--wave", choices=sorted(WAVE_ALPHAS), default="wave1")
     parser.add_argument("--run-root", type=Path, default=None)
-    parser.add_argument("--review-dir", type=Path, default=DEFAULT_REVIEW_DIR)
+    parser.add_argument("--review-dir", type=Path, default=None)
     parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT)
     parser.add_argument("--cases", default=DEFAULT_CASES)
     parser.add_argument("--gpus", default=None, help="Comma-separated GPUs, one per alpha lane.")
@@ -70,11 +79,8 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     if args.epoch_override is not None and int(args.epoch_override) < 1:
         raise ValueError("--epoch-override must be >= 1")
-    if args.run_root is None:
-        args.run_root = DEFAULT_SMOKE_RUN_ROOT if args.smoke else DEFAULT_RUN_ROOT
     if args.gpus is None:
         args.gpus = "0,1,2,3" if args.wave == "wave1" else "0,1"
-    args.review_dir = Path(args.review_dir) / ("smoke" if args.smoke else "") / args.wave
     if args.smoke:
         if str(args.cases) == DEFAULT_CASES:
             args.cases = "1"
@@ -82,6 +88,27 @@ def parse_args() -> argparse.Namespace:
             args.epoch_override = 1
         args.eval_interval = 1
         args.global_ncc_diagnostic_interval = 1
+    return resolve_artifact_paths(args)
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Resolve landscape run, log, and review outputs externally."""
+
+    run_key = SMOKE_RUN_KEY if args.smoke else RUN_KEY
+    args.run_root = artifact_paths.resolve_run_root(run_key, args.run_root, repo_root=base.REPO_ROOT)
+    review_parts = [EXPERIMENT_KEY]
+    if args.smoke:
+        review_parts.append("smoke")
+    review_parts.append(str(args.wave))
+    review_key = "/".join(review_parts)
+    requested_review_dir = None if args.review_dir is None else Path(args.review_dir)
+    if requested_review_dir is not None:
+        if args.smoke:
+            requested_review_dir = requested_review_dir / "smoke"
+        requested_review_dir = requested_review_dir / str(args.wave)
+    args.review_dir = artifact_paths.resolve_review_root(
+        review_key, requested_review_dir, repo_root=base.REPO_ROOT
+    )
     return args
 
 

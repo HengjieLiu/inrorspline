@@ -20,11 +20,10 @@ if str(THIS_DIR) not in sys.path:
 
 import common as c  # noqa: E402
 from launch_oasis_selected_fast_first100 import (  # noqa: E402
-    DEFAULT_OUT_ROOT,
-    DEFAULT_REVIEW_ROOT,
     FIRST10_SOURCE_ROOT,
     SELECTED_CANDIDATES,
     VARIANT,
+    resolve_artifact_paths,
 )
 from launch_oasis_unified_acceleration_sweep import candidate_map  # noqa: E402
 
@@ -51,8 +50,8 @@ METRICS = [
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--out-root", type=Path, default=DEFAULT_OUT_ROOT)
-    parser.add_argument("--review-root", type=Path, default=DEFAULT_REVIEW_ROOT)
+    parser.add_argument("--out-root", type=Path, default=None)
+    parser.add_argument("--review-root", type=Path, default=None)
     parser.add_argument("--first10-source-root", type=Path, default=FIRST10_SOURCE_ROOT)
     parser.add_argument("--variant", type=str, default=VARIANT)
     parser.add_argument("--allow-incomplete", action="store_true")
@@ -301,7 +300,7 @@ def write_report(args: argparse.Namespace, rows: Sequence[Mapping[str, object]],
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     Path(args.review_root).mkdir(parents=True, exist_ok=True)
     rows = collect_rows(args)
     missing = missing_rows(rows)

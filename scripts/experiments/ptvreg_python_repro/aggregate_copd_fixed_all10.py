@@ -6,25 +6,42 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import sys
 from pathlib import Path
 from typing import Dict, List, Sequence
 
 import numpy as np
 
+THIS_DIR = Path(__file__).resolve().parent
+EXPERIMENTS_DIR = THIS_DIR.parent
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths
 import run_copd_case as runner
 
 
-DEFAULT_REVIEW_ROOT = runner.REPO_ROOT / "experiments" / "2026-08-28_ptvreg_python_copd_fixed_all10"
+EXPERIMENT_KEY = "2026-08-28_ptvreg_python_copd_fixed_all10"
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--protocol", choices=runner.PROTOCOL_CHOICES, default="canonical_1mm")
-    parser.add_argument("--out-root", type=Path, default=runner.DEFAULT_RUN_ROOT)
-    parser.add_argument("--review-root", type=Path, default=DEFAULT_REVIEW_ROOT)
+    parser.add_argument("--out-root", type=Path, default=None)
+    parser.add_argument("--review-root", type=Path, default=None)
     parser.add_argument("--case-ids", type=str, default="1,2,3,4,5,6,7,8,9,10")
     parser.add_argument("--allow-missing", action="store_true")
     return parser.parse_args()
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    args.out_root = runner.resolve_run_root(args.out_root)
+    args.review_root = artifact_paths.resolve_review_root(
+        EXPERIMENT_KEY,
+        args.review_root,
+        repo_root=runner.REPO_ROOT,
+    )
+    return args
 
 
 def safe_float(value: object) -> float:
@@ -191,7 +208,7 @@ def acceptance_from_rows(rows: Sequence[Dict[str, object]], requested_cases: Seq
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     requested_cases = runner.c.parse_int_list(args.case_ids)
     rows = collect_rows(args.out_root, args.protocol, requested_cases)
     acceptance = acceptance_from_rows(rows, requested_cases)

@@ -32,9 +32,14 @@ def repo_root() -> Path:
 
 REPO_ROOT = repo_root()
 THIS_DIR = Path(__file__).resolve().parent
+EXPERIMENTS_DIR = REPO_ROOT / "scripts" / "experiments"
 LUNG_COMMON_PATH = REPO_ROOT / "scripts" / "experiments" / "lungct_no_sweep_repro" / "common.py"
 DATA_LUNGCT_PATH = REPO_ROOT / "scripts" / "data" / "common" / "lungct.py"
 PTVREG_PYTHON_SRC = REPO_ROOT / "external" / "ptvreg-python" / "src"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths
 
 METHOD = "ptvreg_python_admm"
 PROTOCOL_CANONICAL = "ptvreg_python_admm+canonical_ptv_landmark_crop_1mm_no_lungmask"
@@ -45,14 +50,24 @@ DEFAULT_CASES = tuple(range(1, 11))
 MARGIN_XYZ = np.asarray([10, 10, 5], dtype=np.int64)
 MARGIN_ZYX = MARGIN_XYZ[::-1].copy()
 MASK_MODEL_NAME = "R231"
-DEFAULT_RUN_ROOT = Path(
-    os.environ.get(
-        "INRORSPLINE_PTVREG_PYTHON_RUN_ROOT",
-        "/database/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1"
-        if Path("/database").exists()
-        else "/data/hengjie/inrorspline/runs/ptvreg_python_copd_fixed_all10_v1",
-    )
-)
+RUN_KEY = "ptvreg_python_copd_fixed_all10_v1"
+
+
+def configured_default_run_root() -> Path:
+    """Return an import-safe display fallback; runtime resolution is strict."""
+
+    configured = os.environ.get("INRORSPLINE_PTVREG_PYTHON_RUN_ROOT")
+    if configured:
+        return Path(configured)
+    artifact_root = os.environ.get(artifact_paths.ARTIFACT_ROOT_ENV)
+    if artifact_root:
+        return Path(artifact_root) / artifact_paths.RUNS_DIRNAME / RUN_KEY
+    return Path("/database/inrorspline") / artifact_paths.RUNS_DIRNAME / RUN_KEY
+
+
+# Kept for import compatibility.  Actual launches call ``resolve_run_root``
+# and therefore require ARTIFACT_ROOT instead of trusting this fallback.
+DEFAULT_RUN_ROOT = configured_default_run_root()
 DEFAULT_PAPER_HU_ISO1MM_ROOT = Path(
     os.environ.get(
         "INRORSPLINE_PTVREG_PYTHON_PAPER_HU_ROOT",
@@ -66,6 +81,42 @@ DEFAULT_PAPER_HU_NATIVE_ROOT = Path(
     )
 )
 DEFAULT_PAPER_HU_ROOT = DEFAULT_PAPER_HU_ISO1MM_ROOT
+
+
+def resolve_run_root(requested_run_root: Optional[Path] = None) -> Path:
+    """Resolve the ptvreg run root under the configured external artifact store."""
+
+    requested = requested_run_root
+    if requested is None:
+        configured = os.environ.get("INRORSPLINE_PTVREG_PYTHON_RUN_ROOT")
+        requested = Path(configured) if configured else None
+    return artifact_paths.resolve_run_root(
+        RUN_KEY,
+        requested,
+        repo_root=REPO_ROOT,
+    )
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    args.out_root = resolve_run_root(args.out_root)
+    args.paper_hu_root = resolve_paper_hu_root(str(args.protocol), args.paper_hu_root)
+    for attribute, label in (
+        ("audit_output", "--audit-output"),
+        ("synthetic_smoke_output", "--synthetic-smoke-output"),
+        ("prepare_output", "--prepare-output"),
+    ):
+        value = getattr(args, attribute)
+        if value is not None:
+            setattr(
+                args,
+                attribute,
+                artifact_paths.resolve_managed_path(
+                    value,
+                    allowed_root=args.out_root,
+                    label=label,
+                ),
+            )
+    return args
 
 
 def load_module(name: str, path: Path) -> ModuleType:
@@ -106,6 +157,16 @@ def paper_hu_root_for_protocol(protocol: str, explicit_root: Optional[Path]) -> 
     if protocol == "paper_hu_native":
         return DEFAULT_PAPER_HU_NATIVE_ROOT
     return DEFAULT_PAPER_HU_ISO1MM_ROOT
+
+
+def resolve_paper_hu_root(protocol: str, explicit_root: Optional[Path]) -> Path:
+    """Keep generated paper-HU inputs in the configured external artifact store."""
+
+    return artifact_paths.resolve_managed_path(
+        paper_hu_root_for_protocol(protocol, explicit_root),
+        allowed_root=artifact_paths.artifact_root(repo_root=REPO_ROOT),
+        label="--paper-hu-root",
+    )
 
 
 def parse_triplet(value: str, cast, name: str) -> Tuple:
@@ -1315,7 +1376,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--raw-data-root", type=Path, default=None)
     parser.add_argument("--paper-hu-root", type=Path, default=None)
     parser.add_argument("--mask-root", type=Path, default=None)
-    parser.add_argument("--out-root", type=Path, default=DEFAULT_RUN_ROOT)
+    parser.add_argument("--out-root", type=Path, default=None)
     parser.add_argument("--run-name", type=str, default="")
     parser.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     parser.add_argument("--gpu", type=str, default="0")
@@ -1364,7 +1425,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     if args.audit_loader:
         audit = c.loader_audit(args.data_root, c.parse_int_list(args.audit_cases), dataset="copd")
         if args.audit_output is not None:

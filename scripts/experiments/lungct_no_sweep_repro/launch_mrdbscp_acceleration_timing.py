@@ -15,6 +15,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence
 
+THIS_DIR = Path(__file__).resolve().parent
+EXPERIMENTS_DIR = THIS_DIR.parent
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths
 import common as c
 import run_one
 
@@ -31,8 +37,7 @@ VARIANT_IDS = (
 )
 DATASETS = ("4dct", "copd")
 CASES = tuple(range(1, 11))
-DEFAULT_OUT_ROOT = Path("/database/inrorspline/runs/2026-09-01_lungct_mrdbscp_acceleration_best1mm_v1")
-DEFAULT_REVIEW_ROOT = c.REPO_ROOT / "experiments/2026-09-01_lungct_mrdbscp_acceleration_best1mm"
+RUN_KEY = "2026-09-01_lungct_mrdbscp_acceleration_best1mm_v1"
 
 
 @dataclass(frozen=True)
@@ -197,8 +202,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cases", type=str, default="1,2,3,4,5,6,7,8,9,10")
     parser.add_argument("--gpus", type=str, default="0,1,2,3")
     parser.add_argument("--data-root", type=Path, default=c.DEFAULT_PTVPREP_ROOT)
-    parser.add_argument("--out-root", type=Path, default=DEFAULT_OUT_ROOT)
-    parser.add_argument("--review-root", type=Path, default=DEFAULT_REVIEW_ROOT)
+    parser.add_argument("--out-root", type=Path, default=None)
+    parser.add_argument("--review-root", type=Path, default=None)
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--ptv-lcc-sigma-mm", type=float, default=2.1)
     parser.add_argument("--ptv-isotv-weight", type=float, default=0.055)
@@ -211,6 +216,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--worker-variant", choices=VARIANT_IDS, default="")
     parser.add_argument("--worker-gpu", type=str, default="")
     return parser.parse_args()
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    args.out_root = artifact_paths.resolve_run_root(
+        RUN_KEY,
+        args.out_root,
+        repo_root=c.REPO_ROOT,
+    )
+    args.review_root = artifact_paths.resolve_review_root(
+        EXPERIMENT_ID,
+        args.review_root,
+        repo_root=c.REPO_ROOT,
+    )
+    return args
 
 
 def selected_datasets(value: str) -> Sequence[str]:
@@ -507,7 +526,7 @@ def launch_workers(args: argparse.Namespace, rows: Sequence[Dict[str, object]]) 
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     if args.worker_dataset and args.worker_variant:
         raise SystemExit(run_worker(args))
     args.out_root.mkdir(parents=True, exist_ok=True)

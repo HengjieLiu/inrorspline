@@ -22,9 +22,17 @@ if str(THIS_DIR) not in sys.path:
 
 import common as c  # noqa: E402
 
+EXPERIMENTS_DIR = REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
 
-DEFAULT_RUN_ROOT = Path("/database/inrorspline/runs/lungct_fdbe_cps4_alpha1e5_1e6_all10_v1")
-DEFAULT_REVIEW_DIR = REPO_ROOT / "experiments/2026-08-14_lungct_fdbe_cps4_alpha1e5_1e6_all10"
+import artifact_paths  # noqa: E402
+
+
+RUN_KEY = "lungct_fdbe_cps4_alpha1e5_1e6_all10_v1"
+EXPERIMENT_KEY = "2026-08-14_lungct_fdbe_cps4_alpha1e5_1e6_all10"
+DEFAULT_RUN_ROOT = None
+DEFAULT_REVIEW_DIR = None
 DEFAULT_CASES = tuple(range(1, 11))
 EXPECTED_DIAGNOSTIC_EPOCHS = [1, *range(10, 2501, 10)]
 
@@ -50,12 +58,22 @@ LANES = (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--run-root", type=Path, default=DEFAULT_RUN_ROOT)
-    parser.add_argument("--review-dir", type=Path, default=DEFAULT_REVIEW_DIR)
+    parser.add_argument("--run-root", type=Path, default=None)
+    parser.add_argument("--review-dir", type=Path, default=None)
     parser.add_argument("--cases", default=",".join(str(case_id) for case_id in DEFAULT_CASES))
     parser.add_argument("--expected-epochs", type=int, default=2500)
     parser.add_argument("--allow-incomplete", action="store_true")
     return parser.parse_args()
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Resolve the current FD-BE aggregation's generated paths externally."""
+
+    args.run_root = artifact_paths.resolve_run_root(RUN_KEY, args.run_root, repo_root=REPO_ROOT)
+    args.review_dir = artifact_paths.resolve_review_root(
+        EXPERIMENT_KEY, args.review_dir, repo_root=REPO_ROOT
+    )
+    return args
 
 
 def utc_text() -> str:
@@ -396,7 +414,7 @@ def write_report(path: Path, manifest: dict[str, Any], mean_rows: Sequence[dict[
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     review_dir = Path(args.review_dir)
     run_root = Path(args.run_root)
     review_dir.mkdir(parents=True, exist_ok=True)
