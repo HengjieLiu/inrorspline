@@ -13,6 +13,7 @@ import argparse
 import csv
 import json
 import math
+import sys
 import time
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
@@ -31,9 +32,16 @@ def find_repo_root(start: Path) -> Path:
 
 
 REPO_ROOT = find_repo_root(THIS_DIR)
+EXPERIMENTS_DIR = REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths  # noqa: E402
+
+
+EXPERIMENT_KEY = "2026-06-29_sinr_cp_kernel_followup"
+RUN_KEY = "sinr_cp_kernel_followup_20260629_v1"
 DEFAULT_SOURCE_UPDATE_ROOT = Path("/database/inrorspline/runs/update_alignment_overnight_20260629_v1")
-DEFAULT_OUT_ROOT = Path("/database/inrorspline/runs/sinr_cp_kernel_followup_20260629_v1")
-DEFAULT_REVIEW_ROOT = REPO_ROOT / "experiments/2026-06-29_sinr_cp_kernel_followup"
 
 
 CASE_SPECS = [
@@ -439,8 +447,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--scope", choices=("first3",), default="first3")
     parser.add_argument("--gpus", type=str, default="0,1,2,3")
     parser.add_argument("--source-update-root", type=Path, default=DEFAULT_SOURCE_UPDATE_ROOT)
-    parser.add_argument("--out-root", type=Path, default=DEFAULT_OUT_ROOT)
-    parser.add_argument("--review-root", type=Path, default=DEFAULT_REVIEW_ROOT)
+    parser.add_argument("--out-root", type=Path, default=None)
+    parser.add_argument("--review-root", type=Path, default=None)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--run-full", action="store_true")
@@ -449,8 +457,24 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Keep generated run and review material beneath the external store."""
+
+    args.out_root = artifact_paths.resolve_run_root(
+        RUN_KEY,
+        args.out_root,
+        repo_root=REPO_ROOT,
+    )
+    args.review_root = artifact_paths.resolve_review_root(
+        EXPERIMENT_KEY,
+        args.review_root,
+        repo_root=REPO_ROOT,
+    )
+    return args
+
+
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     if not (args.dry_run or args.smoke or args.run_full):
         raise SystemExit("Choose one of --dry-run, --smoke, or --run-full.")
     if args.run_full:

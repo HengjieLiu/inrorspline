@@ -28,6 +28,14 @@ import numpy as np
 
 THIS_FILE = Path(__file__).resolve()
 THIS_DIR = THIS_FILE.parent
+REPO_ROOT = THIS_DIR.parents[2]
+EXPERIMENTS_DIR = REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths  # noqa: E402
+
+
 RUNNER_PATH = THIS_DIR / "run_pairlocal.py"
 PROFILES = ("p2e_equiv_hu", "l2b_lung_hu")
 COPD_CASES = tuple(str(value) for value in range(104, 114))
@@ -36,6 +44,22 @@ VALIDATION_CASES = tuple(str(value) for value in range(1, 11))
 
 class AuditError(RuntimeError):
     """Raised when the immutable manifest, gates, or reports are invalid."""
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Require the caller-selected audit root to stay in the artifact store."""
+
+    root = artifact_paths.artifact_root(repo_root=REPO_ROOT)
+    args.out_root = artifact_paths.resolve_managed_path(
+        args.out_root,
+        allowed_root=root,
+        label="--out-root",
+    )
+    if args.out_root == root:
+        raise artifact_paths.ArtifactPathError(
+            f"--out-root must name an audit directory below {root}, not the shared artifact root."
+        )
+    return args
 
 
 def runner_module() -> ModuleType:
@@ -661,7 +685,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     if args.command == "make-manifest":
         manifest = build_manifest(args)
         print(json.dumps({"manifest": str(manifest_path(args.out_root)), "job_count": manifest["job_count"]}, indent=2))

@@ -17,9 +17,16 @@ from typing import Dict, Iterable, List, Optional, Sequence
 
 THIS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = next(p for p in [THIS_DIR, *THIS_DIR.parents] if (p / "docs").is_dir() and (p / "scripts").is_dir())
+EXPERIMENTS_DIR = REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths  # noqa: E402
+
+
+EXPERIMENT_KEY = "2026-06-29_sinr_cp_kernel_followup"
+RUN_KEY = "sinr_cp_mechanism_explore_20260629_v1"
 RUN_ONE = REPO_ROOT / "scripts/experiments/lungct_no_sweep_repro/run_one.py"
-DEFAULT_OUT_ROOT = Path("/database/inrorspline/runs/sinr_cp_mechanism_explore_20260629_v1")
-DEFAULT_REVIEW_ROOT = REPO_ROOT / "experiments/2026-06-29_sinr_cp_kernel_followup"
 DEFAULT_PTVPREP_ROOT = Path(
     "/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm"
 )
@@ -480,8 +487,8 @@ def write_report(args: argparse.Namespace, rows: Sequence[Dict[str, object]]) ->
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--gpus", type=str, default="0,1,2,3")
-    parser.add_argument("--out-root", type=Path, default=DEFAULT_OUT_ROOT)
-    parser.add_argument("--review-root", type=Path, default=DEFAULT_REVIEW_ROOT)
+    parser.add_argument("--out-root", type=Path, default=None)
+    parser.add_argument("--review-root", type=Path, default=None)
     parser.add_argument("--ptvprep-root", type=Path, default=DEFAULT_PTVPREP_ROOT)
     parser.add_argument("--phase-name", type=str, default="standard_pyramid_probe")
     parser.add_argument("--probe-set", choices=["standard", "refinement"], default="standard")
@@ -500,8 +507,24 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Resolve generated P6 run and review roots outside the Git worktree."""
+
+    args.out_root = artifact_paths.resolve_run_root(
+        RUN_KEY,
+        args.out_root,
+        repo_root=REPO_ROOT,
+    )
+    args.review_root = artifact_paths.resolve_review_root(
+        EXPERIMENT_KEY,
+        args.review_root,
+        repo_root=REPO_ROOT,
+    )
+    return args
+
+
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     jobs = build_jobs(args)
     write_manifest(args, jobs)
     log_path = Path(args.review_root) / "scientist_reviewer_log.md"

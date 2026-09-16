@@ -94,15 +94,15 @@ def status_payload(args: argparse.Namespace) -> Dict[str, object]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--out-root", type=Path, default=explore.DEFAULT_OUT_ROOT)
-    parser.add_argument("--review-root", type=Path, default=explore.DEFAULT_REVIEW_ROOT)
+    parser.add_argument("--out-root", type=Path, default=None)
+    parser.add_argument("--review-root", type=Path, default=None)
     parser.add_argument("--update-root", type=Path, default=explore.DEFAULT_UPDATE_ROOT)
     parser.add_argument("--gpus", type=str, default="0,1,2,3")
     parser.add_argument("--poll-sec", type=float, default=900.0)
     parser.add_argument("--max-runtime-sec", type=float, default=14400.0)
     parser.add_argument("--aggregate-empty", action="store_true")
     parser.add_argument("--exit-when-finished", action="store_true")
-    args = parser.parse_args()
+    args = explore.resolve_artifact_paths(parser.parse_args())
 
     review_root = Path(args.review_root)
     log_path = review_root / "scientist_reviewer_log.md"

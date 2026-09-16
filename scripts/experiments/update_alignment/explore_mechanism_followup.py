@@ -28,11 +28,19 @@ def find_repo_root(start: Path) -> Path:
 
 
 REPO_ROOT = find_repo_root(THIS_DIR)
+EXPERIMENTS_DIR = REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths  # noqa: E402
+
+
+EXPERIMENT_KEY = "2026-06-29_sinr_cp_kernel_followup"
+RUN_KEY = "sinr_cp_mechanism_explore_20260629_v1"
+PROXY_RUN_KEY = "sinr_cp_kernel_followup_20260629_v1"
 LUNG_RUN_ONE = REPO_ROOT / "scripts/experiments/lungct_no_sweep_repro/run_one.py"
 PROXY_FOLLOWUP = THIS_DIR / "run_sinr_cp_kernel_followup.py"
 
-DEFAULT_OUT_ROOT = Path("/database/inrorspline/runs/sinr_cp_mechanism_explore_20260629_v1")
-DEFAULT_REVIEW_ROOT = REPO_ROOT / "experiments/2026-06-29_sinr_cp_kernel_followup"
 DEFAULT_UPDATE_ROOT = Path("/database/inrorspline/runs/update_alignment_overnight_20260629_v1")
 DEFAULT_PTVPREP_ROOT = Path(
     "/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm"
@@ -417,6 +425,10 @@ def launch_jobs(args: argparse.Namespace, jobs: Sequence[Job]) -> Dict[str, obje
 
 
 def run_proxy_followup(args: argparse.Namespace) -> Dict[str, object]:
+    proxy_run_root = artifact_paths.resolve_run_root(
+        PROXY_RUN_KEY,
+        repo_root=REPO_ROOT,
+    )
     cmd = [
         sys.executable,
         str(PROXY_FOLLOWUP),
@@ -429,7 +441,7 @@ def run_proxy_followup(args: argparse.Namespace) -> Dict[str, object]:
         "--source-update-root",
         str(args.update_root),
         "--out-root",
-        "/database/inrorspline/runs/sinr_cp_kernel_followup_20260629_v1",
+        str(proxy_run_root),
         "--review-root",
         str(args.review_root),
     ]
@@ -1122,8 +1134,8 @@ def maybe_wait_min_runtime(args: argparse.Namespace, start: float) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--gpus", type=str, default="0,1,2,3")
-    parser.add_argument("--out-root", type=Path, default=DEFAULT_OUT_ROOT)
-    parser.add_argument("--review-root", type=Path, default=DEFAULT_REVIEW_ROOT)
+    parser.add_argument("--out-root", type=Path, default=None)
+    parser.add_argument("--review-root", type=Path, default=None)
     parser.add_argument("--update-root", type=Path, default=DEFAULT_UPDATE_ROOT)
     parser.add_argument("--ptvprep-root", type=Path, default=DEFAULT_PTVPREP_ROOT)
     parser.add_argument("--seed", type=int, default=1)
@@ -1148,8 +1160,24 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Resolve generated P6 run and review roots outside the Git worktree."""
+
+    args.out_root = artifact_paths.resolve_run_root(
+        RUN_KEY,
+        args.out_root,
+        repo_root=REPO_ROOT,
+    )
+    args.review_root = artifact_paths.resolve_review_root(
+        EXPERIMENT_KEY,
+        args.review_root,
+        repo_root=REPO_ROOT,
+    )
+    return args
+
+
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     started = time.time()
     init_logs(args)
     jobs = build_jobs(args)
