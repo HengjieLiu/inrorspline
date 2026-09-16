@@ -29,24 +29,19 @@ from typing import Any, Iterable, Sequence
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-EXPERIMENT_ROOT = REPO_ROOT / "experiments/2026-08-02_fit_modes_population_n10"
+EXPERIMENTS_DIR = REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths  # noqa: E402
+
+
+EXPERIMENT_KEY = "2026-08-02_fit_modes_population_n10"
+RUN_KEY = "fit_modes_population_n10_v1"
+SMOKE_RUN_KEY = "fit_modes_population_n10_smoke_v1"
+FIGURE_EXPERIMENT_KEY = "paper_artifacts/fitting_figure/v002_candidate"
 DEFAULT_DATA_ROOT = Path(os.environ.get("DATA_ROOT", "/workspace/data"))
-DEFAULT_OUT_ROOT = Path(
-    os.environ.get(
-        "RUN_ROOT", "/workspace/scratch/runs/fit_modes_population_n10_v1"
-    )
-)
-DEFAULT_SMOKE_OUT_ROOT = Path(
-    os.environ.get(
-        "SMOKE_RUN_ROOT",
-        "/workspace/scratch/runs/fit_modes_population_n10_smoke_v1",
-    )
-)
 PAIR_FILE = REPO_ROOT / "configs/splits/oasis/pair_test_200_shuffled_seed000003.txt"
-REUSE_CSV = (
-    REPO_ROOT
-    / "experiments/paper_artifacts/fitting_figure/v002_candidate/fit_modes_standardized_panelAB_selected_runs.csv"
-)
 DEFAULT_OASIS_ROOT = Path(
     os.environ.get("OASIS_ROOT", "/workspace/data/brain/oasis_organized/split_v1")
 )
@@ -165,7 +160,7 @@ def format_float(value: float) -> str:
     return text.replace("-", "m").replace(".", "p")
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--smoke", action="store_true")
@@ -181,7 +176,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-concurrent", type=int, default=0)
     parser.add_argument("--poll-sec", type=int, default=15)
     parser.add_argument("--out-root", type=Path, default=None)
-    parser.add_argument("--review-root", type=Path, default=EXPERIMENT_ROOT)
+    parser.add_argument("--review-root", type=Path, default=None)
     parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT)
     parser.add_argument("--oasis-root", type=Path, default=DEFAULT_OASIS_ROOT)
     parser.add_argument("--pair-file", type=Path, default=PAIR_FILE)
@@ -189,15 +184,53 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dirlab-data-root", type=Path, default=DEFAULT_DIRLAB_DATA_ROOT)
     parser.add_argument("--ptvreg-field-root", type=Path, default=DEFAULT_PTVREG_FIELD_ROOT)
     parser.add_argument("--reuse-selected", action=argparse.BooleanOptionalAction, default=True)
-    parser.add_argument("--reuse-csv", type=Path, default=REUSE_CSV)
+    parser.add_argument("--reuse-csv", type=Path, default=None)
+    parser.add_argument("--figure-root", type=Path, default=None)
     parser.add_argument("--skip-aggregate", action="store_true")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.poll_sec < 1 or args.poll_sec > 60:
         raise ValueError("--poll-sec must be between 1 and 60 seconds")
-    if args.out_root is None:
-        args.out_root = DEFAULT_SMOKE_OUT_ROOT if args.smoke else DEFAULT_OUT_ROOT
+    return args
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Resolve every generated run, log, and review location under ARTIFACT_ROOT."""
+
+    args.out_root = artifact_paths.resolve_run_root(
+        SMOKE_RUN_KEY if args.smoke else RUN_KEY,
+        args.out_root,
+        repo_root=REPO_ROOT,
+    )
+    review_root = artifact_paths.resolve_review_root(
+        EXPERIMENT_KEY,
+        args.review_root,
+        repo_root=REPO_ROOT,
+    )
     if args.smoke:
-        args.review_root = Path(args.review_root) / "smoke"
+        review_root = artifact_paths.resolve_managed_path(
+            review_root / "smoke",
+            allowed_root=artifact_paths.review_store_root(repo_root=REPO_ROOT),
+            label="smoke review root",
+        )
+    args.review_root = review_root
+    args.figure_root = artifact_paths.resolve_review_root(
+        FIGURE_EXPERIMENT_KEY,
+        args.figure_root,
+        repo_root=REPO_ROOT,
+    )
+    if args.reuse_selected:
+        reuse_csv = args.reuse_csv or args.figure_root / "fit_modes_standardized_panelAB_selected_runs.csv"
+        args.reuse_csv = artifact_paths.resolve_external_input_file(
+            reuse_csv,
+            label="--reuse-csv",
+            repo_root=REPO_ROOT,
+        )
+    elif args.reuse_csv is not None:
+        args.reuse_csv = artifact_paths.resolve_external_input_file(
+            args.reuse_csv,
+            label="--reuse-csv",
+            repo_root=REPO_ROOT,
+        )
     return args
 
 
@@ -994,7 +1027,7 @@ def deep_validate_targets(args: argparse.Namespace, cases: Sequence[CaseSpec]) -
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     cases = build_cases(args)
     if args.validate_targets or args.dry_run or args.smoke:
         validate_targets(cases)
@@ -1024,6 +1057,7 @@ def main() -> None:
             "--review-root", str(args.review_root),
             "--run-root", str(args.out_root),
             "--data-root", str(args.data_root),
+            "--figure-root", str(args.figure_root),
         ]
         aggregate = subprocess.run(aggregate_cmd, cwd=REPO_ROOT, check=False)
         returncode = returncode or aggregate.returncode

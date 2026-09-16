@@ -18,6 +18,7 @@ import hashlib
 import json
 import math
 import os
+import sys
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,11 +34,16 @@ import pandas as pd
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_REVIEW_ROOT = REPO_ROOT / "experiments/2026-08-02_fit_modes_population_n10"
+EXPERIMENTS_DIR = REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths  # noqa: E402
+
+
+EXPERIMENT_KEY = "2026-08-02_fit_modes_population_n10"
+RUN_KEY = "fit_modes_population_n10_v1"
 DEFAULT_DATA_ROOT = Path(os.environ.get("DATA_ROOT", "/workspace/data"))
-DEFAULT_RUN_ROOT = Path(
-    os.environ.get("RUN_ROOT", "/workspace/scratch/runs/fit_modes_population_n10_v1")
-)
 
 METHOD_ORDER = ["idir", "inr_bscp", "d_bscp", "mr_d_bscp"]
 METHOD_STYLE = {
@@ -75,15 +81,47 @@ class DiagnosticCurve:
     accepted_endpoint: float
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--review-root", type=Path, default=DEFAULT_REVIEW_ROOT)
-    parser.add_argument("--run-root", type=Path, default=DEFAULT_RUN_ROOT)
+    parser.add_argument("--review-root", type=Path, default=None)
+    parser.add_argument("--run-root", type=Path, default=None)
     parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--comparison-md", type=Path, default=None)
     parser.add_argument("--dpi", type=int, default=180)
-    return parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Constrain figure, report, and summary writes to the external review root."""
+
+    args.review_root = artifact_paths.resolve_review_root(
+        EXPERIMENT_KEY,
+        args.review_root,
+        repo_root=REPO_ROOT,
+    )
+    args.run_root = artifact_paths.resolve_run_root(
+        RUN_KEY,
+        args.run_root,
+        repo_root=REPO_ROOT,
+    )
+    if args.output_dir is None:
+        args.output_dir = args.review_root / "diagnostic_figures"
+    else:
+        args.output_dir = artifact_paths.resolve_managed_path(
+            args.output_dir,
+            allowed_root=args.review_root,
+            label="--output-dir",
+        )
+    if args.comparison_md is None:
+        args.comparison_md = args.review_root / "diagnostic_comparison.md"
+    else:
+        args.comparison_md = artifact_paths.resolve_managed_path(
+            args.comparison_md,
+            allowed_root=args.review_root,
+            label="--comparison-md",
+        )
+    return args
 
 
 def finite(value: Any) -> float | None:
@@ -530,7 +568,7 @@ def write_comparison_report(
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     review_root = args.review_root.resolve()
     run_root = args.run_root.resolve()
     data_root = args.data_root.resolve()

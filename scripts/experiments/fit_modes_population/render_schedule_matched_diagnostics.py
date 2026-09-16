@@ -15,6 +15,7 @@ import json
 import math
 import os
 import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Sequence
@@ -38,26 +39,16 @@ from plot_case_diagnostics import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-BASE_EXPERIMENT = REPO_ROOT / "experiments/2026-08-02_fit_modes_population_n10"
-REFRESH_EXPERIMENT = (
-    REPO_ROOT / "experiments/2026-08-13_fit_modes_dirlab_panelA_schedule_refresh"
-)
-DEFAULT_OUTPUT_ROOT = (
-    REPO_ROOT
-    / "experiments/paper_artifacts/fit_modes_population_diagnostics/v001_schedule_matched"
-)
-DEFAULT_POPULATION_RUN_ROOT = Path(
-    os.environ.get(
-        "POPULATION_RUN_ROOT",
-        "/workspace/scratch/runs/fit_modes_population_n10_v1",
-    )
-)
-DEFAULT_REFRESH_RUN_ROOT = Path(
-    os.environ.get(
-        "DIRLAB_REFRESH_RUN_ROOT",
-        "/workspace/scratch/runs/fit_modes_dirlab_panelA_mrdbscp_e400_400_800_900_diag10_v1",
-    )
-)
+EXPERIMENTS_DIR = REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths  # noqa: E402
+
+
+EXPERIMENT_KEY = "paper_artifacts/fit_modes_population_diagnostics/v001_schedule_matched"
+POPULATION_RUN_KEY = "fit_modes_population_n10_v1"
+REFRESH_RUN_KEY = "fit_modes_dirlab_panelA_mrdbscp_e400_400_800_900_diag10_v1"
 DEFAULT_DATA_ROOT = Path(os.environ.get("DATA_ROOT", "/workspace/data"))
 
 POPULATION_TOKEN = "${POPULATION_RUN_ROOT}"
@@ -76,25 +67,48 @@ PANEL_Y_LABEL = {"A": "A. Registration: 1−NCC", "B": "B. Field fitting: rRMSE 
 DATASET_LABEL = {"oasis": "OASIS N=10", "dirlab": "DIR-LAB N=10"}
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--base-index",
-        type=Path,
-        default=BASE_EXPERIMENT / "optimization_index.csv",
-    )
-    parser.add_argument(
-        "--replacement-index",
-        type=Path,
-        default=REFRESH_EXPERIMENT / "replacement_index.csv",
-    )
-    parser.add_argument("--population-run-root", type=Path, default=DEFAULT_POPULATION_RUN_ROOT)
-    parser.add_argument("--refresh-run-root", type=Path, default=DEFAULT_REFRESH_RUN_ROOT)
+    parser.add_argument("--base-index", type=Path, required=True)
+    parser.add_argument("--replacement-index", type=Path, required=True)
+    parser.add_argument("--population-run-root", type=Path, default=None)
+    parser.add_argument("--refresh-run-root", type=Path, default=None)
     parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT)
-    parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    parser.add_argument("--output-root", type=Path, default=None)
     parser.add_argument("--dpi", type=int, default=200)
     parser.add_argument("--dry-run", action="store_true")
-    return parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Require migrated generated indexes and route the versioned render externally."""
+
+    args.base_index = artifact_paths.resolve_external_input_file(
+        args.base_index,
+        label="--base-index",
+        repo_root=REPO_ROOT,
+    )
+    args.replacement_index = artifact_paths.resolve_external_input_file(
+        args.replacement_index,
+        label="--replacement-index",
+        repo_root=REPO_ROOT,
+    )
+    args.population_run_root = artifact_paths.resolve_run_root(
+        POPULATION_RUN_KEY,
+        args.population_run_root,
+        repo_root=REPO_ROOT,
+    )
+    args.refresh_run_root = artifact_paths.resolve_run_root(
+        REFRESH_RUN_KEY,
+        args.refresh_run_root,
+        repo_root=REPO_ROOT,
+    )
+    args.output_root = artifact_paths.resolve_review_root(
+        EXPERIMENT_KEY,
+        args.output_root,
+        repo_root=REPO_ROOT,
+    )
+    return args
 
 
 def sha256(path: Path) -> str:
@@ -611,7 +625,7 @@ def write_report(
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     base_index = Path(args.base_index).resolve()
     replacement_index = Path(args.replacement_index).resolve()
     population_root = Path(args.population_run_root).resolve()
@@ -786,9 +800,9 @@ def main() -> None:
         "repo_branch": git_output("branch", "--show-current"),
         "container_image": "${DOCKER_IMAGE}",
         "inputs": {
-            "historical_index": "experiments/2026-08-02_fit_modes_population_n10/optimization_index.csv",
+            "historical_index": f"external --base-index/{base_index.name}",
             "historical_index_sha256": sha256(base_index),
-            "replacement_index": "experiments/2026-08-13_fit_modes_dirlab_panelA_schedule_refresh/replacement_index.csv",
+            "replacement_index": f"external --replacement-index/{replacement_index.name}",
             "replacement_index_sha256": sha256(replacement_index),
             "population_run_root": "${POPULATION_RUN_ROOT}",
             "refresh_run_root": REFRESH_TOKEN,

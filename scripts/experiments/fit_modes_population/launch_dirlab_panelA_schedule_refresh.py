@@ -19,13 +19,18 @@ from typing import Any, Sequence
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+EXPERIMENTS_DIR = REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths  # noqa: E402
+
+
 RUNNER = REPO_ROOT / "scripts/experiments/lungct_no_sweep_repro/run_one.py"
 COMMON = REPO_ROOT / "scripts/experiments/lungct_no_sweep_repro/common.py"
 METHOD = "direct_cp_32_16_8_4_global_ncc_fd_be"
 EXPERIMENT_ID = "fit_modes_dirlab_panelA_mrdbscp_e400_400_800_900_diag10_v1"
-DEFAULT_REVIEW_ROOT = REPO_ROOT / "experiments/2026-08-13_fit_modes_dirlab_panelA_schedule_refresh"
-DEFAULT_RUN_ROOT = Path(f"/database/inrorspline/runs/{EXPERIMENT_ID}")
-DEFAULT_SMOKE_RUN_ROOT = Path(f"/database/inrorspline/runs/{EXPERIMENT_ID}_smoke")
+EXPERIMENT_KEY = "2026-08-13_fit_modes_dirlab_panelA_schedule_refresh"
 DEFAULT_DATA_ROOT = Path("/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm")
 DEFAULT_CASES = tuple(range(1, 11))
 SMOKE_CASES = (2, 8)
@@ -37,11 +42,11 @@ HISTORICAL_MEDIAN_RUNTIME_SEC = 308.9180957078934
 TERMINAL_SUCCESS = {"completed", "completed_existing"}
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--review-root", type=Path, default=DEFAULT_REVIEW_ROOT)
-    parser.add_argument("--run-root", type=Path, default=DEFAULT_RUN_ROOT)
-    parser.add_argument("--smoke-run-root", type=Path, default=DEFAULT_SMOKE_RUN_ROOT)
+    parser.add_argument("--review-root", type=Path, default=None)
+    parser.add_argument("--run-root", type=Path, default=None)
+    parser.add_argument("--smoke-run-root", type=Path, default=None)
     parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT)
     parser.add_argument("--cases", type=str, default=",".join(map(str, DEFAULT_CASES)))
     parser.add_argument("--gpus", type=str, default="0,1")
@@ -52,7 +57,28 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--require-free-gpus", action=argparse.BooleanOptionalAction, default=True
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Resolve generated logs, run data, and review reports below ARTIFACT_ROOT."""
+
+    args.review_root = artifact_paths.resolve_review_root(
+        EXPERIMENT_KEY,
+        args.review_root,
+        repo_root=REPO_ROOT,
+    )
+    args.run_root = artifact_paths.resolve_run_root(
+        EXPERIMENT_ID,
+        args.run_root,
+        repo_root=REPO_ROOT,
+    )
+    args.smoke_run_root = artifact_paths.resolve_run_root(
+        f"{EXPERIMENT_ID}_smoke",
+        args.smoke_run_root,
+        repo_root=REPO_ROOT,
+    )
+    return args
 
 
 def utc_now() -> datetime:
@@ -403,7 +429,7 @@ def write_monitor(
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     gpus = parse_ints(args.gpus)
     if gpus != [0, 1]:
         raise ValueError(f"This locked refresh requires GPUs 0,1; got {gpus}")

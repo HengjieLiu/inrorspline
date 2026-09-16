@@ -18,9 +18,16 @@ from typing import Any, Sequence
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+EXPERIMENTS_DIR = REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths  # noqa: E402
+
+
 RUNNER = REPO_ROOT / "scripts/experiments/oasis_alpha_sweep/run_one.py"
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "experiments/2026-08-14_oasis_panelA_fixedmask_diagnostics"
-DEFAULT_RUN_ROOT = Path("/database/inrorspline/runs/oasis_panelA_fixedmask_diag_curves_v1")
+EXPERIMENT_KEY = "2026-08-14_oasis_panelA_fixedmask_diagnostics"
+RUN_KEY = "oasis_panelA_fixedmask_diag_curves_v1"
 DEFAULT_OASIS_ROOT = Path(
     os.environ.get(
         "INRORSPLINE_OASIS_ROOT",
@@ -79,10 +86,10 @@ METHODS: dict[str, dict[str, Any]] = {
 }
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--run-root", type=Path, default=DEFAULT_RUN_ROOT)
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument("--run-root", type=Path, default=None)
+    parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--oasis-root", type=Path, default=DEFAULT_OASIS_ROOT)
     parser.add_argument("--pair-file", type=Path, default=DEFAULT_PAIR_FILE)
     parser.add_argument("--ranks", default="0,1,2,3,4,5,6,7,8,9")
@@ -91,7 +98,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--resume", action="store_true")
-    return parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Constrain all generated run, log, and review material to ARTIFACT_ROOT."""
+
+    args.run_root = artifact_paths.resolve_run_root(
+        RUN_KEY,
+        args.run_root,
+        repo_root=REPO_ROOT,
+    )
+    args.output_dir = artifact_paths.resolve_review_root(
+        EXPERIMENT_KEY,
+        args.output_dir,
+        repo_root=REPO_ROOT,
+    )
+    return args
 
 
 def utc_text() -> str:
@@ -488,7 +511,7 @@ def launch(job: dict[str, Any], gpu: str) -> subprocess.Popen[str]:
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     gpus = parse_gpus(args.gpus)
     if args.poll_sec < 1 or args.poll_sec > 60:
         raise ValueError("--poll-sec must be in [1, 60]")

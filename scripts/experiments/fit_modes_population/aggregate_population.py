@@ -9,6 +9,7 @@ import json
 import math
 import os
 import statistics
+import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,30 +17,50 @@ from typing import Any, Iterable, Sequence
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_REVIEW_ROOT = REPO_ROOT / "experiments/2026-08-02_fit_modes_population_n10"
-FIGURE_ROOT = REPO_ROOT / "experiments/paper_artifacts/fitting_figure/v002_candidate"
+EXPERIMENTS_DIR = REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths  # noqa: E402
+
+
+EXPERIMENT_KEY = "2026-08-02_fit_modes_population_n10"
+RUN_KEY = "fit_modes_population_n10_v1"
+SMOKE_RUN_KEY = "fit_modes_population_n10_smoke_v1"
+FIGURE_EXPERIMENT_KEY = "paper_artifacts/fitting_figure/v002_candidate"
 TERMINAL_SUCCESS = {"completed", "completed_existing", "reused"}
 DEFAULT_DATA_ROOT = Path(os.environ.get("DATA_ROOT", "/workspace/data"))
-DEFAULT_RUN_ROOT = Path(
-    os.environ.get(
-        "RUN_ROOT", "/workspace/scratch/runs/fit_modes_population_n10_v1"
-    )
-)
-DEFAULT_SMOKE_RUN_ROOT = Path(
-    os.environ.get(
-        "SMOKE_RUN_ROOT",
-        "/workspace/scratch/runs/fit_modes_population_n10_smoke_v1",
-    )
-)
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--review-root", type=Path, default=DEFAULT_REVIEW_ROOT)
+    parser.add_argument("--review-root", type=Path, default=None)
     parser.add_argument("--run-root", type=Path, default=None)
+    parser.add_argument("--figure-root", type=Path, default=None)
     parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT)
     parser.add_argument("--allow-incomplete", action="store_true")
-    return parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Keep aggregate reports external and resolve the current figure input safely."""
+
+    args.review_root = artifact_paths.resolve_review_root(
+        EXPERIMENT_KEY,
+        args.review_root,
+        repo_root=REPO_ROOT,
+    )
+    args.run_root = artifact_paths.resolve_run_root(
+        SMOKE_RUN_KEY if args.review_root.name == "smoke" else RUN_KEY,
+        args.run_root,
+        repo_root=REPO_ROOT,
+    )
+    args.figure_root = artifact_paths.resolve_review_root(
+        FIGURE_EXPERIMENT_KEY,
+        args.figure_root,
+        repo_root=REPO_ROOT,
+    )
+    return args
 
 
 def finite(value: Any) -> float | None:
@@ -145,9 +166,9 @@ def last_finite_row(path: Path, fields: Iterable[str]) -> tuple[dict[str, str], 
     return None
 
 
-def selected_endpoint_map() -> dict[tuple[str, str, str], float]:
+def selected_endpoint_map(figure_root: Path) -> dict[tuple[str, str, str], float]:
     result: dict[tuple[str, str, str], float] = {}
-    path = FIGURE_ROOT / "fit_modes_standardized_panelAB_curve_summary.csv"
+    path = figure_root / "fit_modes_standardized_panelAB_curve_summary.csv"
     for row in read_csv(path):
         plot_case = str(row["plot_case"])
         key = (str(row["panel"]), plot_case, str(row["display_method"]))
@@ -157,9 +178,9 @@ def selected_endpoint_map() -> dict[tuple[str, str, str], float]:
     return result
 
 
-def target_power_map() -> dict[str, float]:
+def target_power_map(figure_root: Path) -> dict[str, float]:
     result: dict[str, float] = {}
-    path = FIGURE_ROOT / "fit_modes_standardized_target_power_summary.csv"
+    path = figure_root / "fit_modes_standardized_target_power_summary.csv"
     for row in read_csv(path):
         value = finite(row.get("target_power_component_mean"))
         if value is not None:
@@ -292,18 +313,16 @@ def population_stats(rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     review = Path(args.review_root)
     data_root = Path(args.data_root)
-    run_root = Path(args.run_root) if args.run_root is not None else (
-        DEFAULT_SMOKE_RUN_ROOT if review.name == "smoke" else DEFAULT_RUN_ROOT
-    )
+    run_root = Path(args.run_root)
     jobs_path = review / "job_manifest.json"
     jobs = json.loads(jobs_path.read_text())
     if not isinstance(jobs, list):
         raise RuntimeError(f"Expected a list in {jobs_path}")
-    selected_endpoints = selected_endpoint_map()
-    powers = target_power_map()
+    selected_endpoints = selected_endpoint_map(Path(args.figure_root))
+    powers = target_power_map(Path(args.figure_root))
     rows: list[dict[str, Any]] = []
     problems: list[str] = []
     for job in jobs:

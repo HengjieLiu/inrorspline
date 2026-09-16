@@ -9,6 +9,7 @@ import hashlib
 import json
 import math
 import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
@@ -27,10 +28,6 @@ from render_lungmask_panelA_population_diagnostics import (
     DATA_TOKEN,
     DATASET_LABEL,
     DEFAULT_DATA_ROOT,
-    DEFAULT_LUNGMASK_RUN_ROOT,
-    DEFAULT_OUTPUT_ROOT as DEFAULT_V002_ROOT,
-    DEFAULT_POPULATION_RUN_ROOT,
-    DEFAULT_REFRESH_RUN_ROOT,
     LUNGMASK_TOKEN,
     PANEL_Y_LABEL,
     POPULATION_TOKEN,
@@ -58,11 +55,18 @@ from render_lungmask_panelA_population_diagnostics import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_OUTPUT_ROOT = (
-    REPO_ROOT
-    / "experiments/paper_artifacts/fit_modes_population_diagnostics/v003_masked_panelA_both_datasets"
-)
-DEFAULT_OASIS_MASKED_RUN_ROOT = Path("/database/inrorspline/runs/oasis_panelA_fixedmask_diag_curves_v1")
+EXPERIMENTS_DIR = REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths  # noqa: E402
+
+
+EXPERIMENT_KEY = "paper_artifacts/fit_modes_population_diagnostics/v003_masked_panelA_both_datasets"
+OASIS_MASKED_RUN_KEY = "oasis_panelA_fixedmask_diag_curves_v1"
+POPULATION_RUN_KEY = "fit_modes_population_n10_v1"
+REFRESH_RUN_KEY = "fit_modes_dirlab_panelA_mrdbscp_e400_400_800_900_diag10_v1"
+LUNGMASK_RUN_KEY = "dirlab_case01_case08_panelA_lungmask_diag_curves_v1"
 OASIS_MASKED_TOKEN = "${OASIS_MASKED_PANELA_RUN_ROOT}"
 EXPECTED_EPOCHS = np.array([1, *range(10, 2501, 10)], dtype=float)
 
@@ -89,17 +93,53 @@ OASIS_METHODS = {
 }
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--v002-root", type=Path, default=DEFAULT_V002_ROOT)
-    parser.add_argument("--oasis-masked-run-root", type=Path, default=DEFAULT_OASIS_MASKED_RUN_ROOT)
-    parser.add_argument("--population-run-root", type=Path, default=DEFAULT_POPULATION_RUN_ROOT)
-    parser.add_argument("--refresh-run-root", type=Path, default=DEFAULT_REFRESH_RUN_ROOT)
-    parser.add_argument("--lungmask-run-root", type=Path, default=DEFAULT_LUNGMASK_RUN_ROOT)
+    parser.add_argument("--v002-root", type=Path, required=True)
+    parser.add_argument("--oasis-masked-run-root", type=Path, default=None)
+    parser.add_argument("--population-run-root", type=Path, default=None)
+    parser.add_argument("--refresh-run-root", type=Path, default=None)
+    parser.add_argument("--lungmask-run-root", type=Path, default=None)
     parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT)
-    parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    parser.add_argument("--output-root", type=Path, default=None)
     parser.add_argument("--dpi", type=int, default=200)
-    return parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Route this versioned renderer and all migrated generated inputs externally."""
+
+    args.v002_root = artifact_paths.resolve_external_input_directory(
+        args.v002_root,
+        label="--v002-root",
+        repo_root=REPO_ROOT,
+    )
+    args.oasis_masked_run_root = artifact_paths.resolve_run_root(
+        OASIS_MASKED_RUN_KEY,
+        args.oasis_masked_run_root,
+        repo_root=REPO_ROOT,
+    )
+    args.population_run_root = artifact_paths.resolve_run_root(
+        POPULATION_RUN_KEY,
+        args.population_run_root,
+        repo_root=REPO_ROOT,
+    )
+    args.refresh_run_root = artifact_paths.resolve_run_root(
+        REFRESH_RUN_KEY,
+        args.refresh_run_root,
+        repo_root=REPO_ROOT,
+    )
+    args.lungmask_run_root = artifact_paths.resolve_run_root(
+        LUNGMASK_RUN_KEY,
+        args.lungmask_run_root,
+        repo_root=REPO_ROOT,
+    )
+    args.output_root = artifact_paths.resolve_review_root(
+        EXPERIMENT_KEY,
+        args.output_root,
+        repo_root=REPO_ROOT,
+    )
+    return args
 
 
 def utc_text() -> str:
@@ -417,7 +457,7 @@ def write_reports(output_root: Path, counts: dict[str, int], audit: Sequence[dic
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     output_root = args.output_root.resolve()
     output_root.mkdir(parents=True, exist_ok=True)
     case_dir = output_root / "case_figures"

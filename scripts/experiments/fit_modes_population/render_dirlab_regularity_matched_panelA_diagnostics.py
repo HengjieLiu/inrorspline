@@ -18,6 +18,7 @@ import csv
 import json
 import math
 import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
@@ -36,18 +37,19 @@ from plot_case_diagnostics import DiagnosticCurve, METHOD_ORDER, METHOD_STYLE, n
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_V003_ROOT = (
-    REPO_ROOT
-    / "experiments/paper_artifacts/fit_modes_population_diagnostics/v003_masked_panelA_both_datasets"
-)
-DEFAULT_ALPHA_CASE_ROWS = (
-    REPO_ROOT / "experiments/2026-08-14_lungct_fdbe_cps4_alpha_landscape_all10/case_rows.csv"
-)
-DEFAULT_ALPHA_RUN_ROOT = Path("/database/inrorspline/runs/lungct_fdbe_cps4_alpha_landscape_all10_v1")
-DEFAULT_OUTPUT_ROOT = (
-    REPO_ROOT
-    / "experiments/paper_artifacts/fit_modes_population_diagnostics/v004_dirlab_regularity_matched_panelA"
-)
+EXPERIMENTS_DIR = REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths  # noqa: E402
+
+
+EXPERIMENT_KEY = "paper_artifacts/fit_modes_population_diagnostics/v004_dirlab_regularity_matched_panelA"
+ALPHA_RUN_KEY = "lungct_fdbe_cps4_alpha_landscape_all10_v1"
+POPULATION_RUN_KEY = "fit_modes_population_n10_v1"
+REFRESH_RUN_KEY = "fit_modes_dirlab_panelA_mrdbscp_e400_400_800_900_diag10_v1"
+LUNGMASK_RUN_KEY = "dirlab_case01_case08_panelA_lungmask_diag_curves_v1"
+OASIS_MASKED_RUN_KEY = "oasis_panelA_fixedmask_diag_curves_v1"
 ALPHA_TOKEN = "${DIRLAB_FDBE_CPS4_ALPHA_LANDSCAPE_RUN_ROOT}"
 EXPECTED_EPOCHS = np.array([1, *range(10, 2501, 10)], dtype=int)
 V004_AXIS_LIMITS = {"A": (1.0e-2, 1.0e0), "B": (1.0e-1, 1.0e3)}
@@ -63,19 +65,41 @@ FIG3_CAMERA_READY_FONTS = {
 }
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--v003-root", type=Path, default=DEFAULT_V003_ROOT)
-    parser.add_argument("--alpha-case-rows", type=Path, default=DEFAULT_ALPHA_CASE_ROWS)
-    parser.add_argument("--alpha-run-root", type=Path, default=DEFAULT_ALPHA_RUN_ROOT)
-    parser.add_argument("--population-run-root", type=Path, default=base.DEFAULT_POPULATION_RUN_ROOT)
-    parser.add_argument("--refresh-run-root", type=Path, default=base.DEFAULT_REFRESH_RUN_ROOT)
-    parser.add_argument("--lungmask-run-root", type=Path, default=base.DEFAULT_LUNGMASK_RUN_ROOT)
-    parser.add_argument("--oasis-masked-run-root", type=Path, default=v003.DEFAULT_OASIS_MASKED_RUN_ROOT)
+    parser.add_argument("--v003-root", type=Path, required=True)
+    parser.add_argument("--alpha-case-rows", type=Path, required=True)
+    parser.add_argument("--alpha-run-root", type=Path, default=None)
+    parser.add_argument("--population-run-root", type=Path, default=None)
+    parser.add_argument("--refresh-run-root", type=Path, default=None)
+    parser.add_argument("--lungmask-run-root", type=Path, default=None)
+    parser.add_argument("--oasis-masked-run-root", type=Path, default=None)
     parser.add_argument("--data-root", type=Path, default=base.DEFAULT_DATA_ROOT)
-    parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    parser.add_argument("--output-root", type=Path, default=None)
     parser.add_argument("--dpi", type=int, default=200)
-    return parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Use only external stores for the v004 output and generated inputs."""
+
+    args.v003_root = artifact_paths.resolve_external_input_directory(
+        args.v003_root,
+        label="--v003-root",
+        repo_root=REPO_ROOT,
+    )
+    args.alpha_case_rows = artifact_paths.resolve_external_input_file(
+        args.alpha_case_rows,
+        label="--alpha-case-rows",
+        repo_root=REPO_ROOT,
+    )
+    args.alpha_run_root = artifact_paths.resolve_run_root(ALPHA_RUN_KEY, args.alpha_run_root, repo_root=REPO_ROOT)
+    args.population_run_root = artifact_paths.resolve_run_root(POPULATION_RUN_KEY, args.population_run_root, repo_root=REPO_ROOT)
+    args.refresh_run_root = artifact_paths.resolve_run_root(REFRESH_RUN_KEY, args.refresh_run_root, repo_root=REPO_ROOT)
+    args.lungmask_run_root = artifact_paths.resolve_run_root(LUNGMASK_RUN_KEY, args.lungmask_run_root, repo_root=REPO_ROOT)
+    args.oasis_masked_run_root = artifact_paths.resolve_run_root(OASIS_MASKED_RUN_KEY, args.oasis_masked_run_root, repo_root=REPO_ROOT)
+    args.output_root = artifact_paths.resolve_review_root(EXPERIMENT_KEY, args.output_root, repo_root=REPO_ROOT)
+    return args
 
 
 def utc_text() -> str:
@@ -95,12 +119,12 @@ def write_csv(path: Path, rows: Sequence[dict[str, Any]]) -> None:
         writer.writerows(rows)
 
 
-def portable_alpha_path(value: Any) -> str:
+def portable_alpha_path(value: Any, alpha_root: Path) -> str:
     text = str(value or "")
     if text.startswith("${RUN_ROOT}/"):
         return text.replace("${RUN_ROOT}", ALPHA_TOKEN, 1)
-    if text.startswith(str(DEFAULT_ALPHA_RUN_ROOT)):
-        return text.replace(str(DEFAULT_ALPHA_RUN_ROOT), ALPHA_TOKEN, 1)
+    if text.startswith(str(alpha_root)):
+        return text.replace(str(alpha_root), ALPHA_TOKEN, 1)
     return text
 
 
@@ -130,8 +154,8 @@ def selected_alpha_rows(alpha_rows: pd.DataFrame) -> pd.DataFrame:
 
 def validate_alpha_curve(row: pd.Series, alpha_root: Path) -> dict[str, Any]:
     roots = {ALPHA_TOKEN: alpha_root}
-    curve_path = resolve_path(portable_alpha_path(row["curve_path"]), roots)
-    summary_path = resolve_path(portable_alpha_path(row["summary_path"]), roots)
+    curve_path = resolve_path(portable_alpha_path(row["curve_path"], alpha_root), roots)
+    summary_path = resolve_path(portable_alpha_path(row["summary_path"], alpha_root), roots)
     if not curve_path.is_file():
         raise FileNotFoundError(curve_path)
     if not summary_path.is_file():
@@ -214,8 +238,8 @@ def build_v004_source_index(
         updates = {
             "status": "completed_reused",
             "source_kind": "dirlab_regularity_matched_panelA_alpha_landscape_reuse",
-            "source_path": portable_alpha_path(new["curve_path"]),
-            "summary_path": portable_alpha_path(new["summary_path"]),
+            "source_path": portable_alpha_path(new["curve_path"], alpha_root),
+            "summary_path": portable_alpha_path(new["summary_path"], alpha_root),
             "endpoint_name": "lung_mask_one_minus_ncc",
             "endpoint_value": check["endpoint_value"],
             "diagnostic_ncc": check["diagnostic_ncc"],
@@ -724,7 +748,7 @@ def write_reports(
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     base.AXIS_LIMITS["A"] = V004_AXIS_LIMITS["A"]
     base.AXIS_LIMITS["B"] = V004_AXIS_LIMITS["B"]
     v003.AXIS_LIMITS["A"] = V004_AXIS_LIMITS["A"]
@@ -786,7 +810,7 @@ def main() -> None:
         "created_at_utc": utc_text(),
         "version": "v004_dirlab_regularity_matched_panelA",
         "v003_source_index": "v003_masked_panelA_both_datasets/camera_ready_source_index_masked_panelA_both_datasets.csv",
-        "alpha_case_rows": os.path.relpath(args.alpha_case_rows.resolve(), REPO_ROOT),
+        "alpha_case_rows": f"external --alpha-case-rows/{args.alpha_case_rows.name}",
         "run_root_tokens": sorted(roots),
         "axis_limits": V004_AXIS_LIMITS,
         "stage_boundaries": {f"{dataset}_{panel}": values for (dataset, panel), values in base.STAGE_BOUNDARIES.items()},

@@ -9,6 +9,7 @@ import hashlib
 import json
 import math
 import statistics
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Sequence
@@ -18,21 +19,19 @@ import pandas as pd
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+EXPERIMENTS_DIR = REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
+
+import artifact_paths  # noqa: E402
+
+
 METHOD = "direct_cp_32_16_8_4_global_ncc_fd_be"
-DEFAULT_REVIEW_ROOT = REPO_ROOT / "experiments/2026-08-13_fit_modes_dirlab_panelA_schedule_refresh"
-DEFAULT_RUN_ROOT = Path(
-    "/database/inrorspline/runs/fit_modes_dirlab_panelA_mrdbscp_e400_400_800_900_diag10_v1"
-)
-DEFAULT_HISTORICAL_RUN_ROOT = Path(
-    "/database/inrorspline/runs/fit_modes_population_n10_v1"
-)
+EXPERIMENT_KEY = "2026-08-13_fit_modes_dirlab_panelA_schedule_refresh"
+RUN_KEY = "fit_modes_dirlab_panelA_mrdbscp_e400_400_800_900_diag10_v1"
+HISTORICAL_RUN_KEY = "fit_modes_population_n10_v1"
 DEFAULT_DATA_ROOT = Path("/database/inrorspline")
-DEFAULT_AUG13_RUN_ROOT = Path(
-    "/database/inrorspline/runs/lungct_fig2_mrdbscp_idirloss_fdbe_e400_400_800_900_v1"
-)
-HISTORICAL_INDEX = (
-    REPO_ROOT / "experiments/2026-08-02_fit_modes_population_n10/optimization_index.csv"
-)
+AUG13_RUN_KEY = "lungct_fig2_mrdbscp_idirloss_fdbe_e400_400_800_900_v1"
 EXPECTED_CASES = list(range(1, 11))
 EXPECTED_EPOCHS = [1, *range(10, 2501, 10)]
 EXPECTED_STAGE_EPOCHS = [400, 400, 800, 900]
@@ -40,15 +39,43 @@ EXPECTED_STAGE_FULL_CPS = [32, 16, 8, 4]
 EXPECTED_STAGE_DOWNSAMPLE = [8, 4, 2, 1]
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--review-root", type=Path, default=DEFAULT_REVIEW_ROOT)
-    parser.add_argument("--run-root", type=Path, default=DEFAULT_RUN_ROOT)
-    parser.add_argument("--historical-run-root", type=Path, default=DEFAULT_HISTORICAL_RUN_ROOT)
+    parser.add_argument("--review-root", type=Path, default=None)
+    parser.add_argument("--run-root", type=Path, default=None)
+    parser.add_argument("--historical-run-root", type=Path, default=None)
+    parser.add_argument("--historical-index", type=Path, required=True)
     parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT)
-    parser.add_argument("--aug13-run-root", type=Path, default=DEFAULT_AUG13_RUN_ROOT)
+    parser.add_argument("--aug13-run-root", type=Path, default=None)
     parser.add_argument("--allow-incomplete", action="store_true")
-    return parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Keep current outputs external and make migrated generated inputs explicit."""
+
+    args.review_root = artifact_paths.resolve_review_root(
+        EXPERIMENT_KEY,
+        args.review_root,
+        repo_root=REPO_ROOT,
+    )
+    args.run_root = artifact_paths.resolve_run_root(RUN_KEY, args.run_root, repo_root=REPO_ROOT)
+    args.historical_run_root = artifact_paths.resolve_run_root(
+        HISTORICAL_RUN_KEY,
+        args.historical_run_root,
+        repo_root=REPO_ROOT,
+    )
+    args.aug13_run_root = artifact_paths.resolve_run_root(
+        AUG13_RUN_KEY,
+        args.aug13_run_root,
+        repo_root=REPO_ROOT,
+    )
+    args.historical_index = artifact_paths.resolve_external_input_file(
+        args.historical_index,
+        label="--historical-index",
+        repo_root=REPO_ROOT,
+    )
+    return args
 
 
 def finite(value: Any) -> float | None:
@@ -361,7 +388,7 @@ def format_value(value: Any, digits: int = 6) -> str:
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     review_root = Path(args.review_root)
     run_root = Path(args.run_root)
     historical_run_root = Path(args.historical_run_root)
@@ -378,7 +405,7 @@ def main() -> None:
         replacement_rows.append(row)
         problems.extend(errors)
 
-    old = historical_rows(HISTORICAL_INDEX)
+    old = historical_rows(Path(args.historical_index))
     if old["case_id"].tolist() != EXPECTED_CASES:
         problems.append(f"historical_cases={old['case_id'].tolist()}")
     replacement_by_case = {int(row["case_id"]): row for row in replacement_rows}
