@@ -26,19 +26,15 @@ THIS_DIR = Path(__file__).resolve().parent
 if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
 
+EXPERIMENT_SCRIPTS_DIR = REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENT_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENT_SCRIPTS_DIR))
+
 import build_current_tre_stdlogj_expanded as base  # noqa: E402
+import artifact_paths  # noqa: E402
 
 
-DEFAULT_OUTPUT_DIR = (
-    REPO_ROOT / "experiments/paper_artifacts/pareto_figure/v013_final_dirlab4dct_axes_labels"
-)
-DEFAULT_V012_DIR = (
-    REPO_ROOT
-    / "experiments/paper_artifacts/pareto_figure/"
-    / "v012_current_tre_stdlogj_fdbe_cps4_alpha_landscape"
-)
-DEFAULT_OASIS_SOURCE = base.DEFAULT_OASIS_SOURCE
-DEFAULT_V012_SOURCE_ROWS = DEFAULT_V012_DIR / "source_rows.csv"
+ARTIFACT_EXPERIMENT_KEY = "paper_artifacts/pareto_figure/v013_final_dirlab4dct_axes_labels"
 
 X_COL = base.X_COL
 Y_COL = base.Y_COL
@@ -477,18 +473,39 @@ def build(
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
-    parser.add_argument("--oasis-source", type=Path, default=DEFAULT_OASIS_SOURCE)
-    parser.add_argument("--source-rows", type=Path, default=DEFAULT_V012_SOURCE_ROWS)
+    parser.add_argument("--review-root", type=Path, default=None)
+    parser.add_argument("--oasis-source", type=Path, required=True)
+    parser.add_argument("--source-rows", type=Path, required=True)
     return parser.parse_args(argv)
 
 
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Resolve the external destination and prior generated-input files."""
+
+    args.review_root = artifact_paths.resolve_review_root(
+        ARTIFACT_EXPERIMENT_KEY,
+        args.review_root,
+        repo_root=REPO_ROOT,
+    )
+    args.oasis_source = artifact_paths.resolve_external_input_file(
+        args.oasis_source,
+        label="--oasis-source",
+        repo_root=REPO_ROOT,
+    )
+    args.source_rows = artifact_paths.resolve_external_input_file(
+        args.source_rows,
+        label="--source-rows",
+        repo_root=REPO_ROOT,
+    )
+    return args
+
+
 def main(argv: Sequence[str] | None = None) -> None:
-    args = parse_args(argv)
+    args = resolve_artifact_paths(parse_args(argv))
     manifest = build(
-        output_dir=args.output_dir.resolve(),
-        oasis_source=args.oasis_source.resolve(),
-        source_rows=args.source_rows.resolve(),
+        output_dir=args.review_root,
+        oasis_source=args.oasis_source,
+        source_rows=args.source_rows,
     )
     print(json.dumps(manifest, indent=2, sort_keys=True))
 

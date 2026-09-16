@@ -51,15 +51,15 @@
   "artifact_versions": {
     "best_result_table": {
       "current": "v002_candidate",
-      "output_dir": "experiments/paper_artifacts/best_result_table/v002_candidate"
+      "review_key": "paper_artifacts/best_result_table/v002_candidate"
     },
     "pareto_figure": {
       "current": "v002_candidate",
-      "output_dir": "experiments/paper_artifacts/pareto_figure/v002_candidate"
+      "review_key": "paper_artifacts/pareto_figure/v002_candidate"
     },
     "fitting_figure": {
       "current": "v001",
-      "output_dir": "experiments/paper_artifacts/fitting_figure/v001"
+      "review_key": "paper_artifacts/fitting_figure/v001"
     }
   },
   "artifact_source_overrides": {

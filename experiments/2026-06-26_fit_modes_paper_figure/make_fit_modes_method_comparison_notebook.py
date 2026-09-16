@@ -8,8 +8,8 @@ from pathlib import Path
 import nbformat as nbf
 
 
-REVIEW_ROOT = Path(__file__).resolve().parent
-NOTEBOOK_PATH = REVIEW_ROOT / "fit_modes_method_comparison.ipynb"
+SOURCE_ROOT = Path(__file__).resolve().parent
+NOTEBOOK_PATH = SOURCE_ROOT / "fit_modes_method_comparison.ipynb"
 
 
 def code_cell(source: str) -> nbf.NotebookNode:
@@ -92,13 +92,13 @@ candidates = [
 ]
 for candidate in candidates:
     if (candidate / "fit_modes_method_comparison.py").exists():
-        REVIEW_ROOT = candidate
+        SOURCE_ROOT = candidate
         break
 else:
     raise FileNotFoundError("Could not locate fit_modes_method_comparison.py")
 
-sys.path.insert(0, str(REVIEW_ROOT))
-print(REVIEW_ROOT)
+sys.path.insert(0, str(SOURCE_ROOT))
+print(SOURCE_ROOT)
 """
         ),
         code_cell(
@@ -111,12 +111,17 @@ from fit_modes_method_comparison import (
     make_main_figure,
     make_relative_field_fit_figure,
     relative_field_curve_summary,
+    resolve_fitting_output_dir,
     save_relative_field_fit_figure,
     save_main_figure,
     selected_runs,
     curve_summary,
     target_power_summary,
 )
+
+ARTIFACT_OUTPUT_DIR = resolve_fitting_output_dir()
+ARTIFACT_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+print(f"Artifact output directory: {ARTIFACT_OUTPUT_DIR}")
 """
         ),
         markdown_cell(
@@ -135,7 +140,7 @@ objective target-field MSE.
             """
 selection = selected_runs()
 display(selection.drop(columns=["run_dir"]))
-selection.to_csv(REVIEW_ROOT / "fit_modes_method_comparison_selected_runs.csv", index=False)
+selection.to_csv(ARTIFACT_OUTPUT_DIR / "fit_modes_method_comparison_selected_runs.csv", index=False)
 """
         ),
         markdown_cell(
@@ -161,7 +166,7 @@ summary = pd.concat(
     ignore_index=True,
 )
 display(summary.drop(columns=["source"]))
-summary.to_csv(REVIEW_ROOT / "fit_modes_method_comparison_curve_summary.csv", index=False)
+summary.to_csv(ARTIFACT_OUTPUT_DIR / "fit_modes_method_comparison_curve_summary.csv", index=False)
 """
         ),
         markdown_cell(
@@ -179,11 +184,11 @@ fig = make_main_figure(reg_curves, field_curves, smooth=True)
 display(fig)
 plt.close(fig)
 existing_outputs = {
-    "pdf": REVIEW_ROOT / "fit_modes_method_comparison_curves.pdf",
-    "png": REVIEW_ROOT / "fit_modes_method_comparison_curves.png",
+    "pdf": ARTIFACT_OUTPUT_DIR / "fit_modes_method_comparison_curves.pdf",
+    "png": ARTIFACT_OUTPUT_DIR / "fit_modes_method_comparison_curves.png",
 }
 display(Markdown(
-    "Existing combined-figure files are not rewritten by this cell:\\n"
+    "Combined-figure paths in the external artifact store (not rewritten by this cell):\\n"
     + "\\n".join([f"- `{name}`: `{path}`" for name, path in existing_outputs.items()])
 ))
 """
@@ -204,7 +209,7 @@ epoch-1 masked MSE equals the masked target-field component power.
 relative_field_curves = load_relative_field_fit_curves(selection)
 target_powers = target_power_summary(relative_field_curves, RELATIVE_FIELD_CASE_ORDER)
 display(target_powers)
-target_powers.to_csv(REVIEW_ROOT / "fit_modes_target_power_summary.csv", index=False)
+target_powers.to_csv(ARTIFACT_OUTPUT_DIR / "fit_modes_target_power_summary.csv", index=False)
 """
         ),
         code_cell(
@@ -227,7 +232,7 @@ display(
         ]
     ]
 )
-relative_summary.to_csv(REVIEW_ROOT / "fit_modes_relative_field_fit_curve_summary.csv", index=False)
+relative_summary.to_csv(ARTIFACT_OUTPUT_DIR / "fit_modes_relative_field_fit_curve_summary.csv", index=False)
 """
         ),
         code_cell(
@@ -238,7 +243,10 @@ relative_fig = make_relative_field_fit_figure(
     smooth=True,
     case_order=RELATIVE_FIELD_CASE_ORDER,
 )
-relative_outputs = save_relative_field_fit_figure(relative_fig)
+relative_outputs = save_relative_field_fit_figure(
+    relative_fig,
+    review_root=ARTIFACT_OUTPUT_DIR,
+)
 display(Markdown("\\n".join([f"- `{name}`: `{path}`" for name, path in relative_outputs.items()])))
 display(Image(filename=str(relative_outputs["png"])))
 """
@@ -257,7 +265,9 @@ is capped at `100%` rRMSE.
         ),
         code_cell(
             """
-lr_selected, lr_target_powers, lr_summary, lr_fig, lr_outputs = build_rrmse_lr_trajectory_outputs()
+lr_selected, lr_target_powers, lr_summary, lr_fig, lr_outputs = build_rrmse_lr_trajectory_outputs(
+    review_root=ARTIFACT_OUTPUT_DIR,
+)
 display(lr_selected.drop(columns=["source"]))
 display(
     lr_summary[
@@ -284,7 +294,8 @@ plt.close(lr_fig)
             """
 ## Output Files
 
-The notebook writes or updates:
+The notebook writes or updates the following files only under the configured
+external `ARTIFACT_OUTPUT_DIR` (`$ARTIFACT_ROOT/repo_experiments/...`):
 
 - `fit_modes_method_comparison_selected_runs.csv`
 - `fit_modes_method_comparison_curve_summary.csv`

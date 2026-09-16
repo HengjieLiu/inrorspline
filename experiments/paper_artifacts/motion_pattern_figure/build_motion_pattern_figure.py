@@ -8,7 +8,6 @@ import csv
 import importlib.util
 import json
 import math
-import os
 import re
 import sys
 from dataclasses import dataclass
@@ -33,16 +32,13 @@ THIS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = THIS_DIR.parents[2]
 OASIS_DIR = REPO_ROOT / "scripts/experiments/oasis_alpha_sweep"
 LUNGCT_DIR = REPO_ROOT / "scripts/experiments/lungct_no_sweep_repro"
-DEFAULT_OUTPUT_DIR = THIS_DIR / "v001"
-DEFAULT_SITREG_ROOT = Path(
-    os.environ.get(
-        "INRORSPLINE_OASIS_SITREG_ROOT",
-        "/database/wavereg/wipmidl_0407/OASIS_v1/round1_MIDL/"
-        "gpu8_OASIS_v1_bs4_sitreg_v0_run1_20250407165940/inference/inference_bestdice",
-    )
-)
-DEFAULT_PTVREG_ROOT = Path(os.environ.get("INRORSPLINE_PTVREG_4DCT_ROOT", "/database/inrorspline/ptvreg/4DCT"))
+EXPERIMENT_SCRIPTS_DIR = REPO_ROOT / "scripts" / "experiments"
+ARTIFACT_EXPERIMENT_KEY = "paper_artifacts/motion_pattern_figure/v001"
 OASIS_SPACING_ZYX_MM = (1.0, 1.0, 1.0)
+
+if str(EXPERIMENT_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENT_SCRIPTS_DIR))
+import artifact_paths  # noqa: E402
 
 
 def load_module(name: str, path: Path) -> Any:
@@ -66,8 +62,8 @@ import run_case01_ptvreg_field_fit_one as ptvreg_field_fit  # noqa: E402
 PUBLIC_PATH_REPLACEMENTS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"/homebase/code_sync/inrorspline"), "${REPO_ROOT}"),
     (re.compile(r"/home/[^/]+/code_sync/inrorspline"), "${REPO_ROOT}"),
-    (re.compile(r"/database/inrorspline"), "${DATA_ROOT}"),
-    (re.compile(r"/data/[^/]+/inrorspline"), "${DATA_ROOT}"),
+    (re.compile(r"/database/inrorspline"), "${ARTIFACT_ROOT}"),
+    (re.compile(r"/data/[^/]+/inrorspline"), "${ARTIFACT_ROOT}"),
     (re.compile(r"/database/wavereg"), "${WAVEREG_DATA_ROOT}"),
     (re.compile(r"/data/[^/]+/wavereg"), "${WAVEREG_DATA_ROOT}"),
     (re.compile(r"/database/datasets/lungCT"), "${LUNGCT_DATA_ROOT}"),
@@ -128,19 +124,47 @@ class LoadedSITRegField:
     reorientation: str
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument("--review-root", type=Path, default=None)
     parser.add_argument("--grid-step", type=int, default=4)
     parser.add_argument("--vector-step", type=int, default=12)
     parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
     parser.add_argument("--oasis-root", type=Path, default=oasis_common.DEFAULT_OASIS_ROOT)
     parser.add_argument("--oasis-pair-file", type=Path, default=oasis_common.DEFAULT_PAIR_FILE)
-    parser.add_argument("--sitreg-root", type=Path, default=DEFAULT_SITREG_ROOT)
+    parser.add_argument("--sitreg-root", type=Path, required=True)
     parser.add_argument("--lungct-ptvprep-root", type=Path, default=lungct_common.DEFAULT_PTVPREP_ROOT)
-    parser.add_argument("--ptvreg-root", type=Path, default=DEFAULT_PTVREG_ROOT)
+    parser.add_argument("--ptvreg-root", type=Path, required=True)
     parser.add_argument("--overwrite", action="store_true")
-    return parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Resolve the external review destination and reference-field inputs."""
+
+    args.review_root = artifact_paths.resolve_review_root(
+        ARTIFACT_EXPERIMENT_KEY,
+        args.review_root,
+        repo_root=REPO_ROOT,
+    )
+    args.sitreg_root = artifact_paths.resolve_external_input_directory(
+        args.sitreg_root,
+        label="--sitreg-root",
+        repo_root=REPO_ROOT,
+    )
+    args.ptvreg_root = artifact_paths.resolve_external_input_directory(
+        args.ptvreg_root,
+        label="--ptvreg-root",
+        repo_root=REPO_ROOT,
+    )
+    return args
+
+
+def symbolic_artifact_path(path: Path) -> str:
+    """Render a destination inside the configured store without host details."""
+
+    root = artifact_paths.artifact_root(repo_root=REPO_ROOT)
+    return "${ARTIFACT_ROOT}/" + path.resolve().relative_to(root).as_posix()
 
 
 def device_from_arg(name: str) -> torch.device:
@@ -1075,9 +1099,9 @@ def check_outputs(paths: Sequence[Path]) -> None:
 
 
 def main() -> None:
-    args = parse_args()
+    args = resolve_artifact_paths(parse_args())
     self_check_forward_grid_helpers()
-    out_dir = Path(args.output_dir)
+    out_dir = args.review_root
     if out_dir.exists() and any(out_dir.iterdir()) and not args.overwrite:
         raise FileExistsError(f"Output directory is non-empty; pass --overwrite to regenerate: {out_dir}")
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1116,7 +1140,7 @@ def main() -> None:
         "artifact": "motion_pattern_figure",
         "version": "v001",
         "generated_by": str(Path(__file__).relative_to(REPO_ROOT)),
-        "output_dir": str(out_dir),
+        "output_dir": symbolic_artifact_path(out_dir),
         "device": str(device),
         "cases": [case.manifest for case in cases],
         "outputs": {

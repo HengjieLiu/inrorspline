@@ -5,7 +5,9 @@ from __future__ import annotations
 import csv
 import json
 import math
+import os
 import re
+import sys
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -17,8 +19,8 @@ DEFAULT_NICKNAME_PATH = PAPER_ROOT / "method_nicknames.csv"
 
 LR_TAG_RE = re.compile(r"lr(?P<tag>0p0+1|0p01|0p001|0p0001|1e-2|1e-3|1e-4)")
 PUBLIC_PATH_REPLACEMENTS = [
-    (re.compile(r"/database/inrorspline"), "${DATA_ROOT}"),
-    (re.compile(r"/data/[^/]+/inrorspline"), "${DATA_ROOT}"),
+    (re.compile(r"/database/inrorspline"), "${ARTIFACT_ROOT}"),
+    (re.compile(r"/data/[^/]+/inrorspline"), "${ARTIFACT_ROOT}"),
     (re.compile(r"/homebase/code_sync/inrorspline"), "${REPO_ROOT}"),
     (re.compile(r"/home/[^/]+/code_sync/inrorspline"), "${REPO_ROOT}"),
 ]
@@ -32,11 +34,27 @@ def repo_path(path: str | Path) -> Path:
 
 
 def repo_relative(path: str | Path) -> str:
-    path = Path(path)
+    """Return a portable path for public manifests and review reports.
+
+    Repository paths stay repo-relative.  Paths beneath the configured artifact
+    store use the symbolic ``${ARTIFACT_ROOT}`` prefix, and any other external
+    input is deliberately anonymized rather than serializing a host path.
+    """
+
+    path = Path(path).resolve(strict=False)
     try:
         return str(path.relative_to(REPO_ROOT))
     except ValueError:
-        return str(path)
+        configured_root = os.environ.get("ARTIFACT_ROOT", "").strip()
+        if configured_root:
+            artifact_root = Path(configured_root).resolve(strict=False)
+            try:
+                relative = path.relative_to(artifact_root)
+            except ValueError:
+                pass
+            else:
+                return "${ARTIFACT_ROOT}" if relative == Path(".") else f"${{ARTIFACT_ROOT}}/{relative}"
+        return f"${{EXTERNAL_INPUT}}/{path.name}"
 
 
 def sanitize_public_value(value: Any) -> Any:
@@ -109,11 +127,44 @@ def canonical_lr(method_id: str, standard: Mapping[str, Any] | None = None) -> f
     return float(value)
 
 
-def artifact_output_dir(artifact: str, standard: Mapping[str, Any] | None = None) -> Path:
+def artifact_output_dir(
+    artifact: str,
+    standard: Mapping[str, Any] | None = None,
+    requested_review_root: str | Path | None = None,
+    *,
+    environ: Mapping[str, str] | None = None,
+) -> Path:
+    """Resolve a paper-artifact destination in the external review store.
+
+    ``artifact_versions.*.review_key`` defines the external review-store key.
+    Older archived standards with ``output_dir`` remain readable, but that
+    legacy field is never used as a writable destination.
+    """
+
     if standard is None:
         standard = load_standard()
     spec = standard["artifact_versions"][artifact]
-    return repo_path(str(spec["output_dir"]))
+    version = str(spec["current"]).strip()
+    if not version:
+        raise ValueError(f"artifact {artifact!r} has no current version")
+    review_key = str(spec.get("review_key", "")).strip()
+    if not review_key:
+        review_key = str(Path("paper_artifacts") / str(artifact) / version)
+
+    # This module is also imported by scripts invoked directly from this
+    # directory, so use the resolver's source directory rather than assuming
+    # the repository is installed as a Python package.
+    experiments_scripts_dir = REPO_ROOT / "scripts" / "experiments"
+    if str(experiments_scripts_dir) not in sys.path:
+        sys.path.insert(0, str(experiments_scripts_dir))
+    import artifact_paths
+
+    return artifact_paths.resolve_review_root(
+        review_key,
+        requested_review_root,
+        environ=environ,
+        repo_root=REPO_ROOT,
+    )
 
 
 def safe_float(value: Any) -> float:

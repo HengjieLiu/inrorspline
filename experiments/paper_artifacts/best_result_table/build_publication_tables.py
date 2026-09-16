@@ -7,6 +7,7 @@ import argparse
 import csv
 import json
 import math
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -14,8 +15,58 @@ from typing import Any, Mapping, Sequence
 
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[2]
-DEFAULT_SOURCE_DIR = HERE / "v002_candidate"
-DEFAULT_OUTPUT_DIR = HERE / "v002_publication"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from scripts.experiments import artifact_paths  # noqa: E402
+
+
+REVIEW_KEY = "paper_artifacts/best_result_table/v002_publication"
+ARTIFACT_ROOT_TOKEN = "${ARTIFACT_ROOT}"
+
+
+def resolve_output_dir(
+    requested_output_dir: str | Path | None,
+    *,
+    environ: Mapping[str, str] | None = None,
+) -> Path:
+    """Resolve publication-table output beneath the external review store."""
+
+    return artifact_paths.resolve_review_root(
+        REVIEW_KEY,
+        requested_output_dir,
+        environ=environ,
+        repo_root=REPO_ROOT,
+    )
+
+
+def resolve_external_review_dir(
+    value: str | Path,
+    *,
+    label: str,
+    environ: Mapping[str, str] | None = None,
+) -> Path:
+    """Require an existing migrated selected-row directory outside the repo."""
+
+    review_store = artifact_paths.review_store_root(environ=environ, repo_root=REPO_ROOT)
+    path = artifact_paths.resolve_managed_path(value, allowed_root=review_store, label=label)
+    if not path.is_dir():
+        raise artifact_paths.ArtifactPathError(f"{label} must name an existing directory, got {path}.")
+    return path
+
+
+def public_path(path: str | Path, *, artifact_root: Path) -> str:
+    """Render repo and artifact paths without exposing a host-specific root."""
+
+    resolved = Path(path).resolve(strict=False)
+    try:
+        return str(resolved.relative_to(REPO_ROOT))
+    except ValueError:
+        try:
+            relative = resolved.relative_to(artifact_root)
+        except ValueError as exc:
+            raise ValueError(f"Path is outside both the repo and ARTIFACT_ROOT: {resolved}") from exc
+        return str(Path(ARTIFACT_ROOT_TOKEN) / relative)
 
 
 def safe_float(value: Any) -> float:
@@ -314,29 +365,41 @@ def write_readme(output_dir: Path, manifest: Mapping[str, Any]) -> None:
             "",
             "## Rebuild",
             "",
+            "The selected-row source directory must be an explicit migrated directory",
+            "under `${ARTIFACT_ROOT}/repo_experiments/`. Output defaults to this",
+            "artifact family's external review directory.",
+            "",
             "```bash",
-            "python experiments/paper_artifacts/best_result_table/build_publication_tables.py",
+            "python experiments/paper_artifacts/best_result_table/build_publication_tables.py \\",
+            f"  --source-dir \"{manifest['source_dir']}\"",
             "```",
         ]
     )
     (output_dir / "README.md").write_text("\n".join(lines).rstrip() + "\n")
 
 
-def repo_relative(path: Path) -> str:
-    return str(path.resolve().relative_to(REPO_ROOT))
-
-
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source-dir", type=Path, default=DEFAULT_SOURCE_DIR)
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
-    return parser.parse_args()
+    parser.add_argument(
+        "--source-dir",
+        type=Path,
+        required=True,
+        help="Required absolute migrated selected-row directory below the external review store.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Optional absolute directory below $ARTIFACT_ROOT/repo_experiments.",
+    )
+    return parser.parse_args(argv)
 
 
-def main() -> None:
-    args = parse_args()
-    source_dir = args.source_dir if args.source_dir.is_absolute() else REPO_ROOT / args.source_dir
-    output_dir = args.output_dir if args.output_dir.is_absolute() else REPO_ROOT / args.output_dir
+def main(argv: Sequence[str] | None = None) -> None:
+    args = parse_args(argv)
+    configured_artifact_root = artifact_paths.artifact_root(repo_root=REPO_ROOT)
+    source_dir = resolve_external_review_dir(args.source_dir, label="--source-dir")
+    output_dir = resolve_output_dir(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     selected_rows_by_dataset = {
@@ -369,7 +432,10 @@ def main() -> None:
                 "stem": stem,
                 "title": spec["title"],
                 "dataset": spec["dataset"],
-                "source_json": repo_relative(source_dir / str(spec["source_json"])),
+                "source_json": public_path(
+                    source_dir / str(spec["source_json"]),
+                    artifact_root=configured_artifact_root,
+                ),
                 "headers": headers,
                 "rows": manifest_rows,
             }
@@ -380,8 +446,8 @@ def main() -> None:
 
     manifest = {
         "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "source_dir": repo_relative(source_dir),
-        "output_dir": repo_relative(output_dir),
+        "source_dir": public_path(source_dir, artifact_root=configured_artifact_root),
+        "output_dir": public_path(output_dir, artifact_root=configured_artifact_root),
         "format": "mean (std)",
         "source_version": "v002_candidate",
         "tables": manifest_tables,

@@ -20,24 +20,15 @@ THIS_DIR = Path(__file__).resolve().parent
 if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
 
+EXPERIMENT_SCRIPTS_DIR = REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENT_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENT_SCRIPTS_DIR))
+
 import build_current_tre_stdlogj_expanded as base  # noqa: E402
+import artifact_paths  # noqa: E402
 
 
-DEFAULT_OUTPUT_DIR = (
-    REPO_ROOT
-    / "experiments/paper_artifacts/pareto_figure/v012_current_tre_stdlogj_fdbe_cps4_alpha_landscape"
-)
-DEFAULT_LANDSCAPE_CASE_ROWS = (
-    REPO_ROOT / "experiments/2026-08-14_lungct_fdbe_cps4_alpha_landscape_all10/case_rows.csv"
-)
-DEFAULT_ACCEPTED_EXTENSION_CASE_ROWS = (
-    REPO_ROOT / "experiments/2026-08-14_lungct_fdbe_cps4_alpha1e5_1e6_all10/case_rows.csv"
-)
-DEFAULT_LEGACY_V011_CASE_ROWS = (
-    REPO_ROOT
-    / "experiments/paper_artifacts/pareto_figure/"
-    / "v011_current_tre_stdlogj_fdbe_cps4_alpha_extension/fdbe_cps4_alpha_sweep_case_rows.csv"
-)
+ARTIFACT_EXPERIMENT_KEY = "paper_artifacts/pareto_figure/v012_current_tre_stdlogj_fdbe_cps4_alpha_landscape"
 EXPECTED_FDBE_ALPHAS = (10000.0, 20000.0, 50000.0, 100000.0, 200000.0, 500000.0, 1000000.0)
 
 
@@ -299,30 +290,60 @@ def build(
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
-    parser.add_argument("--oasis-source", type=Path, default=base.DEFAULT_OASIS_SOURCE)
-    parser.add_argument("--lung-schedule-source", type=Path, default=base.DEFAULT_LUNG_SCHEDULE_SOURCE)
-    parser.add_argument("--legacy-w0022-source", type=Path, default=base.DEFAULT_LEGACY_W0022_SOURCE)
-    parser.add_argument("--dual-stage2-source", type=Path, default=base.DEFAULT_DUAL_STAGE2_SOURCE)
-    parser.add_argument("--dual-stage3-source", type=Path, default=base.DEFAULT_DUAL_STAGE3_SOURCE)
-    parser.add_argument("--landscape-case-rows", type=Path, default=DEFAULT_LANDSCAPE_CASE_ROWS)
-    parser.add_argument("--accepted-extension-case-rows", type=Path, default=DEFAULT_ACCEPTED_EXTENSION_CASE_ROWS)
-    parser.add_argument("--legacy-v011-case-rows", type=Path, default=DEFAULT_LEGACY_V011_CASE_ROWS)
+    parser.add_argument("--review-root", type=Path, default=None)
+    parser.add_argument("--oasis-source", type=Path, required=True)
+    parser.add_argument("--lung-schedule-source", type=Path, required=True)
+    parser.add_argument("--legacy-w0022-source", type=Path, required=True)
+    parser.add_argument("--dual-stage2-source", type=Path, required=True)
+    parser.add_argument("--dual-stage3-source", type=Path, required=True)
+    parser.add_argument("--landscape-case-rows", type=Path, required=True)
+    parser.add_argument("--accepted-extension-case-rows", type=Path, required=True)
+    parser.add_argument("--legacy-v011-case-rows", type=Path, required=True)
     return parser.parse_args(argv)
 
 
+def resolve_artifact_paths(args: argparse.Namespace) -> argparse.Namespace:
+    """Resolve the external destination and prior generated-input files."""
+
+    args.review_root = artifact_paths.resolve_review_root(
+        ARTIFACT_EXPERIMENT_KEY,
+        args.review_root,
+        repo_root=REPO_ROOT,
+    )
+    for attribute, option in (
+        ("oasis_source", "--oasis-source"),
+        ("lung_schedule_source", "--lung-schedule-source"),
+        ("legacy_w0022_source", "--legacy-w0022-source"),
+        ("dual_stage2_source", "--dual-stage2-source"),
+        ("dual_stage3_source", "--dual-stage3-source"),
+        ("landscape_case_rows", "--landscape-case-rows"),
+        ("accepted_extension_case_rows", "--accepted-extension-case-rows"),
+        ("legacy_v011_case_rows", "--legacy-v011-case-rows"),
+    ):
+        setattr(
+            args,
+            attribute,
+            artifact_paths.resolve_external_input_file(
+                getattr(args, attribute),
+                label=option,
+                repo_root=REPO_ROOT,
+            ),
+        )
+    return args
+
+
 def main(argv: Sequence[str] | None = None) -> None:
-    args = parse_args(argv)
+    args = resolve_artifact_paths(parse_args(argv))
     manifest = build(
-        output_dir=args.output_dir.resolve(),
-        oasis_source=args.oasis_source.resolve(),
-        lung_schedule_source=args.lung_schedule_source.resolve(),
-        legacy_w0022_source=args.legacy_w0022_source.resolve(),
-        dual_stage2_source=args.dual_stage2_source.resolve(),
-        dual_stage3_source=args.dual_stage3_source.resolve(),
-        landscape_case_rows=args.landscape_case_rows.resolve(),
-        accepted_extension_case_rows=args.accepted_extension_case_rows.resolve(),
-        legacy_v011_case_rows=args.legacy_v011_case_rows.resolve(),
+        output_dir=args.review_root,
+        oasis_source=args.oasis_source,
+        lung_schedule_source=args.lung_schedule_source,
+        legacy_w0022_source=args.legacy_w0022_source,
+        dual_stage2_source=args.dual_stage2_source,
+        dual_stage3_source=args.dual_stage3_source,
+        landscape_case_rows=args.landscape_case_rows,
+        accepted_extension_case_rows=args.accepted_extension_case_rows,
+        legacy_v011_case_rows=args.legacy_v011_case_rows,
     )
     print(json.dumps(manifest, indent=2, sort_keys=True))
 

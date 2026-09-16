@@ -16,6 +16,14 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 import pandas as pd
 
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+EXPERIMENT_SCRIPTS_DIR = REPO_ROOT / "scripts" / "experiments"
+if str(EXPERIMENT_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENT_SCRIPTS_DIR))
+
+import artifact_paths  # noqa: E402
+
 from paper_artifact_common import (
     artifact_output_dir,
     display_name,
@@ -46,15 +54,6 @@ OASIS_LEGEND_FONT_SIZE = 12
 OASIS_ANNOTATED_DIRNAME = "oasis100"
 OASIS_PAPER_NO_ANNOTATIONS_DIRNAME = "oasis100_paper_no_annotations"
 OASIS_SOURCE_ROWS_FILENAME = f"{OASIS_DATASET}_pareto_source_rows.csv"
-OASIS_SOURCE_WITH_DIRECTCP842 = repo_path(
-    "experiments/2026-07-04_oasis_seed3_first100_extension/"
-    "first100_artifacts/oasis100/population_summary_oasis100_with_saved_baselines.csv"
-)
-OASIS_SOURCE_FIVE_SWEEP = repo_path(
-    "experiments/2026-07-04_oasis_seed3_first100_extension/"
-    "first100_artifacts/oasis100/population_summary_oasis100_with_saved_baselines.csv"
-)
-OASIS_SOURCE_OVERRIDE_KEY = "oasis100_population_summary"
 COMPOSITE_DIRNAME = "four_panel_composite"
 COMPOSITE_OUTPUTS = {
     "no_annotations": {
@@ -104,13 +103,6 @@ OASIS_SPOTLIGHT_PANELS = [
 ]
 OASIS_STYLES = ("line_segments", "line_segments_errorbars", "ellipses")
 
-LUNG_MEAN_SOURCE = repo_path(
-    "experiments/2026-06-26_lungct_directcp4stage_midratio_pareto_extension/"
-    "pareto_visual_review_midratio_extension/combined_mean_rows_with_ptvreg.csv"
-)
-LUNG_NO_SWEEP_SOURCE = repo_path(
-    "experiments/2026-06-25_lungct_ptvprep_no_sweep_repro/summary_runs.csv"
-)
 LUNGCT_DPI = 220
 LUNGCT_FIGSIZE = (8.2, 5.8)
 LUNGCT_TICK_LABEL_SIZE = 12
@@ -233,14 +225,6 @@ def _display_name_mapping(*frames: pd.DataFrame) -> list[dict[str, object]]:
     return sorted(rows, key=lambda item: (str(item["dataset"]), str(item["method_family"]), str(item["method_id"])))
 
 
-def _oasis_source(standard: Mapping[str, Any] | None = None) -> Path:
-    if standard is not None:
-        override = standard.get("artifact_source_overrides", {}).get(OASIS_SOURCE_OVERRIDE_KEY)
-        if override:
-            return repo_path(str(override))
-    return OASIS_SOURCE_WITH_DIRECTCP842 if OASIS_INCLUDE_DIRECTCP842 else OASIS_SOURCE_FIVE_SWEEP
-
-
 def _source_lr(row: Mapping[str, Any], standard_records: list[dict[str, Any]]) -> float:
     lr = safe_float(row.get("lr"))
     if math.isfinite(lr):
@@ -299,9 +283,8 @@ def _clean_output_dir(output_dir: Path) -> None:
 def load_oasis_rows(
     nicknames: dict[str, dict[str, str]],
     standard_records: list[dict[str, Any]],
-    standard: Mapping[str, Any] | None = None,
+    source: Path,
 ) -> pd.DataFrame:
-    source = _oasis_source(standard)
     rows = pd.read_csv(source)
     rows["dataset"] = OASIS_DATASET
     rows["method_id"] = rows["method_key"].astype(str)
@@ -322,8 +305,14 @@ def _add_no_sweep_metric(no_sweep_row: dict[str, Any], metric: str, group: pd.Da
     no_sweep_row[_metric_std(metric)] = std
 
 
-def load_lung_rows(nicknames: dict[str, dict[str, str]], standard_records: list[dict[str, Any]]) -> pd.DataFrame:
-    mean_rows = pd.read_csv(LUNG_MEAN_SOURCE).copy()
+def load_lung_rows(
+    nicknames: dict[str, dict[str, str]],
+    standard_records: list[dict[str, Any]],
+    *,
+    mean_source: Path,
+    no_sweep_source: Path,
+) -> pd.DataFrame:
+    mean_rows = pd.read_csv(mean_source).copy()
     mean_rows["dataset"] = "lungct10"
     mean_rows["method_id"] = mean_rows["method"].astype(str)
     mean_rows["display_method"] = [
@@ -333,9 +322,9 @@ def load_lung_rows(nicknames: dict[str, dict[str, str]], standard_records: list[
     mean_rows["method_family"] = mean_rows["method_id"].map(_method_family)
     mean_rows["selected_lr"] = [_source_lr(row, standard_records) for row in mean_rows.to_dict("records")]
     mean_rows["selected_lr_label"] = mean_rows["selected_lr"].map(format_lr)
-    mean_rows["source_path"] = repo_relative(LUNG_MEAN_SOURCE)
+    mean_rows["source_path"] = repo_relative(mean_source)
 
-    case_rows = pd.read_csv(LUNG_NO_SWEEP_SOURCE)
+    case_rows = pd.read_csv(no_sweep_source)
     no_sweep_rows: list[dict[str, Any]] = []
     metric_sources = {
         "original_snap_tre_mean_mm": "native_crop_snap_tre_mean_mm",
@@ -365,7 +354,7 @@ def load_lung_rows(nicknames: dict[str, dict[str, str]], standard_records: list[
             "cases": int(group["case_id"].nunique()),
             "selected_lr": lr,
             "selected_lr_label": format_lr(lr),
-            "source_path": repo_relative(LUNG_NO_SWEEP_SOURCE),
+            "source_path": repo_relative(no_sweep_source),
         }
         for metric, source_col in metric_sources.items():
             _add_no_sweep_metric(row, metric, group, source_col)
@@ -1015,6 +1004,9 @@ def write_manifest(
     *,
     standard_path: str,
     nickname_path: str,
+    oasis_source: Path,
+    lung_mean_source: Path,
+    lung_no_sweep_source: Path,
     oasis: pd.DataFrame,
     lung: pd.DataFrame,
     oasis_paths: Sequence[Path],
@@ -1039,9 +1031,9 @@ def write_manifest(
         "nickname_path": nickname_path,
         "output_formats": list(OUTPUT_FORMATS),
         "source_files": {
-            OASIS_DATASET: repo_relative(_oasis_source(standard)),
-            "lungct10_mean_rows": repo_relative(LUNG_MEAN_SOURCE),
-            "lungct10_single_stage_rows": repo_relative(LUNG_NO_SWEEP_SOURCE),
+            OASIS_DATASET: repo_relative(oasis_source),
+            "lungct10_mean_rows": repo_relative(lung_mean_source),
+            "lungct10_single_stage_rows": repo_relative(lung_no_sweep_source),
         },
         "plot_counts": {
             f"{OASIS_DATASET}_annotated_png": len(oasis_paths),
@@ -1146,19 +1138,47 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--standard-path", type=Path, default=None)
     parser.add_argument("--nickname-path", type=Path, default=None)
+    parser.add_argument("--review-root", type=Path, default=None)
+    parser.add_argument("--oasis-source", type=Path, required=True)
+    parser.add_argument("--lung-mean-source", type=Path, required=True)
+    parser.add_argument("--lung-no-sweep-source", type=Path, required=True)
     return parser.parse_args(argv)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
+    args.oasis_source = artifact_paths.resolve_external_input_file(
+        args.oasis_source,
+        label="--oasis-source",
+        repo_root=REPO_ROOT,
+    )
+    args.lung_mean_source = artifact_paths.resolve_external_input_file(
+        args.lung_mean_source,
+        label="--lung-mean-source",
+        repo_root=REPO_ROOT,
+    )
+    args.lung_no_sweep_source = artifact_paths.resolve_external_input_file(
+        args.lung_no_sweep_source,
+        label="--lung-no-sweep-source",
+        repo_root=REPO_ROOT,
+    )
     standard = load_standard(args.standard_path) if args.standard_path is not None else load_standard()
     nicknames = load_nicknames(args.nickname_path) if args.nickname_path is not None else load_nicknames()
-    output_dir = artifact_output_dir("pareto_figure", standard)
+    output_dir = artifact_output_dir(
+        "pareto_figure",
+        standard,
+        args.review_root,
+    )
     _clean_output_dir(output_dir)
 
     standard_records = selected_hypervariant_records("pareto_figure", standard)
-    oasis = load_oasis_rows(nicknames, standard_records, standard)
-    lung = load_lung_rows(nicknames, standard_records)
+    oasis = load_oasis_rows(nicknames, standard_records, args.oasis_source)
+    lung = load_lung_rows(
+        nicknames,
+        standard_records,
+        mean_source=args.lung_mean_source,
+        no_sweep_source=args.lung_no_sweep_source,
+    )
     _sanitize_dataframe(oasis).to_csv(output_dir / OASIS_SOURCE_ROWS_FILENAME, index=False)
     _sanitize_dataframe(lung).to_csv(output_dir / "lungct10_pareto_source_rows.csv", index=False)
 
@@ -1205,6 +1225,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         validation_rows,
         standard_path=repo_relative(args.standard_path) if args.standard_path is not None else "experiments/paper_artifacts/artifact_standard.json",
         nickname_path=repo_relative(args.nickname_path) if args.nickname_path is not None else "experiments/paper_artifacts/method_nicknames.csv",
+        oasis_source=args.oasis_source,
+        lung_mean_source=args.lung_mean_source,
+        lung_no_sweep_source=args.lung_no_sweep_source,
         oasis=oasis,
         lung=lung,
         oasis_paths=oasis_paths,

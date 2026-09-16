@@ -33,6 +33,11 @@ from experiments.paper_artifacts.paper_artifact_common import (  # noqa: E402
     validate_lr_records,
     validation_report_markdown,
 )
+from scripts.experiments import artifact_paths  # noqa: E402
+
+
+REVIEW_KEY = "2026-06-26_auto_result_selection_tables"
+ARTIFACT_ROOT_TOKEN = "${ARTIFACT_ROOT}"
 
 
 NO_SWEEP_COLUMN_MAP = {
@@ -93,6 +98,50 @@ def repo_path(path_text: str) -> Path:
     if path.is_absolute():
         return path
     return REPO_ROOT / path
+
+
+def resolve_output_dir(
+    requested_output_dir: str | Path | None,
+    *,
+    environ: Mapping[str, str] | None = None,
+) -> Path:
+    """Resolve this producer's review directory outside the Git worktree."""
+
+    return artifact_paths.resolve_review_root(
+        REVIEW_KEY,
+        requested_output_dir,
+        environ=environ,
+        repo_root=REPO_ROOT,
+    )
+
+
+def resolve_external_review_file(
+    value: str | Path,
+    *,
+    label: str,
+    environ: Mapping[str, str] | None = None,
+) -> Path:
+    """Require a migrated generated input beneath the external review store."""
+
+    review_store = artifact_paths.review_store_root(environ=environ, repo_root=REPO_ROOT)
+    path = artifact_paths.resolve_managed_path(value, allowed_root=review_store, label=label)
+    if not path.is_file():
+        raise artifact_paths.ArtifactPathError(f"{label} must name an existing file, got {path}.")
+    return path
+
+
+def public_path(path: str | Path, *, artifact_root: Path) -> str:
+    """Render repo and artifact paths without exposing a host-specific root."""
+
+    resolved = Path(path).resolve(strict=False)
+    try:
+        return str(resolved.relative_to(REPO_ROOT))
+    except ValueError:
+        try:
+            relative = resolved.relative_to(artifact_root)
+        except ValueError as exc:
+            raise ValueError(f"Path is outside both the repo and ARTIFACT_ROOT: {resolved}") from exc
+        return str(Path(ARTIFACT_ROOT_TOKEN) / relative)
 
 
 def _standard_selected_record(
@@ -295,18 +344,15 @@ def selected_setting(row: Mapping[str, Any], dataset_key: str) -> str:
 
 
 def load_oasis_rows(
-    spec: Mapping[str, Any],
-    standard: Mapping[str, Any] | None = None,
+    source: Path,
+    *,
+    source_label: str,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    source_text = str(spec["source"])
-    if standard is not None:
-        source_text = str(standard.get("artifact_source_overrides", {}).get("oasis20_population_summary", source_text))
-    source = repo_path(source_text)
     rows = read_csv(source)
     for row in rows:
         row["_source_name"] = "oasis20_population"
-        row["_source_path"] = str(source.relative_to(REPO_ROOT))
-    return rows, [{"name": "oasis20_population", "path": str(source.relative_to(REPO_ROOT)), "rows": len(rows)}]
+        row["_source_path"] = source_label
+    return rows, [{"name": "oasis20_population", "path": source_label, "rows": len(rows)}]
 
 
 def aggregate_no_sweep_rows(
@@ -314,7 +360,7 @@ def aggregate_no_sweep_rows(
     methods: Sequence[str],
     label_by_method: Mapping[str, str],
     source_name: str,
-    source_path: Path,
+    source_label: str,
 ) -> List[Dict[str, Any]]:
     grouped: Dict[str, List[Mapping[str, Any]]] = defaultdict(list)
     for row in rows:
@@ -333,7 +379,7 @@ def aggregate_no_sweep_rows(
             "ratio_to_best_tre_weight": "",
             "cases": len({str(row.get("case_id")) for row in group if str(row.get("case_id", "")).strip()}),
             "_source_name": source_name,
-            "_source_path": str(source_path.relative_to(REPO_ROOT))
+            "_source_path": source_label,
         }
         for source_column, output_prefix in NO_SWEEP_COLUMN_MAP.items():
             mean, std = population_mean_std(row.get(source_column) for row in group)
@@ -343,20 +389,30 @@ def aggregate_no_sweep_rows(
     return out
 
 
-def load_lungct_rows(spec: Mapping[str, Any]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+def load_lungct_rows(
+    spec: Mapping[str, Any],
+    *,
+    source_paths: Mapping[str, Path],
+    artifact_root: Path,
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     label_by_method = {str(item["id"]): str(item["label"]) for item in spec["methods"]}
     all_rows: List[Dict[str, Any]] = []
     source_summaries: List[Dict[str, Any]] = []
 
     for source_spec in spec["sources"]:
-        source_path = repo_path(str(source_spec["path"]))
+        source_name = str(source_spec["name"])
+        try:
+            source_path = source_paths[source_name]
+        except KeyError as exc:
+            raise ValueError(f"Missing explicit external source for {source_name!r}.") from exc
+        source_label = public_path(source_path, artifact_root=artifact_root)
         rows = read_csv(source_path)
         methods = [str(method) for method in source_spec.get("methods", [])]
         source_summaries.append(
             {
-                "name": source_spec["name"],
+                "name": source_name,
                 "type": source_spec["type"],
-                "path": str(source_path.relative_to(REPO_ROOT)),
+                "path": source_label,
                 "rows": len(rows),
                 "methods": methods
             }
@@ -364,8 +420,8 @@ def load_lungct_rows(spec: Mapping[str, Any]) -> Tuple[List[Dict[str, Any]], Lis
         if source_spec["type"] == "mean_rows":
             for row in rows:
                 if str(row.get("method")) in methods:
-                    row["_source_name"] = str(source_spec["name"])
-                    row["_source_path"] = str(source_path.relative_to(REPO_ROOT))
+                    row["_source_name"] = source_name
+                    row["_source_path"] = source_label
                     all_rows.append(row)
         elif source_spec["type"] == "no_sweep_case_rows":
             all_rows.extend(
@@ -373,8 +429,8 @@ def load_lungct_rows(spec: Mapping[str, Any]) -> Tuple[List[Dict[str, Any]], Lis
                     rows,
                     methods,
                     label_by_method,
-                    str(source_spec["name"]),
-                    source_path,
+                    source_name,
+                    source_label,
                 )
             )
         else:
@@ -420,14 +476,26 @@ def build_dataset(
     dataset_key: str,
     spec: Mapping[str, Any],
     *,
-    output_dir: Path = HERE,
+    output_dir: Path,
     nicknames: Mapping[str, Mapping[str, str]] | None = None,
     standard: Mapping[str, Any] | None = None,
+    source_paths: Mapping[str, Path] | None = None,
+    artifact_root: Path | None = None,
 ) -> Dict[str, Any]:
+    if source_paths is None or artifact_root is None:
+        raise ValueError("Explicit external source paths and ARTIFACT_ROOT are required.")
     if dataset_key == "oasis20":
-        candidates, sources = load_oasis_rows(spec, standard=standard)
+        source = source_paths["oasis20_population"]
+        candidates, sources = load_oasis_rows(
+            source,
+            source_label=public_path(source, artifact_root=artifact_root),
+        )
     elif dataset_key == "lungct10":
-        candidates, sources = load_lungct_rows(spec)
+        candidates, sources = load_lungct_rows(
+            spec,
+            source_paths=source_paths,
+            artifact_root=artifact_root,
+        )
     else:
         raise ValueError(f"Unknown dataset key: {dataset_key}")
 
@@ -530,16 +598,23 @@ def build_dataset(
         "validation_rows": validation_rows,
     }
     if dataset_key == "lungct10" and "failure_analysis" in spec:
-        result["failure_analysis"] = build_failure_analysis(spec["failure_analysis"], nicknames=nicknames)
+        source = source_paths["no_sweep_single_stage_rows"]
+        result["failure_analysis"] = build_failure_analysis(
+            spec["failure_analysis"],
+            source=source,
+            source_label=public_path(source, artifact_root=artifact_root),
+            nicknames=nicknames,
+        )
     return result
 
 
 def build_failure_analysis(
     spec: Mapping[str, Any],
     *,
+    source: Path,
+    source_label: str,
     nicknames: Mapping[str, Mapping[str, str]] | None = None,
 ) -> Dict[str, Any]:
-    source = repo_path(str(spec["source"]))
     rows = read_csv(source)
     metric = str(spec["metric"])
     threshold = safe_float(spec["threshold_mm"])
@@ -580,7 +655,7 @@ def build_failure_analysis(
     headers = ["Method", "Failed cases", "Fail count", "Worst case"]
     return {
         "title": spec.get("title", "Failure analysis"),
-        "source": str(source.relative_to(REPO_ROOT)),
+        "source": source_label,
         "metric": metric,
         "metric_label": spec.get("metric_label", metric),
         "threshold_mm": threshold,
@@ -590,7 +665,7 @@ def build_failure_analysis(
     }
 
 
-def write_review_report(results: Sequence[Mapping[str, Any]], *, output_dir: Path = HERE) -> None:
+def write_review_report(results: Sequence[Mapping[str, Any]], *, output_dir: Path) -> None:
     lines: List[str] = [
         "# Automatic Result Selection Tables",
         "",
@@ -641,7 +716,30 @@ def write_review_report(results: Sequence[Mapping[str, Any]], *, output_dir: Pat
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--spec-path", type=Path, default=SPEC_PATH)
-    parser.add_argument("--output-dir", type=Path, default=HERE)
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Optional absolute directory below $ARTIFACT_ROOT/repo_experiments.",
+    )
+    parser.add_argument(
+        "--oasis-source",
+        type=Path,
+        required=True,
+        help="Required absolute migrated OASIS population CSV below the external review store.",
+    )
+    parser.add_argument(
+        "--lung-mean-source",
+        type=Path,
+        required=True,
+        help="Required absolute migrated LungCT mean-rows CSV below the external review store.",
+    )
+    parser.add_argument(
+        "--lung-no-sweep-source",
+        type=Path,
+        required=True,
+        help="Required absolute migrated LungCT single-stage case CSV below the external review store.",
+    )
     parser.add_argument("--standard-path", type=Path, default=None)
     parser.add_argument("--nickname-path", type=Path, default=None)
     return parser.parse_args(argv)
@@ -650,11 +748,23 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
     spec_path = repo_path(str(args.spec_path))
-    output_dir = repo_path(str(args.output_dir))
     standard_path = repo_path(str(args.standard_path)) if args.standard_path is not None else None
     nickname_path = repo_path(str(args.nickname_path)) if args.nickname_path is not None else None
     standard = load_standard(standard_path) if standard_path is not None else None
     nicknames = load_nicknames(nickname_path) if nickname_path is not None else None
+    configured_artifact_root = artifact_paths.artifact_root(repo_root=REPO_ROOT)
+    output_dir = resolve_output_dir(args.output_dir)
+    source_paths = {
+        "oasis20_population": resolve_external_review_file(args.oasis_source, label="--oasis-source"),
+        "latest_midratio_mean_rows": resolve_external_review_file(
+            args.lung_mean_source,
+            label="--lung-mean-source",
+        ),
+        "no_sweep_single_stage_rows": resolve_external_review_file(
+            args.lung_no_sweep_source,
+            label="--lung-no-sweep-source",
+        ),
+    }
 
     spec = json.loads(spec_path.read_text())
     results = [
@@ -664,15 +774,17 @@ def main(argv: Sequence[str] | None = None) -> None:
             output_dir=output_dir,
             nicknames=nicknames,
             standard=standard,
+            source_paths=source_paths,
+            artifact_root=configured_artifact_root,
         )
         for dataset_key in ["oasis20", "lungct10"]
     ]
     manifest = {
         "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "spec_path": str(spec_path.relative_to(REPO_ROOT)),
-        "output_dir": str(output_dir.relative_to(REPO_ROOT)),
-        "standard_path": str(standard_path.relative_to(REPO_ROOT)) if standard_path else "",
-        "nickname_path": str(nickname_path.relative_to(REPO_ROOT)) if nickname_path else "",
+        "spec_path": public_path(spec_path, artifact_root=configured_artifact_root),
+        "output_dir": public_path(output_dir, artifact_root=configured_artifact_root),
+        "standard_path": public_path(standard_path, artifact_root=configured_artifact_root) if standard_path else "",
+        "nickname_path": public_path(nickname_path, artifact_root=configured_artifact_root) if nickname_path else "",
         "display_name_mapping": {
             str(result["dataset"]): [
                 {

@@ -3,6 +3,11 @@
 Each versioned subfolder contains standardized Pareto figures, source-row CSVs,
 selected-hypervariant manifests, and LR validation reports.
 
+The active v012 landscape and v013 camera-ready builders write only below
+`${ARTIFACT_ROOT}/repo_experiments/paper_artifacts/pareto_figure/` through
+`--review-root`. Their generated source tables are explicit external CLI inputs;
+they do not read the historical version folders in this Git worktree.
+
 Current version: `v001`.
 
 For `v001`, OASIS uses the full configured accuracy-regularity grid and writes

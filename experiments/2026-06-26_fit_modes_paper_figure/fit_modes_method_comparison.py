@@ -13,8 +13,8 @@ import numpy as np
 import pandas as pd
 
 
-REVIEW_ROOT = Path(__file__).resolve().parent
-REPO_ROOT = REVIEW_ROOT.parents[1]
+SOURCE_ROOT = Path(__file__).resolve().parent
+REPO_ROOT = SOURCE_ROOT.parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -30,10 +30,13 @@ from experiments.paper_artifacts.paper_artifact_common import (  # noqa: E402
     validation_report_markdown,
 )
 
-OASIS_REVIEW = REVIEW_ROOT.parent / "2026-06-26_oasis_rank009_sitreg_fit_modes_lr_sweep"
-OASIS_GREEDY_REVIEW = REVIEW_ROOT.parent / "2026-06-26_oasis_rank009_fit_modes_lr_sweep"
-LUNG01_REVIEW = REVIEW_ROOT.parent / "2026-06-26_lungct_case01_ptvreg_fit_modes_lr_sweep"
-LUNG08_REVIEW = REVIEW_ROOT.parent / "2026-06-26_lungct_case08_ptvreg_fit_modes_lr_sweep"
+# These are read-only historical curve inputs.  They are intentionally kept
+# separate from generated figure destinations, which always resolve through
+# ARTIFACT_ROOT below.
+HISTORIC_OASIS_INPUT_ROOT = SOURCE_ROOT.parent / "2026-06-26_oasis_rank009_sitreg_fit_modes_lr_sweep"
+HISTORIC_OASIS_GREEDY_INPUT_ROOT = SOURCE_ROOT.parent / "2026-06-26_oasis_rank009_fit_modes_lr_sweep"
+HISTORIC_LUNG01_INPUT_ROOT = SOURCE_ROOT.parent / "2026-06-26_lungct_case01_ptvreg_fit_modes_lr_sweep"
+HISTORIC_LUNG08_INPUT_ROOT = SOURCE_ROOT.parent / "2026-06-26_lungct_case08_ptvreg_fit_modes_lr_sweep"
 IDIR_EVAL_ROOT = Path("/database/inrorspline/runs/fit_modes_paper_curves_idir_eval_v1")
 PANELA_GLOBAL_NCC_ROOT = Path("/database/inrorspline/runs/fit_modes_panelA_global_ncc_v1")
 OASIS_CPS2_IMAGE_ROOTS = {
@@ -286,7 +289,7 @@ def selected_runs() -> pd.DataFrame:
     """Return the explicit LR/run selection used for the notebook figure."""
     rows: list[dict[str, object]] = []
 
-    oasis_summary = pd.read_csv(OASIS_REVIEW / "final_metric_summary.csv")
+    oasis_summary = pd.read_csv(HISTORIC_OASIS_INPUT_ROOT / "final_metric_summary.csv")
     for method in ["IDIR", "SINR cps4", "DirectCP cps4"]:
         subset = oasis_summary[
             (oasis_summary["objective_group"] == "image_registration")
@@ -330,7 +333,10 @@ def selected_runs() -> pd.DataFrame:
             }
         )
 
-    for case, review in [("LungCT case01", LUNG01_REVIEW), ("LungCT case08", LUNG08_REVIEW)]:
+    for case, review in [
+        ("LungCT case01", HISTORIC_LUNG01_INPUT_ROOT),
+        ("LungCT case08", HISTORIC_LUNG08_INPUT_ROOT),
+    ]:
         case_key = "case01" if case.endswith("case01") else "case08"
         summary = pd.read_csv(review / "summary_runs.csv")
         for method in ["IDIR", "SINR cps4", "DirectCP cps4", "DirectCP 4stage cps4"]:
@@ -405,8 +411,8 @@ def load_curves(selection: pd.DataFrame | None = None) -> tuple[list[Curve], lis
     reg_curves: list[Curve] = []
     field_curves: list[Curve] = []
 
-    oasis_loss = pd.read_csv(OASIS_REVIEW / "loss_history_augmented.csv")
-    oasis_field = pd.read_csv(OASIS_REVIEW / "loss_history_all.csv")
+    oasis_loss = pd.read_csv(HISTORIC_OASIS_INPUT_ROOT / "loss_history_augmented.csv")
+    oasis_field = pd.read_csv(HISTORIC_OASIS_INPUT_ROOT / "loss_history_all.csv")
 
     idir_oasis = pd.read_csv(
         IDIR_EVAL_ROOT
@@ -575,8 +581,8 @@ def _with_case(curve: Curve, case: str, task: str | None = None) -> Curve:
 
 
 def load_oasis_greedy_field_curves() -> list[Curve]:
-    summary = pd.read_csv(OASIS_GREEDY_REVIEW / "final_metric_summary.csv")
-    history = pd.read_csv(OASIS_GREEDY_REVIEW / "loss_history_all.csv")
+    summary = pd.read_csv(HISTORIC_OASIS_GREEDY_INPUT_ROOT / "final_metric_summary.csv")
+    history = pd.read_csv(HISTORIC_OASIS_GREEDY_INPUT_ROOT / "loss_history_all.csv")
     curves: list[Curve] = []
     for method in ["IDIR", "SINR cps4", "DirectCP cps4"]:
         subset = summary[
@@ -972,7 +978,7 @@ def load_rrmse_lr_trajectory_curves() -> list[Curve]:
     curves: list[Curve] = []
     _append_oasis_lr_trajectory_curves(
         curves,
-        review_root=OASIS_REVIEW,
+        review_root=HISTORIC_OASIS_INPUT_ROOT,
         objective_group="sitreg_field_fit",
         case="OASIS SITReg",
         task="SITReg field fit",
@@ -994,7 +1000,7 @@ def load_rrmse_lr_trajectory_curves() -> list[Curve]:
     )
     _append_oasis_lr_trajectory_curves(
         curves,
-        review_root=OASIS_GREEDY_REVIEW,
+        review_root=HISTORIC_OASIS_GREEDY_INPUT_ROOT,
         objective_group="greedy_field_fit",
         case="OASIS Greedy",
         task="Greedy field fit",
@@ -1016,13 +1022,13 @@ def load_rrmse_lr_trajectory_curves() -> list[Curve]:
     )
     _append_lung_lr_trajectory_curves(
         curves,
-        review_root=LUNG01_REVIEW,
+        review_root=HISTORIC_LUNG01_INPUT_ROOT,
         case="LungCT case01",
         case_key="case01",
     )
     _append_lung_lr_trajectory_curves(
         curves,
-        review_root=LUNG08_REVIEW,
+        review_root=HISTORIC_LUNG08_INPUT_ROOT,
         case="LungCT case08",
         case_key="case08",
     )
@@ -2554,6 +2560,9 @@ def _save_figure_to_dir(
     *,
     output_formats: tuple[str, ...] = ("png",),
 ) -> dict[str, Path]:
+    # Keep this internal helper defensive too: every figure write must use a
+    # root accepted by the shared external-artifact resolver.
+    output_dir = resolve_fitting_output_dir(review_root=output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     outputs = {fmt: output_dir / f"{stem}.{fmt}" for fmt in output_formats}
     for path in outputs.values():
@@ -2563,6 +2572,21 @@ def _save_figure_to_dir(
         if stale_path.exists():
             stale_path.unlink()
     return outputs
+
+
+def resolve_fitting_output_dir(
+    *,
+    standard: dict[str, object] | None = None,
+    review_root: str | Path | None = None,
+) -> Path:
+    """Return the compliant external destination for fitting-figure artifacts.
+
+    ``artifact_output_dir`` requires ``ARTIFACT_ROOT`` and rejects worktree
+    paths, including explicitly supplied review roots.  Public output helpers
+    use this wrapper so their default never writes beside this source module.
+    """
+
+    return artifact_output_dir("fitting_figure", standard, review_root)
 
 
 def _write_fitting_validation(
@@ -2624,10 +2648,11 @@ def build_standardized_global_ncc_panelA_outputs(
     *,
     standard_path: str | Path | None = None,
     nickname_path: str | Path | None = None,
+    review_root: str | Path | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, plt.Figure, dict[str, Path]]:
     standard = load_standard(standard_path)
     nicknames = load_nicknames(nickname_path)
-    output_dir = artifact_output_dir("fitting_figure", standard)
+    output_dir = resolve_fitting_output_dir(standard=standard, review_root=review_root)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     curves = load_standardized_panelA_global_ncc_curves()
@@ -2694,10 +2719,11 @@ def build_standardized_rrmse_field_fit_outputs(
     *,
     standard_path: str | Path | None = None,
     nickname_path: str | Path | None = None,
+    review_root: str | Path | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, plt.Figure, dict[str, Path]]:
     standard = load_standard(standard_path)
     nicknames = load_nicknames(nickname_path)
-    output_dir = artifact_output_dir("fitting_figure", standard)
+    output_dir = resolve_fitting_output_dir(standard=standard, review_root=review_root)
     output_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_dir = output_dir / ".ipynb_checkpoints"
     if checkpoint_dir.exists():
@@ -2760,10 +2786,11 @@ def build_standardized_panelAB_outputs(
     *,
     standard_path: str | Path | None = None,
     nickname_path: str | Path | None = None,
+    review_root: str | Path | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, plt.Figure, dict[str, Path]]:
     standard = load_standard(standard_path)
     nicknames = load_nicknames(nickname_path)
-    output_dir = artifact_output_dir("fitting_figure", standard)
+    output_dir = resolve_fitting_output_dir(standard=standard, review_root=review_root)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     panelb_oasis_target = _merged_panelb_oasis_target(standard)
@@ -2870,10 +2897,20 @@ def build_standardized_panelAB_outputs(
     return merged_selected, summary, fig, outputs
 
 
-def save_main_figure(fig: plt.Figure, stem: str = "fit_modes_method_comparison_curves") -> dict[str, Path]:
+def save_main_figure(
+    fig: plt.Figure,
+    stem: str = "fit_modes_method_comparison_curves",
+    *,
+    standard: dict[str, object] | None = None,
+    review_root: str | Path | None = None,
+) -> dict[str, Path]:
+    """Save the main figure only under the configured external review root."""
+
+    output_dir = resolve_fitting_output_dir(standard=standard, review_root=review_root)
+    output_dir.mkdir(parents=True, exist_ok=True)
     outputs = {
-        "pdf": REVIEW_ROOT / f"{stem}.pdf",
-        "png": REVIEW_ROOT / f"{stem}.png",
+        "pdf": output_dir / f"{stem}.pdf",
+        "png": output_dir / f"{stem}.png",
     }
     for path in outputs.values():
         fig.savefig(path, dpi=300, bbox_inches="tight")
@@ -2883,18 +2920,41 @@ def save_main_figure(fig: plt.Figure, stem: str = "fit_modes_method_comparison_c
 def save_relative_field_fit_figure(
     fig: plt.Figure,
     stem: str = "fit_modes_relative_field_fit_prelim_curves",
+    *,
+    standard: dict[str, object] | None = None,
+    review_root: str | Path | None = None,
 ) -> dict[str, Path]:
-    return save_main_figure(fig, stem=stem)
+    return save_main_figure(
+        fig,
+        stem=stem,
+        standard=standard,
+        review_root=review_root,
+    )
 
 
 def save_rrmse_lr_trajectory_figure(
     fig: plt.Figure,
     stem: str = "fit_modes_rrmse_lr_trajectory_curves",
+    *,
+    standard: dict[str, object] | None = None,
+    review_root: str | Path | None = None,
 ) -> dict[str, Path]:
-    return save_main_figure(fig, stem=stem)
+    return save_main_figure(
+        fig,
+        stem=stem,
+        standard=standard,
+        review_root=review_root,
+    )
 
 
-def build_outputs() -> tuple[pd.DataFrame, pd.DataFrame, plt.Figure, dict[str, Path]]:
+def build_outputs(
+    *,
+    standard_path: str | Path | None = None,
+    review_root: str | Path | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, plt.Figure, dict[str, Path]]:
+    standard = load_standard(standard_path)
+    output_dir = resolve_fitting_output_dir(standard=standard, review_root=review_root)
+    output_dir.mkdir(parents=True, exist_ok=True)
     selection = selected_runs()
     reg_curves, field_curves = load_curves(selection)
     summary = pd.concat(
@@ -2904,34 +2964,48 @@ def build_outputs() -> tuple[pd.DataFrame, pd.DataFrame, plt.Figure, dict[str, P
         ],
         ignore_index=True,
     )
-    selection.to_csv(REVIEW_ROOT / "fit_modes_method_comparison_selected_runs.csv", index=False)
-    summary.to_csv(REVIEW_ROOT / "fit_modes_method_comparison_curve_summary.csv", index=False)
+    selection.to_csv(output_dir / "fit_modes_method_comparison_selected_runs.csv", index=False)
+    summary.to_csv(output_dir / "fit_modes_method_comparison_curve_summary.csv", index=False)
     fig = make_main_figure(reg_curves, field_curves)
-    outputs = save_main_figure(fig)
+    outputs = save_main_figure(fig, standard=standard, review_root=review_root)
     return selection, summary, fig, outputs
 
 
-def build_relative_field_fit_outputs() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, plt.Figure, dict[str, Path]]:
+def build_relative_field_fit_outputs(
+    *,
+    standard_path: str | Path | None = None,
+    review_root: str | Path | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, plt.Figure, dict[str, Path]]:
+    standard = load_standard(standard_path)
+    output_dir = resolve_fitting_output_dir(standard=standard, review_root=review_root)
+    output_dir.mkdir(parents=True, exist_ok=True)
     selection = selected_runs()
     field_curves = load_relative_field_fit_curves(selection)
     powers = target_power_summary(field_curves, RELATIVE_FIELD_CASE_ORDER)
     summary = relative_field_curve_summary(field_curves, powers)
-    powers.to_csv(REVIEW_ROOT / "fit_modes_target_power_summary.csv", index=False)
-    summary.to_csv(REVIEW_ROOT / "fit_modes_relative_field_fit_curve_summary.csv", index=False)
+    powers.to_csv(output_dir / "fit_modes_target_power_summary.csv", index=False)
+    summary.to_csv(output_dir / "fit_modes_relative_field_fit_curve_summary.csv", index=False)
     fig = make_relative_field_fit_figure(field_curves, powers, case_order=RELATIVE_FIELD_CASE_ORDER)
-    outputs = save_relative_field_fit_figure(fig)
+    outputs = save_relative_field_fit_figure(fig, standard=standard, review_root=review_root)
     return selection, powers, summary, fig, outputs
 
 
-def build_rrmse_lr_trajectory_outputs() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, plt.Figure, dict[str, Path]]:
+def build_rrmse_lr_trajectory_outputs(
+    *,
+    standard_path: str | Path | None = None,
+    review_root: str | Path | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, plt.Figure, dict[str, Path]]:
+    standard = load_standard(standard_path)
+    output_dir = resolve_fitting_output_dir(standard=standard, review_root=review_root)
+    output_dir.mkdir(parents=True, exist_ok=True)
     selection = selected_runs()
     reference_field_curves = load_relative_field_fit_curves(selection)
     powers = target_power_summary(reference_field_curves, RELATIVE_FIELD_CASE_ORDER)
     curves = load_rrmse_lr_trajectory_curves()
     selected = rrmse_lr_trajectory_selected_runs(curves)
     summary = rrmse_lr_trajectory_curve_summary(curves, powers)
-    selected.to_csv(REVIEW_ROOT / "fit_modes_rrmse_lr_trajectory_selected_runs.csv", index=False)
-    summary.to_csv(REVIEW_ROOT / "fit_modes_rrmse_lr_trajectory_curve_summary.csv", index=False)
+    selected.to_csv(output_dir / "fit_modes_rrmse_lr_trajectory_selected_runs.csv", index=False)
+    summary.to_csv(output_dir / "fit_modes_rrmse_lr_trajectory_curve_summary.csv", index=False)
     fig = make_rrmse_lr_trajectory_figure(curves, powers)
-    outputs = save_rrmse_lr_trajectory_figure(fig)
+    outputs = save_rrmse_lr_trajectory_figure(fig, standard=standard, review_root=review_root)
     return selected, powers, summary, fig, outputs

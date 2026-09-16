@@ -180,10 +180,9 @@ def default_data_root() -> Path:
 
 
 def repo_relative(path: Path) -> str:
-    try:
-        return str(path.resolve().relative_to(REPO_ROOT))
-    except ValueError:
-        return str(path)
+    """Return an anonymous-safe repository or artifact-store path."""
+
+    return pareto_base.repo_relative(path)
 
 
 def finite_float(value: object, default: float = float("nan")) -> float:
