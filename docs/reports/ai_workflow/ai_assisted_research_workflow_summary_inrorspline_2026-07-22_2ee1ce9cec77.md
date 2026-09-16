@@ -2,7 +2,7 @@
 doc_type: ai_workflow_summary
 status: draft
 summary_date: 2026-07-22
-repo_path: /home/hengjie/code_sync/inrorspline
+repo_path: ${REPO_ROOT}
 head_commit: 2ee1ce9cec77d5135f7a215ed4bf23e5d59393b2
 head_commit_short: 2ee1ce9cec77
 head_commit_date: 2026-07-08 22:17:20 -0700

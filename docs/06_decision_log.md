@@ -9,7 +9,7 @@ status: active
 
 Decision:
 
-- `/home/hengjie/code_sync/inrorspline` is the real Git repo root.
+- `${REPO_ROOT}` is the real Git repo root.
 - `starting_kit/` remains as source material for now.
 - Root scaffold is created without `pyproject.toml` or a Python package/test scaffold.
 

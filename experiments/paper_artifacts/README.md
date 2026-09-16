@@ -1,7 +1,15 @@
 # Final-Paper Artifact Standards
 
-This folder is the source of truth for final-paper figure and table display
-names, hyperparameter-variant selection, and versioned review artifacts.
+This folder is the source of truth for final-paper builders, display names,
+and hyperparameter-variant selection. Generated figures, tables, manifests,
+reports, and executed review notebooks are external-only.
+
+Set `ARTIFACT_ROOT` before running a supported builder. Generated paper
+artifacts belong under
+`${ARTIFACT_ROOT}/repo_experiments/paper_artifacts/<artifact>/<version>/`.
+The repository retains only source code, standards, nickname maps, and
+output-free notebook sources. Historical versioned paths in registry and paper
+documents are archive-relative references, not repo-local output destinations.
 
 ## Files
 
@@ -9,11 +17,33 @@ names, hyperparameter-variant selection, and versioned review artifacts.
   hypervariants, temporary exceptions, and TODOs.
 - `method_nicknames.csv`: editable method display-name map. Edit the
   `nickname` column only when changing paper-facing method names.
-- `best_result_table/v001/`: standardized best-result table outputs.
-- `pareto_figure/v001/`: standardized Pareto figure outputs.
-- `fitting_figure/v001/`: standardized field-fit rRMSE figure outputs.
-- `motion_pattern_figure/v001/`: standardized coronal fixed/moving/deformed/grid
-  motion-pattern panels for reference fields.
+- builder scripts: source-only generators that validate output roots through
+  `ARTIFACT_ROOT`.
+
+## Output Routing
+
+The standard JSON and nickname CSV are Git-managed source configuration.
+Generated tables, figures, manifests, reports, and executed notebooks belong
+outside Git. Set `ARTIFACT_ROOT`; the current Pareto builder defaults to:
+
+```text
+${ARTIFACT_ROOT}/repo_experiments/paper_artifacts/pareto_figure/<current-version>/
+```
+
+An explicit `--review-root` is allowed only when it is an absolute path inside
+`${ARTIFACT_ROOT}/repo_experiments/`. The `review_key` values in
+`artifact_standard*.json` define those logical destinations; legacy archived
+manifests may still contain historical repo-relative `output_dir` values.
+
+The current v012/v013 Pareto builders and the motion-pattern builder require
+explicit absolute paths for prior generated inputs outside the Git worktree.
+Use their `--help` output with archived paths under the external store; they do
+not revive deleted `experiments/` output trees as implicit inputs.
+
+The standard-driven Pareto builder likewise requires `--oasis-source`,
+`--lung-mean-source`, and `--lung-no-sweep-source`. These are archived
+generated tables and must be explicit absolute external inputs; its output
+still defaults to the configured external `review_key`.
 
 ## Current LR Standard
 

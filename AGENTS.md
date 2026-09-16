@@ -35,18 +35,21 @@ Primary dataset handles:
 PROJECT_OBJECT = {
   phase: "new_project_scaffold",
   project_slug: "inrorspline",
-  repo_source_of_truth: "git/GitHub for code, docs, configs, tests, public-review artifacts",
+  repo_source_of_truth: "git/GitHub for source code, docs, configs, tests, and source-only review material",
+  artifact_source_of_truth: "${ARTIFACT_ROOT} for generated experiment, review, and migrated project artifacts; never Git",
   code_write_model: "single-writer primary development repo",
   worker_model: "GPU workers are execution mirrors unless explicitly promoted",
   datasets: ["brain", "lungct"],
-  data_source_of_truth: "server-local DATA_ROOT folders, never Git",
-  docker_model: "container gets separate repo/data/scratch mounts",
+  data_source_of_truth: "dataset-specific server-local roots plus ARTIFACT_ROOT for project-generated data; never Git",
+  docker_model: "container gets separate repo/raw-data/artifact mounts",
   repo_mount_in_container: "/workspace/repo",
   data_mount_in_container: "/workspace/data",
-  scratch_mount_in_container: "/workspace/scratch",
+  artifact_mount_in_container: "/database/inrorspline",
+  artifact_env_in_container: "ARTIFACT_ROOT=/database/inrorspline",
   raw_data_mode: "read-only by default",
   rsync_policy: "explain impact first, dry-run first, real sync only after approval",
   docker_policy: "normal requested operation; no rsync-style impact explanation required",
+  artifact_policy: "source-only Git worktree; generated artifacts and executed notebooks are external-only",
   public_review_policy: "anonymous-safe code and docs from day one"
 }
 ```
@@ -63,6 +66,7 @@ Use these bracket commands in prompts:
 [agents sync]                # propose AGENTS.md updates from current repo/conversation context
 [sync-code plan]             # one-way primary repo -> worker rsync; explain + dry-run first
 [sync-data plan]             # one-way DATA_ROOT -> DATA_ROOT rsync; explain + dry-run first
+[artifact-store migration plan] # copy/check/retain migration to ARTIFACT_ROOT; never delete source without separate approval
 [rsync explain]              # required before every rsync command
 [docker run]                 # Docker build/run commands; no rsync-style impact explanation needed
 [docker image transfer]      # registry push/pull, or save/load; rsync step follows rsync rule
@@ -277,36 +281,60 @@ Rules:
 - Never use bidirectional rsync for source code.
 - Never use `--delete` on raw datasets by default.
 - Never sync raw data into the Git repo.
-- Log meaningful real syncs in `logs/YYYY-MM.md` or `outputs/inspection/`.
+- Log meaningful real syncs outside the repo under
+  `${ARTIFACT_ROOT}/migration_manifests/`.
+- Artifact-store migrations are copy/check/retain operations. Do not use
+  `--delete`, `--remove-source-files`, or `--inplace` for an initial or final
+  migration pass. Preserve source trees for at least 30 days after validation;
+  rerun checksum comparison and obtain separate approval before any deletion.
+- For an artifact-store migration, validate a small metadata canary first, use
+  `-aHAXS -x` with ownership/group preservation disabled, freeze writers for a
+  final delta pass, and require a checksum dry-run plus count/size/mtime
+  inventories before declaring the destination valid. Treat ACL, xattr, mode,
+  path, file-type, or modification-time preservation failures as blockers.
 
 ## Path and Mount Model
 
 ```bash
 export PROJECT_SLUG=inrorspline
 export REPO_ROOT="$HOME/code_sync/$PROJECT_SLUG"
-export DATA_ROOT="/data/$USER/$PROJECT_SLUG"
-export SCRATCH_ROOT="/scratch/$USER/$PROJECT_SLUG"
-export BRAIN_DATA="$DATA_ROOT/brain"
-export LUNGCT_DATA="/data/$USER/datasets/lungCT/DIR-Lab"
-export LUNGCT_PTVREG_ISO1MM="$LUNGCT_DATA/processed/pTVReg_iso1mm"
+export ARTIFACT_ROOT="${ARTIFACT_ROOT:?set ARTIFACT_ROOT to the external artifact store}"
+export ARTIFACT_RUN_ROOT="$ARTIFACT_ROOT/runs"
+export ARTIFACT_REVIEW_ROOT="$ARTIFACT_ROOT/repo_experiments"
+export ARTIFACT_MANIFEST_ROOT="$ARTIFACT_ROOT/migration_manifests"
+export DATA_ROOT="${DATA_ROOT:?set the raw-data root in ignored local configuration}"
+export BRAIN_DATA="${BRAIN_DATA:?set the brain-data root in ignored local configuration}"
+export LUNGCT_DATA="${LUNGCT_DATA:?set the LungCT-data root in ignored local configuration}"
+export LUNGCT_PTVREG_ISO1MM="${LUNGCT_PTVREG_ISO1MM:?set the pTVReg root in ignored local configuration}"
 ```
 
 Expected host layout:
 
 ```text
-$REPO_ROOT/                 # Git-managed code/docs/configs/tests
-$DATA_ROOT/brain/           # OASIS and related brain data, outside Git
-/data/$USER/datasets/lungCT/DIR-Lab/  # canonical LungCT/4DCT/COPD data
-/data/$USER/datasets/manifests/       # dataset migration/integrity records
-$SCRATCH_ROOT/runs/         # large experiment outputs, outside Git
+$REPO_ROOT/                             # Git-managed source only
+$ARTIFACT_ROOT/runs/                    # checkpoints, fields, run logs, outputs
+$ARTIFACT_ROOT/{ptvreg,prepared,dual_author_data,logs}/ # migrated project data
+$ARTIFACT_ROOT/repo_experiments/        # figures, tables, reports, executed notebooks
+$ARTIFACT_ROOT/migration_manifests/     # inventories, checksums, transfer logs
+external raw dataset roots               # host-local, outside Git and ARTIFACT_ROOT when retained
 ```
+
+`ARTIFACT_ROOT` is host-specific operational context. Committed code and docs
+must use the variable only; the actual mount path belongs in ignored
+`private/data_sources.md`. The Git worktree is source-only: generated figures,
+PDFs, CSV/JSON result tables, reports, live-monitor files, checkpoints, dense
+fields, and executed notebook copies all belong under `ARTIFACT_ROOT`, even
+when they are small. Keep the narrow `.gitignore` policy so accidental
+repo-local artifacts remain visible for review rather than being silently
+hidden.
 
 Expected container layout:
 
 ```text
 /workspace/repo             # mounted from $REPO_ROOT
-/workspace/data             # mounted from $DATA_ROOT; raw data read-only by default
-/workspace/scratch          # mounted from $SCRATCH_ROOT; outputs/checkpoints/logs
+/workspace/data             # optional raw-data mounts; read-only by default
+/database/inrorspline       # compatibility bind of $ARTIFACT_ROOT for legacy launchers
+ARTIFACT_ROOT=/database/inrorspline  # required container environment for artifact resolvers
 ```
 
 ## Docker Execution Default
@@ -316,22 +344,27 @@ data-inspection Python work, unless the user explicitly says to use a different
 environment:
 
 ```text
-default_container_name: py310sitreg_v1_test1
+legacy_container_name: py310sitreg_v1_test1
+default_container_name: py310sitreg_v1_artifact_store
 default_container_image: hengjieliu96/dl_dir:py310sitreg_v1
-observed_container_id: c525c6217286
 ```
 
 Default interactive entry:
 
 ```bash
-docker exec -it py310sitreg_v1_test1 bash
+docker exec -it py310sitreg_v1_artifact_store bash
 ```
 
 Default direct Python entry:
 
 ```bash
-docker exec py310sitreg_v1_test1 python <script-and-args>
+docker exec py310sitreg_v1_artifact_store python <script-and-args>
 ```
+
+The default container has a verified `ARTIFACT_ROOT=/database/inrorspline`
+environment and compatible `ARTIFACT_ROOT:/database/inrorspline:rw` bind. The
+legacy container remains available only as a rollback reference; do not stop
+or repurpose it without explicit approval.
 
 Inside this container, use the legacy path mapping:
 
@@ -340,17 +373,18 @@ Inside this container, use the legacy path mapping:
 /data/hengjie  -> /database
 ```
 
-Large `inrorspline` experiment artifacts, checkpoints, dense fields, and
-per-run logs should default to:
+All generated `inrorspline` experiment material should default to:
 
 ```text
-host:   /data/hengjie/inrorspline
+host:   ${ARTIFACT_ROOT}
 docker: /database/inrorspline
 ```
 
-Only large data and run artifacts belong there. Small review figures, CSV
-summaries, and reports may stay under the repo/homebase when they are intended
-for immediate inspection or later documentation.
+The container must receive a direct read-write bind from `ARTIFACT_ROOT` to
+`/database/inrorspline`, while any existing raw-data bind at `/database` may
+remain in place. Small review figures, CSV summaries, reports, and executed
+notebooks are generated artifacts too; retain only their source code,
+specifications, and unexecuted notebook sources in the repo.
 
 Do not use the native Python environment for preprocessing, mask generation,
 image-loading audits, notebooks, or dependency-sensitive data work unless the
@@ -361,22 +395,22 @@ non-Python/non-preprocessing tasks.
 ## Notebook Review Habit
 
 When the user asks for a notebook, especially for data inspection, visual audit,
-or qualitative review, design the notebook as the primary review surface. It
-must display the important figures, overlays, tables, and summaries inline in
-the notebook, not only save files to disk. Companion scripts are welcome for
-reproducibility, but the notebook should call them and then render the generated
-outputs directly so the user can inspect results without leaving Jupyter.
+or qualitative review, keep an output-free notebook source in the repo and use
+an executed copy under `ARTIFACT_ROOT/repo_experiments/<experiment-key>/` as the
+primary review surface. That executed copy must display important figures,
+overlays, tables, and summaries inline. Companion scripts may generate the
+external outputs, but must not write them back into the worktree.
 
-Notebook outputs can be cleared before commit unless the notebook is intended as
-a small public report. The cells needed to regenerate and display the review
-figures should remain in the notebook.
+After creating or materially revising a review notebook, execute the external
+copy in the intended environment unless the user explicitly asks not to run it
+or the run would be unsafe or prohibitively expensive. For preprocessing or
+data-inspection notebooks, use the default Docker container. Before any source
+notebook is committed, clear all cell outputs; never treat an executed notebook
+or embedded figure output as a Git artifact.
 
-After creating or materially revising a review notebook, run it in the intended
-environment so the user can open it and inspect populated outputs directly,
-unless the user explicitly asks not to run it or the run would be unsafe or
-prohibitively expensive. For preprocessing/data-inspection notebooks, execute
-inside the default Docker container and keep the executed notebook outputs when
-the user needs immediate visual review.
+Run `python -B scripts/experiments/check_tracked_notebook_outputs.py` before
+declaring the worktree source-only or preparing a commit. It must report no
+Git-tracked notebook cell outputs.
 
 ## Local Data Source Map
 
@@ -386,6 +420,8 @@ Before OASIS/brainMR or LungCT/4DCT data work, check `private/data_sources.md` i
 
 - legacy task roots to inspect for loaders, reports, and protocol state
 - host and container path mappings
+- the configured external `ARTIFACT_ROOT` and its `/database/inrorspline`
+  compatibility bind
 - raw OASIS/brainMR image, segmentation, split, and baseline-displacement roots
 - raw LungCT/4DCT image, landmark, lung-mask, and pTV-preprocessed output roots
 - protocol warnings from `docs/reports/protocol_warnings/`
@@ -404,11 +440,15 @@ Before launching a real run:
 4. Add `codex_execution_spec.md` if Codex will implement or modify code for the run.
 5. Add `technical_log.md` with known limitations near the top.
 6. Confirm dataset manifest and split config.
-7. Confirm Docker image tag or digest.
-8. Run the smallest relevant smoke command.
-9. Launch the real run only after approval if in plan mode.
+7. Configure `ARTIFACT_ROOT`; direct run, review, monitor, and executed-notebook
+   outputs outside the repo and record symbolic roots in the execution spec.
+8. Confirm Docker image tag or digest.
+9. Run the smallest relevant smoke command.
+10. Launch the real run only after approval if in plan mode.
 
-Do not commit raw data, checkpoints, generated outputs, Docker image archives, private hostnames, credentials, or identity-breaking metadata.
+Do not commit raw data, checkpoints, generated outputs (including figures,
+tables, reports, or notebook outputs), Docker image archives, private hostnames,
+credentials, or identity-breaking metadata.
 
 ## LungCT Interpretation Rule
 

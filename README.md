@@ -16,25 +16,48 @@ The working thesis is that continuous/off-grid deformation evaluation is not eno
 
 ## Repo Model
 
-Code, docs, configs, tests, and public-review artifacts live in Git. Large datasets, raw outputs, checkpoints, and server-private paths do not.
+Code, docs, configs, tests, hand-authored experiment specifications, and
+output-free notebook sources live in Git. Generated experiment and review
+artifacts do not: figures, PDFs, result tables, reports, monitors, checkpoints,
+dense fields, and executed notebooks belong in the external artifact store.
 
 Default path model:
 
 ```bash
 export PROJECT_SLUG=inrorspline
 export REPO_ROOT="$HOME/code_sync/$PROJECT_SLUG"
-export DATA_ROOT="/data/$USER/$PROJECT_SLUG"
-export SCRATCH_ROOT="/scratch/$USER/$PROJECT_SLUG"
+export ARTIFACT_ROOT="${ARTIFACT_ROOT:?set ARTIFACT_ROOT to the external artifact store}"
+export ARTIFACT_RUN_ROOT="$ARTIFACT_ROOT/runs"
+export ARTIFACT_REVIEW_ROOT="$ARTIFACT_ROOT/repo_experiments"
 ```
+
+The actual host location of `ARTIFACT_ROOT` is private operational context and
+is recorded only in ignored local configuration. Its expected layout is:
+
+```text
+${ARTIFACT_ROOT}/runs/                 # run outputs, checkpoints, fields, logs
+${ARTIFACT_ROOT}/ptvreg/               # migrated pTVReg/project artifacts
+${ARTIFACT_ROOT}/prepared/             # prepared project data
+${ARTIFACT_ROOT}/dual_author_data/     # migrated project data
+${ARTIFACT_ROOT}/repo_experiments/     # review artifacts and executed notebooks
+${ARTIFACT_ROOT}/migration_manifests/  # migration inventories, checksums, logs
+```
+
+The repository deliberately keeps a narrow `.gitignore`; accidental generated
+files under `experiments/` should be visible and moved out, not broadly ignored.
 
 Docker should mount these as separate volumes:
 
 ```text
 /workspace/repo      # code repo
-/workspace/data      # dataset root, read-only by default
-/workspace/scratch   # runs, checkpoints, logs
+/workspace/data      # optional raw-data mounts, read-only by default
+/database/inrorspline # compatibility mount for legacy run paths
 ```
 
 ## Current Status
 
-This repository has just been scaffolded from `starting_kit/`. It intentionally does not yet include a Python package scaffold, real experiment configs, server-specific launch scripts, raw data, checkpoints, or generated result artifacts.
+The external-artifact-store migration completed on 2026-09-03 after the
+metadata canary, writer-free final delta, checksum comparison, and inventories
+passed. The former source data remain rollback-only through 2026-10-03; no
+source-data deletion is authorized before then. See
+[`docs/migrations/artifact_store_2026-09-02.md`](docs/migrations/artifact_store_2026-09-02.md).

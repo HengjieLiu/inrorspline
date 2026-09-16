@@ -10,7 +10,15 @@ status: active
 > `/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm`; see
 > `docs/migrations/lungct_dirlab_2026-07-11.md`.
 
-Every real run should get an entry before launch. Large artifacts belong under `SCRATCH_ROOT`, not Git.
+Every real run should get an entry before launch. Generated run and review
+artifacts of every size belong under `${ARTIFACT_ROOT}`, not Git.
+`experiments/` is source-only and may retain execution specifications, technical
+logs, and output-free notebook sources. Historical rows below intentionally
+retain their executed paths; they are not evidence that those paths remain
+valid after the completed external-artifact-store migration. See
+`docs/migrations/artifact_store_2026-09-02.md` and its symbolic manifest
+mapping. The former source data tree remains rollback-only through the recorded
+30-day retention date and requires separate explicit approval for deletion.
 
 ## Required Fields
 
@@ -32,7 +40,10 @@ Split config:
 Standards preflight:
 Protocol tag:
 Command:
-Output root:
+Artifact root: `${ARTIFACT_ROOT}`
+Run/output root: `${ARTIFACT_ROOT}/runs/<run-id>`
+Review artifact root: `${ARTIFACT_ROOT}/repo_experiments/<experiment-key>`
+Artifact manifest/verification:
 Primary metrics:
 Known limitations:
 Next decision:
