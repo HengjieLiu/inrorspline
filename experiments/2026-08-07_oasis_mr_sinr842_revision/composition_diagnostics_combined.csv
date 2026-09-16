@@ -1,4 +1,0 @@
-method,method_key,run_name,diagnostic,stage_idx,stage_count,image_mean_abs,image_max_abs,image_rmse,image_p95_abs
-mr_sinr842_composed,mr_sinr842_composed,mr_sinr842_composed_rank000_a1000_pilot,composed_vs_sequential_warp,0,1,0.0,0.0,0.0,0.0
-mr_sinr842_composed,mr_sinr842_composed,mr_sinr842_composed_rank000_a1000_pilot,composed_vs_sequential_warp,1,2,0.0029274350963532925,0.7519076466560364,0.022448107600212097,0.008376315236091614
-mr_sinr842_composed,mr_sinr842_composed,mr_sinr842_composed_rank000_a1000_pilot,composed_vs_sequential_warp,2,3,0.004379847552627325,0.8845701217651367,0.025493578985333443,0.015350818634033203

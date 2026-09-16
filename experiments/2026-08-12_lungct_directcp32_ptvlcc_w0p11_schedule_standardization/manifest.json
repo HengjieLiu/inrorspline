@@ -1,7 +1,0 @@
-{
-  "title": "LungCT MR-D-BSCP pTVReg-Loss Schedule Standardization",
-  "validation_errors": [],
-  "new_rows": 10,
-  "baseline_rows": 10,
-  "stage_epochs": "400,400,800,900"
-}

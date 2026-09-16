@@ -1,1 +1,0 @@
-D_A_lr1e-2,D_F600_lr1e-2,D_F1000_lr3e-3,S_F1000_lr1e-3,S_A_lr1e-3

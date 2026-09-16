@@ -1,7 +1,0 @@
-{
-  "title": "LungCT Corrected MR-D-BSCP IDIR-Loss Schedule Standardization",
-  "validation_errors": [],
-  "new_rows": 10,
-  "baseline_rows": 0,
-  "stage_epochs": "400,400,800,900"
-}

@@ -1,6 +1,0 @@
-| condition | stage_downsample | stage_epochs | stage_lr | reg1mm_snap_tre_mean_mm | reg1mm_subvoxel_tre_mean_mm | interpretation |
-| --- | --- | --- | --- | --- | --- | --- |
-| ptv_standard_lr0p01_e100 | 8,4,2,1 | 100,100,100,100 | 0.01,0.01,0.01,0.01 | 1.2134897659389092 | 1.083705282897508 | LR0.01 runtime/capture refinement row. |
-| ptv_standard_lr0p01_e200 | 8,4,2,1 | 200,200,200,200 | 0.01,0.01,0.01,0.01 | 1.2166762666601687 | 1.0831964806378171 | LR0.01 runtime/capture refinement row. |
-| ptv_nopyr_lr0p01_e100 | 1,1,1,1 | 100,100,100,100 | 0.01,0.01,0.01,0.01 | 1.217794913391338 | 1.0833562679889397 | LR0.01 runtime/capture refinement row. |
-| ptv_partial_lr0p01_e100 | 4,2,1,1 | 100,100,100,100 | 0.01,0.01,0.01,0.01 | 1.2189987706556913 | 1.0835395906954213 | LR0.01 runtime/capture refinement row. |

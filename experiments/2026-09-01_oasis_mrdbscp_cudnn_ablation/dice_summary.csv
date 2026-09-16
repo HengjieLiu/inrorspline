@@ -1,5 +1,0 @@
-config,config_label,cudnn_benchmark,cudnn_deterministic,gpu,case_count,dice_mean,dice_sd
-benchmark_true_deterministic_false,"benchmark=True, deterministic=False",True,False,2,5,0.7838778093376582,0.04900371152593125
-benchmark_false_deterministic_false,"benchmark=False, deterministic=False",False,False,2,5,0.7838778093376582,0.04900371152593125
-benchmark_true_deterministic_true,"benchmark=True, deterministic=True",True,True,2,5,0.7838778093376582,0.04900371152593125
-benchmark_false_deterministic_true,"benchmark=False, deterministic=True",False,True,2,5,0.7838778093376582,0.04900371152593125

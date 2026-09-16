@@ -1,3 +1,0 @@
-method,method_key,run_name,diagnostic,stage_idx,from_full_cps,to_full_cps,jump_mean_abs,jump_max_abs,jump_mean_mag,jump_p95_mag,jump_max_mag
-mr_sinr842_requery,mr_sinr842_requery,mr_sinr842_requery_rank000_a1000_pilot,requery_stage_transition_jump,1,8,4,0.003206667024642229,0.03325287252664566,0.006427064538002014,0.013732646591961384,0.03357016295194626
-mr_sinr842_requery,mr_sinr842_requery,mr_sinr842_requery_rank000_a1000_pilot,requery_stage_transition_jump,2,4,2,0.0035277693532407284,0.054486580193042755,0.007115774322301149,0.01873760111629963,0.05773017555475235
