@@ -25,6 +25,9 @@ definitions in `docs/03_methods.md`; keep run ledgers in
 - `directcp_bspline_optimization.md`: DirectCP optimization, cubic B-spline
   formulas, analytic derivatives, finite-difference comparisons, and
   multistage knot insertion.
+- `mr_d_bscp_fast_842.md`: comprehensive code-derived specification of the
+  OASIS MR-D-BSCP fast 8-4-2 schedule, implementation conventions, timing
+  semantics, and acceleration-audit invariants.
 - `paper_claims_crosswalk.md`: paper claims mapped to code paths, experiment
   evidence, metrics, and caveats.
 
