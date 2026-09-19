@@ -294,6 +294,177 @@ Next decision:
   required for this batch because disabling benchmark reduced the gap by more
   than 20%. A profiler remains optional for kernel-level attribution.
 
+### P2z: OASIS MR-D-BSCP Table-1 cuDNN Rerun on GPU 3
+
+- Run ID: `oasis_mrdbscp_cudnn_table1_first10_gpu3_20260916_v1`.
+- Status: completed and technically accepted 2026-09-16 (`33/33` timing,
+  `30/30` Dice).
+- Owner/agent: Codex.
+- Date planned: 2026-09-16.
+- Date started: 2026-09-16.
+- Date completed: 2026-09-16.
+- Server: local project GPU server; no private hostname recorded.
+- GPU model/count: physical GPU 3 only; three configurations run sequentially.
+- Git commit: `0d16f8f4fdb6fa252b9a858971a8d2d545aed7b2`; dirty source tree at launch.
+- Branch: `gpu8`.
+- Docker image/container: `hengjieliu96/dl_dir:py310sitreg_v1` /
+  `py310sitreg_v1_artifact_store`.
+- Dataset root: shared-storage OASIS split root, recorded in the execution
+  manifest; not the legacy `/database/wavereg/...` path.
+- Dataset manifest: OASIS BrainMR seed-3 shuffled `pair_test_200`, ranks `0-9`.
+- Split config: `configs/splits/oasis/pair_test_200_shuffled_seed000003.txt`.
+- Standards preflight: reviewed the OASIS protocol, fair-experiment checklist,
+  standards index, implementation notes, and prior P2y cuDNN ablation.
+- Protocol tag:
+  `oasis_seed3_first10_dvf_only_mrdbscp_cudnn_gpu3_table1_sequence`.
+- Method: `MR_A_fast_decay`, direct MR-D-BSCP 8-4-2, alpha `1000`, seed `1`,
+  with the existing decayed-stage learning rates and adaptive stopping.
+- Configuration order:
+  `benchmark_false_deterministic_true`,
+  `benchmark_false_deterministic_false`,
+  `benchmark_true_deterministic_false`.
+- Timing sequence: one fresh worker per configuration; rank `0` cold, then rank
+  `0` rerun plus ranks `1-9` warm, for `33` timing measurements total.
+- Timing endpoint: `case_load_complete` through `dvf_file_ready`; DVF-only,
+  including optimization and DVF output but excluding evaluation.
+- Command source: `scripts/experiments/oasis_alpha_sweep/run_mrdbscp_cudnn_ablation.py`
+  and `evaluate_mrdbscp_cudnn_ablation.py`, extended without changing P2y
+  defaults.
+- Output root:
+  `/database/inrorspline/runs/oasis_mrdbscp_cudnn_table1_first10_gpu3_20260916_v1`.
+- Review root:
+  `/database/inrorspline/repo_experiments/2026-09-16_oasis_mrdbscp_cudnn_table1_first10_gpu3`.
+- Primary metrics: cold endpoint, warm mean/SD, cold-minus-warm gap, phase
+  timing breakdown, actual steps, peak memory, backend metadata, and sampled
+  Dice over 30 unique case/configuration outputs.
+- Acceptance: passed. Timing completed `33/33`; all dense DVFs were finite
+  float32 normalized-grid XYZ arrays with shape `(160, 224, 192, 3)`; every
+  timing JSON recorded matching requested/effective cuDNN flags; Dice completed
+  `30/30` finite rows.
+- Known limitations: first10 only; cold-gap differences combine backend
+  first-use overhead and case-specific runtime; GPU-3 results are directly
+  paired only within this rerun and not bitwise comparable to historical GPU-2
+  timings.
+- Experiment record:
+  `experiments/2026-09-16_oasis_mrdbscp_cudnn_table1_first10_gpu3/`.
+- Results: paired reference cold/warm/gap `110.20/9.23/100.97` s; disabling
+  benchmark with deterministic `True` gave `26.49/9.31/17.19` s and with
+  deterministic `False` gave `22.42/9.29/13.14` s. The generated report records
+  absolute and percentage changes for both arms.
+- Result artifacts:
+  `/database/inrorspline/repo_experiments/2026-09-16_oasis_mrdbscp_cudnn_table1_first10_gpu3/`.
+- Next decision: determine whether the GPU-3 reference and deterministic arm
+  support updating the camera-ready runtime interpretation or only provide a
+  reproducibility diagnostic.
+
+### P2aa: OASIS Table-1 Candidate cuDNN Cold/Warm Rerun on GPU 3
+
+- Run ID: `oasis_table1_candidates_cudnn_first10_gpu3_20260916_v1`.
+- Status: completed and technically accepted 2026-09-17 (`165/165` timing,
+  `150/150` Dice).
+- Owner/agent: Codex.
+- Date planned: 2026-09-16.
+- Date started: 2026-09-16.
+- Date completed: 2026-09-17.
+- Server: local project GPU server; no private hostname recorded.
+- GPU model/count: physical GPU 3 only; all candidates/configurations run
+  sequentially.
+- Git commit: `0d16f8f4fdb6fa252b9a858971a8d2d545aed7b2`; dirty source tree at
+  launch.
+- Branch: `gpu8`.
+- Docker image/container: `hengjieliu96/dl_dir:py310sitreg_v1` /
+  `py310sitreg_v1_artifact_store`.
+- Dataset root:
+  `/mnt/shengdata1/hengjie/workspace/wavereg/datasets/OASIS/OASIS_official/oasis_organized/split_v1`
+  inside the recreated container mount.
+- Dataset manifest: OASIS BrainMR seed-3 shuffled `pair_test_200`, ranks
+  `0-9`.
+- Split config: `configs/splits/oasis/pair_test_200_shuffled_seed000003.txt`.
+- Standards preflight: OASIS protocol, fair-experiment checklist, standards
+  index, implementation notes, and prior P2z cuDNN rerun reviewed.
+- Protocol tag:
+  `oasis_seed3_first10_table1_candidates_dvf_only_cudnn_gpu3_sequence`.
+- Candidates in Table-1 order: `MR_A_fast_decay`, `D2_A_bal_lr10x`,
+  `D4_A_bal_lr10x`, `S2_A_bal_lr10x`, `S4_A_bal_lr10x`.
+- Configuration order per candidate:
+  `benchmark_false_deterministic_true`,
+  `benchmark_false_deterministic_false`,
+  `benchmark_true_deterministic_false`.
+- Timing sequence: fresh worker per candidate/configuration; rank `0` cold,
+  then rank `0` rerun plus ranks `1-9` warm, for `165` measurements total.
+- Timing endpoint: `case_load_complete` through `dvf_file_ready`; DVF-only,
+  including optimization and DVF output but excluding evaluation.
+- Command source:
+  `scripts/experiments/oasis_alpha_sweep/run_mrdbscp_cudnn_ablation.py` and
+  `evaluate_mrdbscp_cudnn_ablation.py`, generalized from P2z while preserving
+  the historical single-candidate defaults.
+- Output root:
+  `/database/inrorspline/runs/oasis_table1_candidates_cudnn_first10_gpu3_20260916_v1`.
+- Review root:
+  `/database/inrorspline/repo_experiments/2026-09-16_oasis_table1_candidates_cudnn_first10_gpu3`.
+- Primary metrics: cold endpoint, warm mean/SD, cold-minus-warm gap, phase
+  timing, setup-device time, actual steps, peak memory, effective backend
+  metadata, and paired Dice over `150` unique saved DVFs.
+- Acceptance: passed. Dry-run queued `165` jobs; all `15` one-step smoke jobs
+  passed; timing completed `165/165`; all selected DVFs were finite float32
+  normalized-grid XYZ arrays of shape `(160,224,192,3)`; requested/effective
+  backend flags matched in every timing JSON; and separate Dice evaluation
+  completed `150/150` rows.
+- Known limitations: first10 only; backend timing differences are diagnostic
+  and do not by themselves justify changing the camera-ready table. No
+  camera-ready PDF or LaTeX source will be modified before user review.
+- Experiment record:
+  `experiments/2026-09-16_oasis_table1_candidates_cudnn_first10_gpu3/`.
+- Results: paired reference cold/warm/gap were `102.52/9.38/93.14` s for
+  MR-D-BSCP (8-4-2), `72.95/17.58/55.36` s for D-BSCP (cps2),
+  `72.80/20.61/52.19` s for D-BSCP (cps4), `177.71/91.34/86.37` s for
+  INR-BSCP (cps2), and `98.67/32.29/66.38` s for INR-BSCP (cps4). The two
+  benchmark-disabled arms and all absolute/percentage paired changes are in
+  the generated report.
+- Result artifacts:
+  `/database/inrorspline/repo_experiments/2026-09-16_oasis_table1_candidates_cudnn_first10_gpu3/`.
+- Next decision: review the generated full report before deciding whether any
+  camera-ready Table-1 values or prose should change.
+
+### P2ab: OASIS Table-1 Base/Fast F/T Rerun on GPU 3
+
+- Run ID: `oasis_table1_base_fast_ft_first10_gpu3_20260916_v1`.
+- Status: in progress.
+- Owner/agent: Codex.
+- Date planned: 2026-09-16.
+- GPU: physical GPU 3 only; all ten schedules run sequentially.
+- Git branch: `gpu8`; exact launch hash and dirty-tree state will be recorded
+  in the external manifest.
+- Docker image/container: `hengjieliu96/dl_dir:py310sitreg_v1` /
+  `py310sitreg_v1_artifact_store`.
+- Dataset root: shared-storage OASIS split root at the documented container
+  path; not the legacy `/database/wavereg/...` path.
+- Dataset manifest: seed-3 shuffled `pair_test_200`, ranks `0-9`.
+- Split config: `configs/splits/oasis/pair_test_200_shuffled_seed000003.txt`.
+- Protocol tag:
+  `oasis_seed3_first10_table1_base_fast_ft_gpu3_sequence`.
+- Candidates: base/fast pairs for MR-D-BSCP (8-4-2), D-BSCP cps2/cps4, and
+  INR-BSCP cps2/cps4.
+- Backend: `benchmark=False, deterministic=True`.
+- Timing: one rank-0 cold run, repeated rank-0 plus ranks 1-9 warm runs per
+  candidate; endpoint is `case_load_complete` through `dvf_file_ready` and
+  excludes evaluation.
+- Monitoring: GPU 3 is polled approximately once per second. Contaminated
+  warm measurements are retried in place; contaminated cold measurements
+  restart the worker in a fresh process. Retry attempts remain external-only.
+- Expected acceptance: `110/110` clean timing rows, `100/100` separate Dice
+  rows, valid finite float32 normalized-grid XYZ DVFs of shape
+  `(160,224,192,3)`, matching requested/effective backend metadata, and exact
+  Git provenance.
+- Known limitation: first10 diagnostic only; it cannot replace the OASIS-100
+  Dice column or authorize camera-ready edits.
+- Experiment record:
+  `experiments/2026-09-16_oasis_table1_base_fast_ft_first10_gpu3/`.
+- Artifact roots:
+  `/database/inrorspline/runs/oasis_table1_base_fast_ft_first10_gpu3_20260916_v1`
+  and
+  `/database/inrorspline/repo_experiments/2026-09-16_oasis_table1_base_fast_ft_first10_gpu3`.
+
 ### P2s: LungCT FD-BE cps4 Alpha Extension for Expanded TRE/SDlogJ Panel
 
 - Run ID: `lungct_fdbe_cps4_alpha1e5_1e6_all10_v1`.
