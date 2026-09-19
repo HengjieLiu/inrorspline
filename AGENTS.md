@@ -44,9 +44,11 @@ PROJECT_OBJECT = {
   docker_model: "container gets separate repo/raw-data/artifact mounts",
   repo_mount_in_container: "/workspace/repo",
   data_mount_in_container: "/workspace/data",
+  shared_storage_mount_in_container: "/mnt/shengdata1/hengjie",
   artifact_mount_in_container: "/database/inrorspline",
   artifact_env_in_container: "ARTIFACT_ROOT=/database/inrorspline",
   raw_data_mode: "read-only by default",
+  shared_storage_mode: "read-only",
   rsync_policy: "explain impact first, dry-run first, real sync only after approval",
   docker_policy: "normal requested operation; no rsync-style impact explanation required",
   artifact_policy: "source-only Git worktree; generated artifacts and executed notebooks are external-only except the two canonical Off-Grid submission PDFs explicitly named below",
@@ -353,6 +355,7 @@ Expected container layout:
 ```text
 /workspace/repo             # mounted from $REPO_ROOT
 /workspace/data             # optional raw-data mounts; read-only by default
+/mnt/shengdata1/hengjie    # optional shared-storage mount; read-only
 /database/inrorspline       # compatibility bind of $ARTIFACT_ROOT for legacy launchers
 ARTIFACT_ROOT=/database/inrorspline  # required container environment for artifact resolvers
 ```
@@ -378,20 +381,28 @@ docker exec -it py310sitreg_v1_artifact_store bash
 Default direct Python entry:
 
 ```bash
-docker exec py310sitreg_v1_artifact_store python <script-and-args>
+docker exec --user 1009:1009 py310sitreg_v1_artifact_store python <script-and-args>
 ```
 
 The default container has a verified `ARTIFACT_ROOT=/database/inrorspline`
 environment and compatible `ARTIFACT_ROOT:/database/inrorspline:rw` bind. The
-legacy container remains available only as a rollback reference; do not stop
-or repurpose it without explicit approval.
+shared-storage OASIS mount, when required, is
+`${SHARED_STORAGE_ROOT}:/mnt/shengdata1/hengjie:ro`. Docker mounts cannot be
+added with `docker restart`; recreate the container and preserve the previous
+container under a rollback name. The legacy container remains available only
+as a rollback reference; do not stop or repurpose it without explicit approval.
 
 Inside this container, use the legacy path mapping:
 
 ```text
 /home/hengjie  -> /homebase
 /data/hengjie  -> /database
+${SHARED_STORAGE_ROOT} -> /mnt/shengdata1/hengjie (read-only)
 ```
+
+The host user/group that owns the artifact store should be used for
+artifact-writing commands (`1009:1009` on the current host) so NFS-backed
+permissions are preserved.
 
 All generated `inrorspline` experiment material should default to:
 
@@ -401,9 +412,10 @@ docker: /database/inrorspline
 ```
 
 The container must receive a direct read-write bind from `ARTIFACT_ROOT` to
-`/database/inrorspline`, while any existing raw-data bind at `/database` may
-remain in place. Small review figures, CSV summaries, reports, and executed
-notebooks are generated artifacts too; retain only their source code,
+`/database/inrorspline`, while raw data and shared-storage mounts are
+read-only. Any existing legacy raw-data bind at `/database` may remain in
+place for compatibility. Small review figures, CSV summaries, reports, and
+executed notebooks are generated artifacts too; retain only their source code,
 specifications, and unexecuted notebook sources in the repo.
 
 Do not use the native Python environment for preprocessing, mask generation,
