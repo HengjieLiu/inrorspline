@@ -26,10 +26,11 @@ import launch_oasis_unified_acceleration_sweep as unified  # noqa: E402
 from run_mrdbscp_cudnn_ablation import (  # noqa: E402
     CANDIDATE_NAME,
     CONFIGS,
-    config_out_root,
-    config_review_root,
+    canonical_case_steps,
     parse_case_ranks,
     run_dir,
+    selected_candidates,
+    selected_configs,
     write_csv,
     write_json,
 )
@@ -39,6 +40,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--gpu", type=str, default="2")
     parser.add_argument("--case-ranks", type=str, default="0-4")
+    parser.add_argument("--configs", type=str, default="")
+    parser.add_argument("--candidates", type=str, default="")
+    parser.add_argument("--repeat-cold-rank", action="store_true")
     parser.add_argument("--alpha", type=float, default=1000.0)
     parser.add_argument("--out-root", type=Path, required=True)
     parser.add_argument("--review-root", type=Path, required=True)
@@ -71,12 +75,24 @@ def saved_dvf_path(run_path: Path, summary: Mapping[str, object]) -> Path:
     return candidates[0]
 
 
-def evaluate_config(args: argparse.Namespace, config: object, device: torch.device) -> List[Dict[str, object]]:
-    ranks = parse_case_ranks(str(args.case_ranks))
+def evaluate_config(
+    args: argparse.Namespace,
+    candidate: unified.Candidate,
+    config: object,
+    device: torch.device,
+) -> List[Dict[str, object]]:
+    steps = canonical_case_steps(args)
     rows: List[Dict[str, object]] = []
-    for rank in ranks:
+    for step in steps:
         started = time.perf_counter()
-        target = run_dir(args, config, rank)  # type: ignore[arg-type]
+        target = run_dir(
+            args,
+            config,  # type: ignore[arg-type]
+            step.rank,
+            timing_condition=step.timing_condition,
+            warm_sequence_index=step.warm_sequence_index,
+            candidate=candidate,
+        )
         summary_path = target / "summary.json"
         if not summary_path.exists():
             raise FileNotFoundError(f"Missing timing-run summary: {summary_path}")
@@ -98,7 +114,7 @@ def evaluate_config(args: argparse.Namespace, config: object, device: torch.devi
             raise ValueError(f"{dvf_path} contains non-finite values")
 
         batch = c.load_oasis_case(
-            rank=int(rank),
+            rank=int(step.rank),
             device=device,
             oasis_root=Path(args.oasis_root),
             pair_file=Path(args.pair_file),
@@ -110,12 +126,15 @@ def evaluate_config(args: argparse.Namespace, config: object, device: torch.devi
         metrics = c.evaluate_from_dense_coords(id_grid + dense_disp, batch)
         accuracy = c.accuracy_row(metrics, str(batch["fixed_id"]), str(batch["moving_id"]))
         row: Dict[str, object] = {
+            "candidate": candidate.name,
+            "method": candidate.method,
             "config": config.slug,  # type: ignore[attr-defined]
             "config_label": config.label,  # type: ignore[attr-defined]
             "cudnn_benchmark": config.benchmark,  # type: ignore[attr-defined]
             "cudnn_deterministic": config.deterministic,  # type: ignore[attr-defined]
             "gpu": str(args.gpu),
-            "case_rank": int(rank),
+            "case_rank": int(step.rank),
+            "timing_condition": step.timing_condition,
             "fixed_id": batch["fixed_id"],
             "moving_id": batch["moving_id"],
             "dvf_path": str(dvf_path),
@@ -134,22 +153,28 @@ def evaluate_config(args: argparse.Namespace, config: object, device: torch.devi
 
 def aggregate(rows: Sequence[Mapping[str, object]], args: argparse.Namespace) -> List[Dict[str, object]]:
     summaries: List[Dict[str, object]] = []
-    for config in CONFIGS:
-        selected = [row for row in rows if row.get("config") == config.slug]
-        values = [finite(row.get("dice_mean")) for row in selected]
-        values = [value for value in values if math.isfinite(value)]
-        summaries.append(
-            {
-                "config": config.slug,
-                "config_label": config.label,
-                "cudnn_benchmark": config.benchmark,
-                "cudnn_deterministic": config.deterministic,
-                "gpu": str(args.gpu),
-                "case_count": len(selected),
-                "dice_mean": mean(values) if values else float("nan"),
-                "dice_sd": stdev(values) if len(values) > 1 else float("nan"),
-            }
-        )
+    for candidate in selected_candidates(args):
+        for config in selected_configs(args):
+            selected = [
+                row for row in rows
+                if row.get("candidate") == candidate.name and row.get("config") == config.slug
+            ]
+            values = [finite(row.get("dice_mean")) for row in selected]
+            values = [value for value in values if math.isfinite(value)]
+            summaries.append(
+                {
+                    "candidate": candidate.name,
+                    "method": candidate.method,
+                    "config": config.slug,
+                    "config_label": config.label,
+                    "cudnn_benchmark": config.benchmark,
+                    "cudnn_deterministic": config.deterministic,
+                    "gpu": str(args.gpu),
+                    "case_count": len(selected),
+                    "dice_mean": mean(values) if values else float("nan"),
+                    "dice_sd": stdev(values) if len(values) > 1 else float("nan"),
+                }
+            )
     write_csv(Path(args.review_root) / "dice_summary.csv", summaries)
     write_json(Path(args.review_root) / "dice_summary.json", summaries)
     return summaries
@@ -157,17 +182,17 @@ def aggregate(rows: Sequence[Mapping[str, object]], args: argparse.Namespace) ->
 
 def main() -> int:
     args = parse_args()
-    if str(args.gpu) != "2":
-        raise ValueError("This focused evaluator is fixed to physical GPU 2.")
-    if parse_case_ranks(str(args.case_ranks)) != [0, 1, 2, 3, 4]:
-        raise ValueError("This focused evaluator requires case ranks 0-4.")
-    device = c.set_cuda_device("2", cudnn_benchmark=False, cudnn_deterministic=True)
+    candidates = selected_candidates(args)
+    selected_configs(args)
+    parse_case_ranks(str(args.case_ranks))
+    device = c.set_cuda_device(str(args.gpu), cudnn_benchmark=False, cudnn_deterministic=True)
     rows: List[Dict[str, object]] = []
-    for config in CONFIGS:
-        rows.extend(evaluate_config(args, config, device))
+    for candidate in candidates:
+        for config in selected_configs(args):
+            rows.extend(evaluate_config(args, candidate, config, device))
     write_csv(Path(args.review_root) / "dice_case_metrics.csv", rows)
     aggregate(rows, args)
-    print(json.dumps({"completed": True, "case_count": len(rows), "candidate": CANDIDATE_NAME}, indent=2), flush=True)
+    print(json.dumps({"completed": True, "case_count": len(rows), "candidates": [candidate.name for candidate in candidates]}, indent=2), flush=True)
     return 0
 
 
