@@ -278,7 +278,7 @@ def phase_candidate(candidate: Candidate, args: argparse.Namespace) -> Candidate
             stage_epochs=stage_epochs,
             stage_min_epochs=stage_epochs if candidate.early_stop_mode == "adaptive" else candidate.stage_min_epochs,
             stage_patience=stage_epochs if candidate.early_stop_mode == "adaptive" else candidate.stage_patience,
-            stage_check_interval="1,1,1",
+            stage_check_interval=",".join(["1"] * n_stages),
         )
     return replace(
         candidate,

@@ -83,7 +83,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stage-rel-delta-data", type=str, default="2e-5")
     parser.add_argument("--stage-min-delta", type=str, default="")
     parser.add_argument("--runtime-candidate", type=str, default="")
-    parser.add_argument("--timing-detail", choices=["off", "coarse", "deep"], default="off")
+    parser.add_argument("--timing-detail", choices=["off", "coarse", "deep", "endpoints", "components"], default="off")
+    parser.add_argument("--loss-history-mode", choices=["cpu", "gpu_buffer"], default="cpu")
     parser.add_argument("--cudnn-benchmark", type=parse_bool_option, default=True)
     parser.add_argument("--cudnn-deterministic", type=parse_bool_option, default=False)
     parser.add_argument("--output-mode", choices=["full", "dvf_only"], default="full")
@@ -292,9 +293,18 @@ class TimingRecorder:
         self.notes: List[Dict[str, object]] = []
         self.marks: List[Dict[str, object]] = []
         self.stage_phase_summaries: List[Dict[str, object]] = []
+        self.components = None
+        if self.detail == "components":
+            from scripts.experiments.mrdbscp842_acceleration.components import ACTIVE
+            self.components = ACTIVE.get()
+            if self.components is None:
+                raise RuntimeError("Component timing requires the main instrumentation context")
+            self.components.origin = self.root_start
 
     def set_device(self, device: torch.device) -> None:
         self.device = device
+        if self.components is not None:
+            self.components.device = device
 
     def sync(self) -> None:
         if not self.enabled:
@@ -310,8 +320,10 @@ class TimingRecorder:
         metadata: Optional[Dict[str, object]] = None,
         sync: bool = True,
     ) -> Optional[Dict[str, object]]:
-        if not self.enabled:
+        if not self.enabled or (self.detail == "endpoints" and name != "setup.device"):
             return None
+        if self.components is not None:
+            sync = False
         if sync:
             self.sync()
         now = time.perf_counter()
@@ -328,6 +340,8 @@ class TimingRecorder:
             "depth": max(0, len(self.stack) - 1),
             "sync": bool(sync),
         }
+        if self.components is not None:
+            token["component_token"] = self.components.start(str(name))
         self.stack.append(str(token["id"]))
         return token
 
@@ -338,6 +352,8 @@ class TimingRecorder:
         if do_sync:
             self.sync()
         now = time.perf_counter()
+        if self.components is not None:
+            self.components.stop(token["component_token"])
         event_id = str(token["id"])
         if not self.stack or self.stack[-1] != event_id:
             raise RuntimeError(f"Timing stack mismatch while stopping {event_id}.")
@@ -404,6 +420,8 @@ class TimingRecorder:
             "sync": bool(sync),
         }
         self.marks.append(row)
+        if self.components is not None:
+            self.components.marks[str(name)] = now-self.components.origin
         return row
 
     def add_stage_phase_summary(self, summary: Dict[str, object]) -> None:
@@ -473,6 +491,7 @@ class TimingRecorder:
             "reconciliation": self.reconciliation(),
             "stage_phase_summaries": list(self.stage_phase_summaries),
             "notes": list(self.notes),
+            **({"components":self.components.payload()} if self.components is not None else {}),
         }
 
 
@@ -2270,11 +2289,20 @@ def optimize_multistage_stage(
     eval_shape = tuple(int(v) for v in fixed_l.shape)
     domain_cps = c.domain_cps_from_full(int(full_cps), int(downsample))
     id_grid = c.make_coordinate_grid(eval_shape, fixed_image.device).detach()
-    optimizer = torch.optim.Adam([control], lr=float(lr))
+    components = timer.components if timer is not None else None
+    with components.scope("optimizer_creation", cuda=False) if components is not None else _null_section():
+        optimizer = torch.optim.Adam([control], lr=float(lr))
     if timer is not None:
         stage_timing["stage_setup_sec"] = timer.stop(setup_token)
 
     rows: List[Dict[str, object]] = []
+    loss_buffer = None
+    if getattr(args, "loss_history_mode", "cpu") == "gpu_buffer":
+        from scripts.experiments.mrdbscp842_acceleration.backends import LossBuffer
+        loss_buffer = LossBuffer(int(epochs), fixed_image.device)
+    snapshot = getattr(args, "_control_snapshot_callback", None)
+    if snapshot is not None:
+        snapshot(stage_idx, 0, control, control_shape, eval_shape, domain_cps, False)
     stop_reason = "requested_epochs_complete"
     stage_start = time.time()
     loop_token = timer.start(
@@ -2311,26 +2339,32 @@ def optimize_multistage_stage(
         flush=True,
     )
     for epoch in range(1, int(epochs) + 1):
-        with phase_acc.phase("control_grid"):
-            control_grid = c.flat_to_grid(control, control_shape)
-        with phase_acc.phase("expand"):
-            dense_disp = c.expand_on_shape(control, control_shape, int(full_cps), eval_shape, int(downsample))
-        with phase_acc.phase("warp_ncc"):
-            warped = c.warp_full(moving_l, id_grid + dense_disp, mode="bilinear")
-            data_loss = c.ncc_loss(fixed_l[None, None], warped[None, None])
-        with phase_acc.phase("regularizer"):
-            reg_loss = c.analytic_bspline_sampled_be(
-                control_grid,
-                eval_shape,
-                int(domain_cps),
-                component_reduction="mean",
-            )
-        loss = data_loss + float(args.alpha) * reg_loss
-        with phase_acc.phase("backward_step"):
-            optimizer.zero_grad(set_to_none=True)
-            loss.backward()
-            optimizer.step()
+        iteration_token = None
+        if components is not None:
+            components.epoch = epoch
+            iteration_token = components.start("iteration")
+            dense_disp, data_loss, reg_loss, loss = components.training_step(
+                c, control, control_shape, full_cps, eval_shape, downsample,
+                moving_l, fixed_l, id_grid, domain_cps, args.alpha, optimizer)
+        else:
+            with phase_acc.phase("control_grid"):
+                control_grid = c.flat_to_grid(control, control_shape)
+            with phase_acc.phase("expand"):
+                dense_disp = c.expand_on_shape(control, control_shape, int(full_cps), eval_shape, int(downsample))
+            with phase_acc.phase("warp_ncc"):
+                warped = c.warp_full(moving_l, id_grid + dense_disp, mode="bilinear")
+                data_loss = c.ncc_loss(fixed_l[None, None], warped[None, None])
+            with phase_acc.phase("regularizer"):
+                reg_loss = c.analytic_bspline_sampled_be(
+                    control_grid, eval_shape, int(domain_cps), component_reduction="mean")
+            loss = data_loss + float(args.alpha) * reg_loss
+            with phase_acc.phase("backward_step"):
+                optimizer.zero_grad(set_to_none=True)
+                loss.backward()
+                optimizer.step()
         logging_start = time.perf_counter()
+        host_token = components.start("host_logging_and_checks", cuda=False) if components is not None else None
+        scalar_token = components.start("scalar_transfers", cuda=False) if components is not None else None
         row = {
             "stage_idx": float(stage_idx),
             "epoch": float(epoch),
@@ -2338,13 +2372,26 @@ def optimize_multistage_stage(
             "full_cps": float(full_cps),
             "downsample": float(downsample),
             "domain_cps": float(domain_cps),
-            "loss": float(loss.detach().cpu()),
-            "data_loss": float(data_loss.detach().cpu()),
-            "reg_loss": float(reg_loss.detach().cpu()),
+            "loss": float(loss.detach().cpu()) if loss_buffer is None else None,
+            "data_loss": float(data_loss.detach().cpu()) if loss_buffer is None else None,
+            "reg_loss": float(reg_loss.detach().cpu()) if loss_buffer is None else None,
             "alpha": float(args.alpha),
             "lr": float(lr),
         }
         rows.append(row)
+        if components is not None:
+            components.stop(scalar_token)
+        if loss_buffer is not None:
+            loss_buffer.append(epoch - 1, loss, data_loss, reg_loss)
+            check_due = (str(early_stop_mode) == "adaptive" and epoch >= int(min_epochs)
+                         and epoch % int(check_interval) == 0)
+            if (check_due or epoch == 1 or epoch % int(args.eval_interval) == 0
+                    or epoch == int(epochs)
+                    or (sampler is not None and sampler.should_record(int(row["global_epoch"])))
+                    or should_global_ncc_diagnostic(args, int(row["global_epoch"]), int(total_epochs))):
+                loss_buffer.flush(rows)
+        if snapshot is not None:
+            snapshot(stage_idx, epoch, control, control_shape, eval_shape, domain_cps, False)
         if should_global_ncc_diagnostic(args, int(row["global_epoch"]), int(total_epochs)):
             with torch.no_grad():
                 dense_full_diag = c.expand_on_shape(control, control_shape, int(full_cps), c.IMAGE_SHAPE, 1)
@@ -2388,6 +2435,7 @@ def optimize_multistage_stage(
             print(json.dumps(row), flush=True)
         should_break = False
         if str(early_stop_mode) == "adaptive":
+            stop_token = components.start("early_stop_check", cuda=False) if components is not None else None
             should_stop, reason = stage_stop_decision(
                 rows,
                 min_epochs=int(min_epochs),
@@ -2396,6 +2444,8 @@ def optimize_multistage_stage(
                 rel_delta_total=float(rel_delta_total),
                 rel_delta_data=float(rel_delta_data),
             )
+            if components is not None:
+                components.stop(stop_token)
             if should_stop:
                 stop_reason = reason
                 print(
@@ -2411,8 +2461,17 @@ def optimize_multistage_stage(
                 )
                 should_break = True
         loop_logging_early_stop_wall_sec += time.perf_counter() - logging_start
+        if components is not None:
+            components.stop(host_token)
+            components.stop(iteration_token)
         if should_break:
             break
+    if components is not None:
+        components.epoch = 0
+    if loss_buffer is not None:
+        loss_buffer.flush(rows)
+    if snapshot is not None:
+        snapshot(stage_idx, len(rows), control, control_shape, eval_shape, domain_cps, True)
     if timer is not None:
         stage_timing["optimizer_loop_sec"] = timer.stop(loop_token)
     phase_summary = phase_acc.summary()
@@ -2592,7 +2651,11 @@ def train_multistage_direct_cp(
         zip(stage_cps, stage_downsample, stage_epochs, stage_lr)
     ):
         control_shape = tuple(int(v) for v in nested_shapes[int(full_cps)])
-        control = torch.nn.Parameter(torch.zeros(int(np.prod(control_shape)), 3, device=device, dtype=torch.float32))
+        components = timer.components if timer is not None else None
+        if components is not None:
+            components.stage, components.epoch = stage_idx, 0
+        with components.scope("control_initialization") if components is not None else _null_section():
+            control = torch.nn.Parameter(torch.zeros(int(np.prod(control_shape)), 3, device=device, dtype=torch.float32))
         if prev_control is not None and prev_shape is not None:
             prolong_token = timer.start(
                 f"stage_{stage_idx}.prolongation",
@@ -2686,6 +2749,9 @@ def train_multistage_direct_cp(
         final_cps = int(full_cps)
         stage_summaries.append(summary)
         history.extend(rows)
+        if components is not None:
+            with components.scope("instrumentation_stage_resolve", cuda=False):
+                components.resolve()
     torch.cuda.synchronize()
     training_elapsed_sec = time.time() - train_start
     training_peak_mem_gb = torch.cuda.max_memory_allocated() / (1024**3)
@@ -3331,6 +3397,15 @@ def write_dvf_only_metadata(
 
 def main() -> None:
     args = parse_args()
+    if str(args.timing_detail) == "components":
+        from scripts.experiments.mrdbscp842_acceleration.components import instrument
+        with instrument(c):
+            _main(args)
+    else:
+        _main(args)
+
+
+def _main(args: argparse.Namespace) -> None:
     timer = TimingRecorder(str(args.timing_detail))
     lr = float(args.lr if args.lr is not None else default_lr(args.method))
     if str(args.output_mode) == "dvf_only":
