@@ -51,6 +51,183 @@ Next decision:
 
 ## Planned Priority Runs
 
+### P2ah: OASIS-100 fixed-50 CP-BE evaluation
+
+- Status: completed and accepted on 2026-09-25. Run
+  `oasis_cpbe_fixed50_first100_20260925T052403Z_v1` contains 202/202 clean
+  timing rows, 200/200 new evaluations, and complete 100-rank historical
+  quality anchors. The external Markdown and machine-readable reports passed
+  acceptance; paper/Table-1 material remains unchanged pending review.
+- Record: `experiments/2026-09-24_oasis_cpbe_fixed50_first100/`.
+- New registration arms: fixed 50/50/50 cache+batch+CP-BE with Adam, and fixed
+  50/50/50 CP-BE with AMSGrad. Both use spacing 8/4/2, downsampling 4/2/1,
+  stage LR .03/.01/.003, alpha1000, seed1, float32 and cuDNN F/T.
+- Protocol: seed-3 shuffled ranks0–99; one automatically selected idle physical
+  GPU locked for timing; per arm rank0 cold, repeated rank0 warm, ranks1–99
+  warm; endpoint case_load_complete through dvf_file_ready.
+- Evaluation: 200 new warm fields only, after timing, with adaptive 16-versus-32
+  persistent workers across idle GPUs. Keep 32 only for >=10% throughput gain
+  with host/GPU memory safety gates.
+- Comparison: existing OASIS-100 MR_A_fast_decay and canonical alpha1000
+  2500-step analytic-BE quality summaries. Baselines are not rerun. Controlled
+  first10 GPU3 F/T timings are context-only, not matched full100 runtime.
+- Outputs: `${ARTIFACT_ROOT}/runs/oasis_cpbe_fixed50_first100_<timestamp>`
+  and the matching external review root under the experiment key.
+- Acceptance: 202 clean timing rows, 200 valid new DVFs/evaluations and exactly
+  100 unique historical quality rows per baseline; first100 plus ranks10–99
+  summaries, paired case/label differences and complete provenance.
+
+
+### P2ag: Case04 fixed-50 cache/batch CP-BE presentation animation
+
+- Status: accepted `render_v6` and dense-cadence extension complete. The
+  original accepted delivery is `render_v6` under run
+  `mrdbscp_progress_case04_fixed50_20260923T021216Z_v2`; `render_v1` through
+  `render_v5` are retained non-delivery layout/report audits.
+- Record: `experiments/2026-09-22_mrdbscp_fixed50_cached_batch_animation/`.
+- Scope: OASIS seed-3 rank3 (Case04, fixed0117/moving0322), fixed50/50/50
+  stages, cache+batch+CP-BE, alpha1000 seed1, cuDNN F/T, physical GPU0.
+- Timing: by user-authorized amendment, no new benchmark was run. The video
+  reuses the accepted Case04 headline warm endpoint `1.893926 s` and measured
+  stage spans `0.522098/0.552847/0.634517 s` from P2af. A concurrent untimed
+  snapshot run supplied fields only; its `23.531749 s` wall time is excluded.
+- Presentation: new non-overwriting 1080p/30fps artifact, compact left image
+  grid and right combined loss panel; display similarity is1-NCC and display
+  total is `(1-NCC)+1000*BE`, a +1 display shift only. The final 15-second
+  phase-aware replay gives 12 seconds to optimization, proportionally by the
+  three accepted stage spans, and compresses setup/transitions/output. Visible
+  status text distinguishes preparation, optimization and final serialization.
+- Outputs: `${ARTIFACT_ROOT}/runs/mrdbscp_progress_case04_fixed50_<timestamp>`
+  and matching review root under the experiment key.
+- Limitations: single-case teaching artifact; labels/metrics are offline and do
+  not guide optimization; only stage totals were measured, so optimization
+  steps are evenly positioned within each accepted historical stage span and
+  the tiny aggregate preparation residual is explicitly allocated equally;
+  CP-BE numerical-equivalence warning retained.
+- Acceptance: 150 loss values matched the historical trajectory exactly; final
+  DVF file and array hashes matched; 18 reconstructed states passed with zero
+  final reconstruction error. The final H.264/yuv420p video is 1920x1080,
+  30 fps, 15 s and 450 frames. Independent decoded-frame checks confirmed
+  moving loss curves, static held images, and pixel-identical frozen columns.
+- Final quality transferred only after exact array-hash matching: Dice
+  `0.830247`, HD95 `1.700792 mm`, foreground SDlogJ `0.836015`, foreground
+  folding `4.202109%`.
+- Dense-cadence extension: one new untimed GPU0 capture saves every optimizer
+  step and must reproduce all 150 losses and the final accepted DVF exactly.
+  One offline reconstruction is then subsampled into measured field cadences
+  of 5, 2 and 1 step(s), producing non-overwriting
+  `animation_step5.mp4`, `animation_step2.mp4`, and `animation_step1.mp4`.
+  All retain the same accepted warm endpoint and stage clock; transition/setup
+  labels are removed so only optimizing stage/step and final DVF-ready status
+  are shown.
+- Dense-cadence accepted run:
+  `mrdbscp_progress_case04_dense_step1_20260923T044548Z`. The capture and
+  153-state evaluation were clean; final reconstruction RMS/max error was zero.
+  Accepted outputs are `step5_v2/animation_step5.mp4`,
+  `step2/animation_step2.mp4`, and `step1/animation_step1.mp4` beneath the
+  matching review run. Each is 1920x1080, 30 fps, 15 s and 450 frames; all
+  renderer, cadence, decoded-frame, frozen-column and delivery checks passed.
+
+### P2af: OASIS CP-BE accuracy-first overnight acceleration, GPU 0
+
+- Status: running automatically; v3 passed8 CPU contracts,12 GPU schedule
+  smokes and a clean35-label metric smoke after two preserved preflight-only
+  corrections. Formal reference registration started2026-09-21 09:39UTC.
+  Stop by09:00 Pacific local time, with earlier GPU cutoff and report reserve.
+  No headline cohort conclusions yet.
+- Record: experiments/2026-09-21_oasis_cpbe_accuracy_speed_gpu0/.
+- Twelve primary candidates: CP-BE fast reference, final-stage cap, fixed
+  budgets, looser adaptive stopping, cosine/step LR, and16/8/4/2 variants.
+- Protocol: seed3 shuffled first10, alpha1000 seed1, F/T, six CPU threads,
+  sequential physical GPU0, fresh worker cold+10warm, separate10-field metrics.
+- Primary Dice/HD95; final full-resolution NCC, FD BE/diffusion, foreground/full
+  SDlogJ, folding and positive fractions; per-case/label deltas and explicit gates.
+- Continuous contamination monitoring/retries, hard scoped-worker deadline,
+  incremental reports and complete provenance. Extensions only after core work.
+- Outputs: ${ARTIFACT_ROOT}/runs/oasis_cpbe_accuracy_speed_<timestamp> and
+  ${ARTIFACT_ROOT}/repo_experiments/2026-09-21_oasis_cpbe_accuracy_speed_gpu0/<run-id>.
+- Limits: tuning, not held-out validation; CP-BE non-equivalence warning retained.
+  No paper edits, existing artifact overwrite or commit.
+
+### P2ae: MR-D-BSCP CP-BE oral-presentation progress animation
+
+- Presentation revision completed: final `render_v4/` with geometric white
+  pull-coordinate grid contours and loss playback independent of field snapshot
+  cadence. CPU-only reconstruction/rendering; previous versions and measured
+  numerical results retained. Twenty CPU tests, fifteen render checks and eight
+  independent encoded-frame/local-player/frozen-column checks passed. `render_v3/`
+  retained; v4 clarifies field-snapshot versus DVF-ready timestamps. Per-video-frame
+  mapping, source snapshots, exact command and checksum manifests retained.
+
+- Status: completed and acceptance-checked. User-selected Case 04 (rank 3,
+  fixed 0117 / moving 0322) has 49 snapshots, 450 loss rows, a 30-second 1080p
+  animation and offline player. Accepted run:
+  `mrdbscp_progress_case04_20260920T223559Z_v2`, primary presentation `render_v4/`.
+  Preview ID:
+  `preview_20260920T221447Z_v1` (ten 1080p panels, overview and offline gallery).
+- Verification: ten CPU contracts and thirteen delivery checks passed; source,
+  DVF and input hashes, Docker provenance, commands and test logs retained.
+- Case-04 continuation verification: fourteen CPU contracts and fifteen final
+  delivery checks passed; zero contamination, exact baseline/clock/capture loss
+  and field parity, exact final control reconstruction. Initial smoke export
+  bug and its corrected fresh run are documented; failed artifacts retained.
+- Record: experiments/2026-09-20_mrdbscp_progress_animation/.
+- Source: accepted P2ad CP-BE-only headline warm outputs, seed-3 first10 ranks
+  0–9. Static preview uses CPU in Docker; no registration or GPU work.
+- Next phase: selected-case MR_A_fast_decay+cpbe, alpha1000 seed1, cuDNN F/T,
+  sequential GPU0; original adaptive three-stage schedule, separate clean warm
+  timing and snapshot runs, offline full-volume Dice and presentation rendering.
+- Deliverables: case-selection PNG/HTML gallery first; after selection, frozen
+  stage-column animation, real warm clock, per-step loss curves, MP4/HTML,
+  source/data provenance and machine/human-readable reports.
+- Outputs: ${ARTIFACT_ROOT}/repo_experiments/2026-09-20_mrdbscp_progress_animation/<run-id>;
+  future capture under ${ARTIFACT_ROOT}/runs/mrdbscp_progress_<timestamp>.
+- Known limits: demonstration, not cohort evidence; prior CP-BE non-equivalence
+  warning retained. No paper changes, production-default changes or commit.
+
+### P2ad: MR-D-BSCP cache/batch/CP-BE first10 and component timing, GPU 0
+
+- Status: completed and acceptance-checked; 33 clean headline + 33 clean
+  diagnostic registrations, 33 metric records, zero contaminated attempts.
+- Diagnostic/headline fields, steps and stop categories match exactly; the
+  eleven combination fields are byte-identical to CP-BE alone. The existing
+  BE-versus-original non-equivalence warning remains unchanged.
+- Record: experiments/2026-09-20_mrdbscp842_cache_batch_cpbe_gpu0/ (UTC date).
+- Arms: original MR_A_fast_decay, CP-BE alone, cache+batch+CP-BE; alpha 1000,
+  seed 1, seed3 shuffled first10, original adaptive stopping, cuDNN F/T.
+- Sequential physical GPU 0: fresh worker per arm, rank0 cold, rank0 warm,
+  ranks1-9 warm; 33 endpoint-only and 33 separate component-instrumented jobs.
+- Separate evaluation: Dice, HD95, positive-determinant foreground/full SDlogJ,
+  folding, field differences, and diagnostic/headline parity. Existing BE
+  non-equivalence warning is retained, not an exclusion gate.
+- Outputs: ${ARTIFACT_ROOT}/runs/mrdbscp842_be_combo_<timestamp> and matching
+  external review root keyed by the source experiment directory.
+- Raw fields, logs, source snapshots, reports and JSON/CSV remain external.
+- No paper edits, production-default changes, or commit.
+
+### P2ac: MR-D-BSCP 8-4-2 acceleration and BE quality characterization, GPU 0
+
+- Status: completed and acceptance-checked 2026-09-19; external completion
+  queue and acceptance manifest verified before P2ad. Source log updated.
+- Scope: MR_A_fast_decay only; first10 OASIS, alpha 1000, seed 1,
+  cuDNN benchmark=False/deterministic=True, sequential physical GPU 0.
+- Source reference: HEAD and all modified source hashes/snapshot are captured
+  in the external execution manifest before numerical workers start.
+- Protocol: CPU/GPU correctness, fresh GPU-0 reference and A/A, isolated
+  caching/layout/history/CP-BE pilots, gated combination, first10 confirmation.
+- Record: experiments/2026-09-19_mrdbscp842_acceleration_gpu0/.
+- Outputs: ${ARTIFACT_ROOT}/runs/mrdbscp842_acceleration_gpu0_<timestamp>
+  and ${ARTIFACT_ROOT}/repo_experiments/2026-09-19_mrdbscp842_acceleration_gpu0/<timestamp>.
+- Acceptance: finite normalized XYZ float32 DVFs, gradient/optimizer/stopping
+  parity for strict-equivalence promotion, paired fixed-step and adaptive runtime,
+  separate Dice/Jacobian metrics and BE-arm HD95,
+  fail-closed GPU contamination monitoring, machine-readable decisions and report.
+- User amendment: characterize BE registration on all first10 cases even when
+  strict FP32/Adam stress tests fail; retain the warning and report empirical
+  Dice/HD95 changes separately from numerical equivalence.
+- Limits: first10 diagnostic; later solver/precision/framework experiments are
+  deferred; no paper changes or commit authorized.
+
 ### P2x: COPD P2e-Geometry isoTV `0.055` All10 Screen
 
 - Run ID: `copd_p2e_geometry_w0p055_all10_v1`.
