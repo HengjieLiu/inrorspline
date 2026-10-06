@@ -101,6 +101,37 @@ Rationale:
 - Tracking their exact bytes and documented roles preserves paper provenance
   while keeping ordinary generated PDFs in ARTIFACT_ROOT.
 
+## 2026-09-29: Default GPU Registration To cuDNN Benchmark-Off Deterministic
+
+Decision:
+
+- Future GPU registration experiments default to
+  `torch.backends.cudnn.benchmark=False` and
+  `torch.backends.cudnn.deterministic=True` when not otherwise specified.
+- Record requested and effective backend flags with library/device provenance
+  for every timed run.
+- An alternative backend is allowed only as an explicit protocol override in
+  the execution specification, registry, command/manifest, and report.
+- Preserve historical backend behavior explicitly. In particular, P34/P35
+  remain `benchmark=True, deterministic=False` records rather than inheriting
+  the new default on reproduction.
+
+Rationale:
+
+- The controlled P36 fixed-50 rerun reduced P34 warm time from
+  `48.690 +/- 30.222` to `3.958 +/- 0.449` seconds for 4DCT and from
+  `36.228 +/- 37.620` to `4.689 +/- 0.577` seconds for COPD, with identical
+  optimizer work.
+- New F/T warm means were only 1.08x/1.09x the independent P35 T/F
+  immediate-repeat floors, showing that shape-specific cuDNN autotuning
+  dominated P34's slow process-warm cases.
+- Case-01 fixed-50 cold time also fell from 57.701 to 4.670 seconds for 4DCT
+  and from 101.004 to 5.615 seconds for COPD.
+- Fixed-50 native-crop snap TRE changed by only -0.0022 mm for 4DCT and
+  -0.0120 mm for COPD versus P34; no material aggregate quality regression was
+  observed. `deterministic=True` still does not claim global bitwise
+  determinism outside cuDNN.
+
 ## Pending Decisions
 
 - Final public dataset handles that avoid private host paths.

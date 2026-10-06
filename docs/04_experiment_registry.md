@@ -4067,3 +4067,127 @@ Next decision:
   `learn2breath26_fireants_e7a613c_cuda12.1`. It retains the method source and
   protocol but introduces a base-runtime asymmetry, recorded per case and
   explicitly distinguished from P31's CUDA-11.8 environment.
+
+### P34: GPU-1 LungCT MR-D-BSCP Adaptive and Fixed-50 Study
+
+- Run ID prefix: `lungct_mrdbscp_adaptive_fixed50_gpu1_`.
+- Status: completed and technically accepted 2026-09-29. The 20-case loader
+  audit, four monitored one-step smokes, 44/44 production registrations, and
+  strict aggregate validation all passed.
+- Owner/agent: Codex.
+- Date planned: 2026-09-29.
+- Dataset: canonical pTVReg-style isotropic-1-mm 4DCT cases 01-10 and COPD
+  cases 01-10.
+- Purpose: compare the best prior adaptive schedule for each cohort with the
+  matched-LR fixed-50-per-stage acceleration stress test while preserving the
+  pTV local-CC plus isoTV DirectCP backend.
+- Scale: four fresh persistent GPU-1 arms and 44 primary registrations. Each
+  arm runs case01 cold, case01 warm repeat, then cases02-10 warm. The 40 warm
+  fields form the quality cohort; four cold fields are retained for QA.
+- GPU contract: physical GPU 1 only, three-sample idle gate, approximately
+  1-Hz plus case-boundary NVML monitoring, no foreign-process intervention,
+  and complete-arm restart after contamination.
+- Timing: synchronized loaded-input to serialized-DVF endpoint, plus
+  optimizer-only, in-memory, peak-memory, stage-step, and case01 cold/warm
+  diagnostics.
+- Comparison policy: fixed-50 is compared directly with same-dataset adaptive.
+  P33 is historical quality/reproducibility context only; no matched speedup
+  against the old 2,500-step timings is permitted.
+- Accepted timing: warm input-to-serialized-DVF mean +/- sample SD was
+  `57.097 +/- 33.319 s` adaptive versus `48.690 +/- 30.222 s` fixed-50 for
+  4DCT (`1.17x`), and `51.332 +/- 46.893 s` versus
+  `36.228 +/- 37.620 s` for COPD (`1.42x`).
+- Subsequent P35/P36 diagnosis established that these process-warm timings
+  include large new-shape cuDNN benchmarking costs and are not steady-state
+  per-case runtime. P34 remains the accepted T/F shape-first record; use P36
+  for the backend-fixed 1-cold plus 10-warm timing.
+- Accepted headline quality: warm native-crop snap TRE was
+  `0.9209 +/- 0.1587 mm` adaptive versus `0.9226 +/- 0.1571 mm` fixed-50 for
+  4DCT, and `1.0054 +/- 0.6673 mm` versus `1.0469 +/- 0.6970 mm` for COPD.
+- Integrity: no production retries or contaminated accepted samples; maximum
+  accepted-arm monitor gaps were 1.199-1.200 seconds. All 44 DVFs were finite
+  and all landmark metrics accounted for 300 landmarks per case.
+- Execution spec:
+  `experiments/2026-09-29_lungct_mrdbscp_adaptive_fixed50_gpu1/`.
+
+### P35: GPU-1 LungCT Adjacent Shape-Pair Cache Diagnostic
+
+- Run ID prefix: `lungct_mrdbscp_shape_pair_cache_diagnostic_gpu1_`.
+- Status: completed and technically accepted 2026-09-29. The 80-row dry run,
+  20-case loader audit, four monitored GPU-1 smokes, 80/80 production fields,
+  and 40/40 adjacent pairs passed.
+- Owner/agent: Codex.
+- Date planned: 2026-09-29.
+- Purpose: diagnose the P34 shape-dependent timing pattern by running every
+  4DCT and COPD case twice consecutively within each adaptive/fixed-50 process.
+- Scale: four physical-GPU-1 arms, 20 registrations per arm, 80 total fields,
+  and 40 adjacent identical-matrix pairs.
+- Interpretation: fixed-50 is primary because paired optimizer steps are
+  identical. Adaptive paired timings must report step-count changes. Adjacent
+  repetition diagnoses established per-shape/process state but does not alone
+  identify a cache or kernel-selection mechanism.
+- Accepted timing: shape-first versus immediate-repeat mean was
+  `68.525/8.670 s` for 4DCT adaptive (`7.90x`) and `76.902/3.674 s` for 4DCT
+  fixed-50 (`20.93x`). COPD was `70.924/11.157 s` adaptive (`6.36x`) and
+  `62.669/4.318 s` fixed-50 (`14.51x`). Fixed-50 paired step counts were
+  identical; adaptive steps changed in 3/10 4DCT and 7/10 COPD pairs.
+- Relationship: voxel count correlated weakly with shape-first time
+  (`r=0.258-0.338`), while adaptive and fixed-50 shape-first case patterns
+  were nearly identical (`r=0.991` 4DCT, `r=0.999` COPD). Immediate-repeat
+  peak allocation was about 2.87x lower. This establishes a same-shape
+  process/backend-state effect, not a simple matrix-size law.
+- Integrity: zero accepted-arm bad monitor samples; maximum accepted gaps were
+  1.199-1.202 seconds. Six retained parse-only attempts preceded the accepted
+  4DCT adaptive production attempt; no CUDA registration ran in those failed
+  attempts, and no accepted production arm was contaminated.
+- Next decision: controlled LungCT fixed-50 A/B of cuDNN benchmark/determinism
+  flags, followed by per-stage/operator tracing only if the backend toggle
+  does not remove the first-shape cost. Existing OASIS evidence makes
+  `benchmark=False` the leading remedy, but this diagnostic alone does not
+  identify cuDNN as the sole mechanism.
+- Execution spec:
+  `experiments/2026-09-29_lungct_shape_pair_cache_diagnostic_gpu1/`.
+
+### P36: GPU-1 LungCT cuDNN F/T Cold/Warm Rerun
+
+- Run ID prefix: `lungct_mrdbscp_cudnn_ft_gpu1_`.
+- Status: completed and technically accepted 2026-09-29. The 44-row dry run,
+  20-case loader audit, focused CPU contracts, four monitored F/T smokes, and
+  44/44 production fields passed with zero validation errors.
+- Owner/agent: Codex.
+- Date planned: 2026-09-29.
+- Purpose: rerun P34's four 1-cold plus 10-warm arms with
+  `cudnn.benchmark=False, deterministic=True`, then compare casewise and
+  aggregate timing with the original P34 T/F warm cohort and P35 T/F adjacent
+  same-shape repeats.
+- Scale: four physical-GPU-1 arms and 44 new registrations. Schedules,
+  objective, data, timing endpoint, seed, and process layout remain matched to
+  P34; only the requested cuDNN flags change.
+- Interpretation: fixed-50 is primary because it executes identical work.
+  Adaptive step mismatches are explicit. P35 immediate repeats estimate the
+  already-tuned T/F floor; comparison across separate accepted runs remains a
+  controlled diagnostic rather than a universal hardware claim.
+- Acceptance: all requested/effective flags must be F/T; 44 finite fields,
+  40 unique warm results, clean GPU-1 monitoring, full provenance, and valid
+  P34/P35 reference joins are required.
+- Accepted timing: new F/T warm mean was `7.589 +/- 1.551 s` adaptive and
+  `3.958 +/- 0.449 s` fixed-50 for 4DCT, and `12.482 +/- 2.182 s` adaptive and
+  `4.689 +/- 0.577 s` fixed-50 for COPD.
+- Fixed-50 backend result: versus P34 T/F warm timing, F/T was 12.30x faster
+  for 4DCT and 7.73x faster for COPD with identical optimizer work. It was
+  only 1.08x/1.09x the P35 immediate-repeat floor. Case-01 cold time fell from
+  57.701 to 4.670 seconds and 101.004 to 5.615 seconds, respectively.
+- Interpretation: this confirms that new-shape cuDNN benchmarking dominated
+  P34's slow process-warm cases. Adaptive ratios are supporting evidence only
+  because steps differed in 6/10 4DCT and 7/10 COPD comparisons versus P34.
+- Integrity: every production arm was accepted on attempt 00 with zero bad
+  monitor samples and maximum gaps of 1.192-1.199 seconds. All 44 summaries
+  recorded effective F/T backend flags.
+- Quality: fixed-50 F/T minus P34 T/F warm native-crop snap TRE was -0.0022 mm
+  for 4DCT and -0.0120 mm for COPD; no material cohort regression was
+  observed, although global bitwise determinism is not claimed.
+- Policy outcome: F/T is now the repository default for future unspecified GPU
+  registration experiments. Requested/effective flags are mandatory
+  provenance, and any alternative must be an explicit protocol override.
+- Execution spec:
+  `experiments/2026-09-29_lungct_mrdbscp_cudnn_ft_gpu1/`.
