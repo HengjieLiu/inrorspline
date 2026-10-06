@@ -271,6 +271,7 @@ def test_external_input_directory_requires_a_directory_outside_the_repo(tmp_path
     [
         "scripts/experiments/oasis_alpha_sweep/run_mrdbscp_cudnn_ablation.py",
         "scripts/experiments/lungct_no_sweep_repro/launch_mrdbscp_acceleration_timing.py",
+        "scripts/experiments/lungct_no_sweep_repro/launch_mrdbscp_adaptive_fixed50_gpu1.py",
         "scripts/experiments/ptvreg_python_repro/launch_copd_fixed_all10.py",
         "scripts/experiments/ptvreg_python_repro/aggregate_copd_fixed_all10.py",
     ],
