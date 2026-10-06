@@ -332,10 +332,15 @@ def loader_audit(root: Path, case_ids: Sequence[int], dataset: str = "4dct") -> 
     }
 
 
-def set_cuda_device(gpu: str) -> torch.device:
+def set_cuda_device(
+    gpu: str,
+    *,
+    cudnn_benchmark: bool = False,
+    cudnn_deterministic: bool = True,
+) -> torch.device:
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
-    torch.backends.cudnn.deterministic = False
-    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.deterministic = bool(cudnn_deterministic)
+    torch.backends.cudnn.benchmark = bool(cudnn_benchmark)
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA is required for this runner.")
     torch.cuda.set_device(0)

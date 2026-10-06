@@ -65,6 +65,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out-root", type=Path, default=c.DEFAULT_RUN_ROOT)
     parser.add_argument("--run-name", type=str, default="")
     parser.add_argument("--gpu", type=str, default="0")
+    parser.add_argument("--cudnn-benchmark", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--cudnn-deterministic", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--eval-interval", type=int, default=100)
     parser.add_argument("--eval-chunk-size", type=int, default=200000)
@@ -116,7 +118,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--timing-condition",
-        choices=("unspecified", "cold", "warm", "warm_continuation"),
+        choices=("unspecified", "cold", "warm", "warm_continuation", "shape_first", "shape_repeat"),
         default="unspecified",
     )
     parser.add_argument("--timing-sequence-index", type=int, default=None)
@@ -2034,7 +2036,11 @@ def main() -> None:
             return
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    device = c.set_cuda_device(args.gpu)
+    device = c.set_cuda_device(
+        args.gpu,
+        cudnn_benchmark=bool(args.cudnn_benchmark),
+        cudnn_deterministic=bool(args.cudnn_deterministic),
+    )
     case = c.load_case(args.data_root, args.case_id, dataset=args.dataset)
     case_load_complete_sec = mark_timing("case_load_complete")
     sampler = CheckpointSampler(args=args, case=case, device=device, out_dir=out_dir)
@@ -2258,6 +2264,17 @@ def main() -> None:
         "elapsed_sec": float(result["elapsed_sec"]),
         "peak_mem_gb": float(result["peak_mem_gb"]),
         "variant_id": str(args.variant_id),
+        "backend": {
+            "requested_cudnn_benchmark": bool(args.cudnn_benchmark),
+            "requested_cudnn_deterministic": bool(args.cudnn_deterministic),
+            "effective_cudnn_benchmark": bool(torch.backends.cudnn.benchmark),
+            "effective_cudnn_deterministic": bool(torch.backends.cudnn.deterministic),
+            "torch_version": str(torch.__version__),
+            "cuda_runtime_version": str(torch.version.cuda),
+            "cudnn_version": int(torch.backends.cudnn.version() or 0),
+            "cuda_device_index": int(torch.cuda.current_device()),
+            "cuda_device_name": str(torch.cuda.get_device_name(torch.cuda.current_device())),
+        },
         "timing": timing,
         "timing_path": str(timing_path),
         "loaded_images_to_dvf_file_sec": float(timing["loaded_images_to_dvf_file_sec"]),
