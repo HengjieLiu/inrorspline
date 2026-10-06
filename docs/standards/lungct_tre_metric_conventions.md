@@ -99,11 +99,21 @@ fractional 1mm registration landmark grid.
 ## pTV-Prep Crop-Origin Warning
 
 Legacy task4 pTV-prep outputs used a task4-compatible Python crop convention.
-The canonical regenerated handle `pTVReg_iso1mm`, stored under
-`DIR-Lab/processed/pTVReg_iso1mm/{4DCT,COPD}`, uses the corrected
-pTVReg/MATLAB-origin crop convention. In the current 4DCT audit, the legacy
-crop was shifted by `+1` voxel in z/y/x for all ten cases while keeping the
-same crop shape.
+The handle `pTVReg_iso1mm` is not sufficient to identify the crop convention.
+The saved metadata under `DIR-Lab/processed/pTVReg_iso1mm/4DCT` uses the
+corrected pTVReg/MATLAB-origin crop; the corresponding `COPD` directory uses
+legacy Python bounds. The old shared protocol name and the COPD metadata
+phrase "corrected pTVReg crop" for masks are misleading; the saved bounds
+are authoritative. Do not silently rewrite historical metadata or results.
+
+In 4DCT, legacy bounds are shifted by `+1` native voxel in z/y/x for all ten
+cases without changing crop shape. In COPD cases 02–10 the same holds.
+COPD case01 clips at z=0: corrected z bounds are 0..108 versus legacy 0..109,
+giving 109 versus 110 native slices (z spacing 2.5 mm), not just a translation.
+The public preparation interface now requires explicit `corrected`/`legacy`
+modes and distinct versioned output directories. Corrected COPD is a new
+protocol and does not inherit the historical legacy-crop results. See private
+release issue CROP-001 in `docs/public_release/` for verification status.
 
 This crop-origin difference does not by itself corrupt TRE if images,
 landmarks, masks, uncropping, and TRE evaluation all use the same convention.

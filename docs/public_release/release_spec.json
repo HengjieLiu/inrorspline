@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "updated_on": "2026-09-30",
+  "status": "technical_checks_completed_publication_held_for_sinr_permission",
+  "visibility": "private_planning_do_not_export",
+  "public_repository": "https://github.com/HengjieLiu/RightPriorDIR",
+  "public_checkout_relative_to_research_repo": "../RightPriorDIR",
+  "authority": {
+    "current_task": "implement_approved_public_release_and_report_each_milestone",
+    "allowed_now": ["read_only_audit", "edit_docs_public_release", "implement_public_checkout", "build_and_verify_environment", "validate_preprocessing_without_optimization", "complete_scoped_public_staging_as_requested"],
+    "run_optimization": false,
+    "modify_public_checkout_this_audit": true,
+    "commit_or_publish_this_audit": false
+  },
+  "decisions": [
+    {"id": "D01", "status": "confirmed", "value": "three_pinned_upstream_submodules_with_wrappers"},
+    {"id": "D02", "status": "superseded", "value": "earlier_sinr_permission_interpretation", "superseded_by": "D14"},
+    {"id": "D03", "status": "confirmed", "value": "frozen_results_and_figure_table_scripts_no_optimization_reruns"},
+    {"id": "D04", "status": "confirmed", "value": "updated_acceleration_main_table_with_published_paper_differences"},
+    {"id": "D05", "status": "confirmed", "value": "copd_preprocessing_configs_verified_existing_results_as_post_paper_extension"},
+    {"id": "D06", "status": "confirmed", "value": "diagnostic_experiments_and_their_reproduction_code_deferred"},
+    {"id": "D07", "status": "confirmed", "value": "external_reference_points_frozen_values_only"},
+    {"id": "D08", "status": "confirmed", "value": "readme_figures_1_2_and_poster"},
+    {"id": "D09", "status": "confirmed", "value": "docker_and_detailed_running_instructions_required"},
+    {"id": "D10", "status": "confirmed", "value": "lung_acceleration_publication_pending"},
+    {"id": "D11", "status": "confirmed", "value": "september16_five_method_base_fast_paired_timing_N10_with_historical_OASIS100_accuracy_separately_listed"},
+    {"id": "D12", "status": "confirmed", "value": "MIT_for_own_code_upstream_licenses_remain_separate"},
+    {"id": "D13", "status": "confirmed", "value": "two_reproduction_layers_frozen_artifacts_and_full_experiment_rerun_code_for_OASIS_4DCT_COPD_no_execution_now"},
+    {"id": "D14", "status": "confirmed", "value": "sinr_author_permission_pending_as_intended_by_user", "confirmed_on": "2026-09-30", "publication_hold": true}
+  ],
+  "resolved_questions": [
+    {
+      "id": "Q04",
+      "status": "answered",
+      "question": "Should September 24 OASIS100 CP-BE results supersede the explicitly selected September 16 N10 table?",
+      "options": ["september24_oasis100_cpbe_fixed50", "september16_first10_all_five_methods", "user_supplied_source"],
+      "answer": "september16_first10_all_five_methods",
+      "accuracy_presentation": "historical_OASIS100_separate_block",
+      "supersedes": "earlier_choice_to_use_first10_accuracy_in_main_table"
+    }
+  ],
+  "open_questions": [],
+  "known_issues": [
+    {"id": "PERMISSION-001", "status": "pending_external_permission", "title": "SINR author permission pending", "blocks": ["public_candidate_push", "image_distribution"], "allowed_local_work": ["implementation", "testing", "candidate_clone_acceptance"], "resolution": "confirm_permission_or_obtain_approval_for_a_separately_reviewed_SINR_free_release"},
+    {
+      "id": "CROP-001",
+      "task_id": "R04",
+      "status": "implemented_and_geometry_verified",
+      "recorded_at_user_request_on": "2026-09-29",
+      "title": "Resolve corrected versus legacy DIR-LAB crop indexing and protocol metadata",
+      "cause": "legacy_crop_bounds_use_one_based_landmark_values_as_zero_based_indices",
+      "current_4dct_mode": "corrected_matlab_origin",
+      "current_copd_mode": "legacy_python_bounds",
+      "saved_metadata_verified": true,
+      "copd_cases02_10_legacy_minus_corrected_bounds_zyx": [[1, 1], [1, 1], [1, 1]],
+      "copd_case01": {
+        "corrected_bounds_zyx_inclusive": [[0, 108], [114, 434], [70, 435]],
+        "legacy_bounds_zyx_inclusive": [[0, 109], [115, 435], [71, 436]],
+        "native_spacing_zyx_mm": [2.5, 0.625, 0.625]
+      },
+      "planned_fix": ["explicit_corrected_and_legacy_modes", "distinct_protocol_ids", "corrected_copd_as_separate_version", "reconcile_tre_standard_and_mask_metadata"],
+      "preserve_historical_inputs_fields_and_results": true,
+      "relabel_old_results_as_corrected": false,
+      "verification": ["interior_and_boundary_crop_cases", "native_crop_registration_coordinate_round_trips", "image_mask_alignment", "300_landmark_coverage", "legacy_geometry_parity"],
+      "implemented": true,
+      "public_preprocessing_code_added": true,
+      "private_TRE_standard_corrected": true,
+      "historical_data_or_results_changed": false,
+      "corrected_COPD_registration_results_available": false,
+      "protocol_pattern": "dirlab_{4dct|copd}_{corrected|legacy}_crop_nominal1mm_v1",
+      "optimization_rerun_in_scope": false
+    }
+  ],
+  "submodules": [
+    {"name": "IDIR", "path": "third_party/IDIR", "url": "https://github.com/MIAGroupUT/IDIR", "release_commit": "9ab3ccfbbf09dc8fc65fa848332e7d9a0b3b81b3", "historical_provenance_verified": false, "release_content_verified": true},
+    {"name": "SINR", "path": "third_party/SINR", "url": "https://github.com/vasl12/SINR", "release_commit": "1a524ca7ae453b55310595fe957245088a108233", "historical_provenance_verified": false, "release_content_verified": true},
+    {"name": "Dual-INR", "path": "third_party/DUAL-INR-DIR", "url": "https://github.com/IPMI-ICNS-UKE/DUAL-INR-DIR", "release_commit": "f7c8e833435ec9c6b7ebec6c9a8098b566709146", "historical_provenance_verified": false, "release_content_verified": true}
+  ],
+  "cohorts": {
+    "paper_oasis100": {"count": 100, "ranks_inclusive": [0, 99], "shuffle_seed": 3, "pair_order": ["fixed_id", "moving_id"], "source": "configs/splits/oasis/pair_test_200_shuffled_seed000003.txt", "public_path": "splits/oasis100.csv", "release_pair_manifest_sha256": "36acaa730eb527266095eb595ce3a5b7ce8b63c64db097e6cee4efb8115352a4"},
+    "oasis_september16": {"count": 10, "ranks_inclusive": [0, 9], "role": "updated_paired_timing", "first10_accuracy_role": "diagnostic_context_only"},
+    "dirlab_4dct": {"count": 10, "case_ids_inclusive": [1, 10], "fixed": "T00", "moving": "T50", "crop_source": "corrected_matlab_origin", "historical_result_mapping": "verified_prepared_geometry_and_frozen_source_provenance"},
+    "dirlab_copd": {"count": 10, "case_ids_inclusive": [1, 10], "fixed": "iBHCT", "moving": "eBHCT", "crop_source": "legacy_python_bounds", "role": "post_paper_extension", "result_allowlist": ["P0", "P1", "MR-D-BSCP P2e", "pTVReg official"], "reference_crop_exception": "pTVReg official uses corrected MATLAB crop; comparison is not fully protocol matched"}
+  },
+  "artifacts": [
+    {"id": "figure1", "role": "paper_overview_static_asset", "public_path": "figures/fig1.png", "sha256": "39cd5f9dbf33135ea6985e7e166ba1c360d98f01a9770febf603d83b493afd63", "editable_source": null},
+    {"id": "figure2", "role": "frozen_paper_arc", "base_own_method_steps": 2500, "lung_Dual_PL1A_steps": 3000, "public_path": "figures/fig2.png", "sha256": "eb0db83bbd1f96d34c3afc9c25576e56c7944c07cc04ce74ece6f615d23e3e16", "canonical_png_match_verified": true, "source_dir": "${ARTIFACT_ROOT}/repo_experiments/migration_2026-09-02/experiments/paper_artifacts/pareto_figure/v013_final_dirlab4dct_axes_labels", "required_inputs": ["oasis100_pareto_source_rows.csv", "source_rows.csv", "source_manifest.json"], "portable_renderer": "rightpriordir/frozen.py", "public_numeric_inputs": ["results/paper/oasis100_arc.csv", "results/paper/dirlab4dct_arc.csv"]},
+    {"id": "poster", "public_path": "poster/offgrid_poster_v3.pdf", "sha256": "e31a88bfcfbaf037ed44c8e8c3164224a66eee9feafc5428107050583736217b", "observed_git_state": "untracked", "readme_link": "implemented"},
+    {"id": "original_table1", "role": "published_historical_record", "source": "docs/offgrid_submission/submitted_files/camera_ready_off-grid_30.pdf", "public_numeric_export": "results/paper/table1_published.csv"},
+    {"id": "updated_table", "role": "post_publication_update", "selected_source": "oasis_september16_base_fast_ft", "accuracy_source": "historical_oasis100_separate_block", "selection_decision": "D11", "public_path": "results/updated_oasis/timing_first10.csv", "release_ready": true},
+    {"id": "copd_table", "role": "post_paper_extension", "source": "results/manifest.json source IDs and hashes", "public_path": "results/copd_extension/population.csv", "case_rows": "results/copd_extension/cases.csv", "release_ready": true},
+    {"id": "figure3", "role": "deferred_diagnostic", "already_tracked_publicly": true, "delete_existing_asset": false, "reproduction_code_in_scope": false}
+  ],
+  "update_candidates": {
+    "historical_oasis100_separate_block": {
+      "source_file": "${ARTIFACT_ROOT}/repo_experiments/migration_2026-09-02/experiments/2026-08-13_oasis_selected_fast_first100/fast_vs_2500_baselines.csv",
+      "source_exists_verified": true,
+      "quality_n": 100,
+      "presentation": "separate_historical_accuracy_block",
+      "not_a_september16_backend_quality_measurement": true
+    },
+    "oasis_september16_base_fast_ft": {
+      "source_dir": "${ARTIFACT_ROOT}/repo_experiments/2026-09-16_oasis_table1_base_fast_ft_first10_gpu3",
+      "required_inputs": ["timing_summary.csv", "dice_summary.csv", "timing_case_rows.csv", "dice_case_metrics.csv", "execution_manifest.json"],
+      "quality_n": 10,
+      "warm_n_per_candidate": 10,
+      "cold_n_per_candidate": 1,
+      "candidate_count": 10,
+      "timing_start": "loaded_images_resident_on_selected_device",
+      "timing_end": "serialized_dense_dvf_ready",
+      "evaluation_in_timing": false,
+      "backend": {"cudnn_benchmark": false, "cudnn_deterministic": true},
+      "reported_environment": {"torch": "2.6.0+cu118", "cuda_runtime": "11.8", "cudnn": "90100", "gpu": "NVIDIA RTX 6000 Ada Generation"}
+    },
+    "oasis_september24_cpbe_fixed50": {
+      "selected_for_release": false,
+      "source_dir": "${ARTIFACT_ROOT}/repo_experiments/2026-09-24_oasis_cpbe_fixed50_first100/oasis_cpbe_fixed50_first100_20260925T052403Z_v1",
+      "required_inputs": ["population_summary.csv", "timing_summary.csv", "case_metrics.csv", "paired_differences.csv", "acceptance.json"],
+      "existing_acceptance_passed": true,
+      "quality_n_per_candidate": 100,
+      "new_timing_rows": 202,
+      "new_quality_rows": 200,
+      "strict_equivalence_to_dense_analytic_be": false,
+      "matched_speedup_against_historical_2500": false,
+      "caveats": ["first10_used_for_candidate_selection", "report_ranks10_99_sensitivity", "historical_timing_first10_gpu3_vs_new_first100_gpu0"]
+    }
+  },
+  "environment": {
+    "dockerfile_status": "implemented_build_and_pip_check_passed",
+    "single_environment_compatibility": "imports_configs_and_numerical_contracts_verified_no_full_optimization",
+    "observed_dependency_conflicts": ["SINR torch==2.2.1 versus Dual-INR torch>=2.11.0", "SINR numpy==1.26.4 versus Dual-INR numpy>=2.2.6"],
+    "include": ["own_methods", "three_inr_wrappers", "lung_preprocessing", "lungmask_R231_setup", "metrics", "cpu_plotting"],
+    "external_reference_methods": "frozen_values_only",
+    "base_digest": "sha256:8a159ba5e7f438cf36ea10d74a4a45fac1b0250d7d70f0dba114eefcbe3416da",
+    "dependency_lock_sha256": "3e4c3dd012c2c2bacba4f6dbb82dc3e9164dda80bb0b5fcb13608c5b1107d265",
+    "installed_package_inventory": "docs/environment.json",
+    "fresh_build_verified": true,
+    "base_registry_anonymous_access_verified": true,
+    "unused_base_packages_removed_only_from_derived_image": ["itk", "PyGObject", "icon_registration"]
+  },
+  "export_policy": {
+    "mode": "explicit_allowlist_preserve_existing_public_history",
+    "allow_small_frozen_public_result_inputs": true,
+    "modify_private_artifact_policy": false,
+    "exclude": ["private_git_history", "internal_agent_instructions", "docs/public_release", "raw_or_prepared_medical_volumes", "dense_fields", "checkpoints", "experiment_logs", "private_absolute_paths", "credentials", "diagnostic_experiment_code"]
+  },
+  "tasks": [
+    {"id": "R01", "status": "completed", "selection_resolved": true},
+    {"id": "R02", "status": "completed"},
+    {"id": "R03", "status": "completed"},
+    {"id": "R04", "status": "completed", "issue_id": "CROP-001", "description": "Explicit crop modes, corrected COPD version, consistent documentation, geometry validation; historical results preserved"},
+    {"id": "R05", "status": "completed"},
+    {"id": "R06", "status": "completed", "full_optimization_excluded": true},
+    {"id": "R07", "status": "completed", "R231_inference_not_reexecuted": true},
+    {"id": "R08", "status": "completed"},
+    {"id": "R09", "status": "completed"},
+    {"id": "R10", "status": "completed", "executed_and_unexecuted_commands_distinguished": true},
+    {"id": "R11", "status": "completed"},
+    {"id": "R12", "status": "completed"},
+    {"id": "R13", "status": "completed", "acceptance_source": "allowlisted_clean_snapshot_not_post_commit_clone"},
+    {"id": "R14", "status": "completed"},
+    {"id": "R15", "status": "completed"},
+    {"id": "R16", "status": "completed", "description": "Audit complete selected experiment matrices for OASIS, 4DCT and COPD"},
+    {"id": "R17", "status": "completed", "description": "Implement cohort execution, resume/retry, paired timing and new-result aggregation without executing real experiments"},
+    {"id": "R18", "status": "completed", "description": "Three-dataset instructions and clean no-optimization acceptance"},
+    {"id": "R19", "status": "completed", "description": "Synchronize user's SINR permission-pending decision and publication hold"},
+    {"id": "R20", "status": "completed", "description": "Verified OASIS ordinal subject mapping, safe organizer and acquisition instructions"},
+    {"id": "R21", "status": "completed", "description": "Sealed manifest, disposable candidate recursive clone, Docker and 85 offline tests"},
+    {"id": "R22", "status": "completed", "description": "Fully scoped staged public tree matches the tested candidate; no official commit or push"}
+  ],
+  "acceptance_report": "progress.json",
+  "experiment_reproduction_report": "experiment_reproduction.json",
+  "public_release_manifest_sha256": "09c1e2ddb51e20771ab6de438cfdb056c5c5be70faf39d92c71c9a4cffc4b27e",
+  "publication_readiness_report": "publication_readiness.json",
+  "publication_state": "on_hold_sinr_permission_pending_no_commit_push_tag_or_image_publication"
+}

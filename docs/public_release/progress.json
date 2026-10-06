@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "status": "technical_checks_completed_publication_held_for_sinr_permission",
+  "current_milestone": "M10",
+  "publication_gate": {"SINR_permission": "pending", "user_confirmed_on": "2026-09-30", "public_release_on_hold": true},
+  "optimization_reruns": false,
+  "public_commit_or_push": false,
+  "license_choice": "MIT",
+  "milestones": [
+    {"id": "M1", "name": "frozen_results_and_protocols", "status": "completed", "tasks": ["R01", "R02", "R03", "R05"], "evidence": ["16_frozen_input_checksums", "110_timing_rows_pair_identity_verified", "OASIS10_and_OASIS100_ordered_pairs", "40_COPD_case_rows", "figure2_PNG_byte_identical_to_paper"]},
+    {"id": "M2", "name": "portable_data_and_crop_geometry", "status": "completed", "tasks": ["R04", "R07"], "evidence": ["20_real_cases_geometry_and_300_landmarks_per_phase_exact", "8_image_mask_phase_pairs_array_equal", "coordinate_roundtrips_pass", "OASIS_real_rank0_loaded", "full_200_pair_order_verified", "explicit_versioned_corrected_legacy_interfaces", "private_TRE_standard_corrected_no_data_mutation"], "not_run": ["R231_inference", "corrected_COPD_registration"]},
+    {"id": "M3", "name": "methods_wrappers_configs_metrics", "status": "completed", "tasks": ["R06"], "evidence": ["three_pinned_submodules_import_and_model_construction_passed", "15_configs_validated", "8_private_to_public_numerical_comparisons_exact", "31_offline_tests_passed", "scalar_CUDA_GPU_check_passed"], "not_run": ["registration_optimization"]},
+    {"id": "M4", "name": "renderers_docker_documentation", "status": "completed", "tasks": ["R08", "R09", "R10", "R11", "R12"], "evidence": ["Docker_build_and_pip_check_passed", "anonymous_base_registry_access_200", "offline_figure2_exact_SHA256_match", "48_offline_tests_passed", "README_two_figures_poster_MIT_citation_and_detailed_commands", "formatted_and_no_undefined_names"]},
+    {"id": "M5", "name": "clean_environment_acceptance", "status": "completed", "tasks": ["R13", "R14", "R15"], "evidence": ["isolated_snapshot_Docker_build_passed", "48_tests_passed_in_6.24_seconds_without_private_mounts", "151_manifest_files_verified_inside_image", "151_installed_package_versions_match_inventory", "16_frozen_inputs_verified", "offline_Figure2_byte_exact", "three_pinned_submodules_clean_and_verified", "15_configs_verified", "scalar_GPU_check_passed", "20_geometry_8_pixel_mask_8_kernel_checks_repeated_against_final_image", "public_history_preserved", "local_links_and_private_path_scan_passed"]}
+  ],
+  "limitations": ["no_registration_optimization_rerun", "R231_inference_not_run_and_weights_not_bundled", "corrected_COPD_results_not_generated", "lung_acceleration_pending", "external_reference_environments_and_diagnostic_experiments_excluded", "clean_snapshot_acceptance_not_post_commit_Git_clone", "historical_upstream_revision_not_proven_for_every_result", "historical_base_image_large_about_14GB"],
+  "new_protocol_findings": ["Figure2_lung_Dual_PL1A_uses_author_blur_3000_steps", "COPD_pTVReg_reference_uses_corrected_MATLAB_crop_other_selected_rows_use_legacy"],
+  "initial_M1_M5_acceptance": {
+    "docker_image": "rightpriordir:release-local",
+    "docker_image_id": "sha256:026b2b13bc0a68b263bc632b9c0f5d87fbf61d178099de4bdf9eb37c996c4381",
+    "docker_image_bytes": 14400190204,
+    "pip_check": "passed",
+    "source_files_including_manifest": 152,
+    "source_snapshot_bytes": 13568191,
+    "release_manifest_sha256": "a6a5c1f2025d34700ab245d3efcf8f79b6e93abf900cf599db788d288fe32f87",
+    "figure2_png_sha256": "eb0db83bbd1f96d34c3afc9c25576e56c7944c07cc04ce74ece6f615d23e3e16",
+    "artifact_root": "${ARTIFACT_ROOT}/repo_experiments/2026-09-29_public_release_acceptance_v1",
+    "reports": [
+      {"path": "final-v2-tests.xml", "sha256": "e4009aa7c058be61f262e4b09a1b16c32dd292cefa701a8614ff0eb97b26978e"},
+      {"path": "final-v2-migration.json", "sha256": "553ca1452b6c65582b648d9a5d1f1235ae019d3b4a6378fc727aeee6133abe59"},
+      {"path": "final-v2-frozen/render_manifest.json", "sha256": "235d6ef76a5d7605cd8a33b6e0e2b6c0981a877ab079f86e7b7e9be53c071499"}
+    ],
+    "resolved_acceptance_failure": "initial_Docker_ignore_excluded_SINR_conf_data; narrowed_rules_and_rebuilt; all_tests_then_passed"
+  },
+  "git_state": {
+    "public_head_unchanged": "9185bab",
+    "auto_staged_by_submodule_add": [".gitmodules", "third_party/IDIR", "third_party/SINR", "third_party/DUAL-INR-DIR"],
+    "remaining_release_changes": "all_91_public_changes_staged_no_unstaged_or_untracked_payload",
+    "staged_index_entries": 95,
+    "staged_tree": "af6603a9fc57c01a1f2466cf109a6a1e057f382c",
+    "staged_tree_matches_tested_candidate": true,
+    "third_party_worktrees_clean": true,
+    "unrelated_private_changes_preserved": true,
+    "commit_push_tag_image_publication_performed": false
+  },
+  "experiment_reproduction_extension": "experiment_reproduction.json",
+  "extension_milestones": [
+    {"id": "M6", "status": "completed", "tasks": ["R16"]},
+    {"id": "M7", "status": "completed", "tasks": ["R17"]},
+    {"id": "M8", "status": "completed", "tasks": ["R18"]},
+    {"id": "M9", "status": "completed", "tasks": ["R19", "R20"]},
+    {"id": "M10", "status": "completed", "tasks": ["R21", "R22"]}
+  ],
+  "layer2_M6_M8_acceptance": {
+    "detailed_report": "experiment_reproduction.json",
+    "tests_passed": 74,
+    "docker_image_id": "sha256:4eab64551bfc11d0007a392d83147d8737a32652fc683798369b3e31507c8e0c",
+    "release_manifest_sha256": "9de8952f50eacdd52912e0825ef2f626bb8081807d04b4a672e8dcc8ab4432a4",
+    "optimization_executed": false,
+    "frozen_numeric_results_changed": false
+  },
+  "documentation_followups": [
+    {
+      "id": "acknowledgement_2026_09_29",
+      "status": "completed",
+      "changed_public_content": ["README.md"],
+      "paper_inspiration": {"name": "ARC", "url": "https://arxiv.org/abs/2503.07185"},
+      "code_acknowledgements": ["IDIR", "SINR", "Dual-INR"],
+      "release_manifest_sha256": "7c58cb9f4cf98c4aba5b600bd24de7bc149ea7bc64a2c34d33fc10cf57168a69",
+      "validation": ["162_manifest_file_hashes_and_sizes_match", "README_only_content_change_since_M8", "local_links_and_private_path_scan_passed", "git_diff_check_passed"],
+      "code_configs_frozen_results_changed": false,
+      "tests_rerun": false,
+      "docker_image_rebuilt": false,
+      "acceptance_scope_note": "M8 test/image acceptance above remains tied to its original snapshot; this follow-up is documentation-only."
+    }
+  ],
+  "acceptance": {
+    "detailed_report": "publication_readiness.json",
+    "tests_passed": 85,
+    "docker_image_id": "sha256:99cf5c78616f21355dcc56e007750e8ea94fe2fdafa93b53de04a5a889dfafc8",
+    "release_manifest_sha256": "09c1e2ddb51e20771ab6de438cfdb056c5c5be70faf39d92c71c9a4cffc4b27e",
+    "fresh_disposable_candidate_recursive_clone": true,
+    "official_release_commit_tested": false,
+    "staged_tree_matches_tested_candidate": true,
+    "optimization_executed": false,
+    "frozen_numeric_results_changed": false,
+    "publication_clearance": false
+  },
+  "publication_readiness_report": "publication_readiness.json",
+  "next_action": "resolve_SINR_permission_then_refresh_status_manifest_and_acceptance_before_separately_authorized_commit_push"
+}

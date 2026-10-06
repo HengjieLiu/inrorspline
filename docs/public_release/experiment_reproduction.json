@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "status": "completed_code_and_instructions_no_real_experiments_run",
+  "authority": "implement_rerun_code_and_instructions_without_running_experiments",
+  "optimization_executed": false,
+  "layers": ["frozen_artifacts", "data_to_experiment_to_new_summary"],
+  "milestones": [
+    {"id": "M6", "status": "completed", "evidence": ["paper_grids_match_frozen_CSVs", "historical_Dual_seed42_verified", "Dual_PL1A_sample_SD_exception_verified"]},
+    {"id": "M7", "status": "completed", "evidence": ["cohort_runner", "verified_resume", "preserved_retry_attempts", "persistent_timing_worker", "strict_new_result_aggregation", "69_no_optimization_tests_passed"]},
+    {"id": "M8", "status": "completed", "evidence": ["three_dataset_running_guide_written", "74_tests_passed_in_clean_image", "162_payload_file_hashes_verified", "151_installed_packages_verified", "frozen_Figure2_PNG_byte_identical", "four_frozen_table_hashes_unchanged", "no_private_mounts_or_network_for_final_acceptance", "pip_check_passed"]}
+  ],
+  "suites": {
+    "oasis-paper": {"cases": 100, "curve_points": 36, "observations": 3600},
+    "4dct-paper": {"cases": 10, "curve_points": 37, "observations": 370, "crop_mode": "corrected"},
+    "copd-extension": {"cases": 10, "configurations": 3, "observations": 30, "crop_mode": "legacy"},
+    "oasis-accuracy": {"cases": 100, "paired_methods": 5, "observations": 1000},
+    "oasis-timing": {"cold_per_candidate": 1, "warm_per_candidate": 10, "candidates": 10, "observations": 110}
+  },
+  "exclusions": ["external_DL_Greedy_pTVReg_reruns", "2400_step_legacy_context_row", "diagnostic_experiments", "lung_acceleration", "corrected_COPD_new_results"],
+  "verification_limits": ["no_real_training", "no_R231_inference", "no_claim_of_identical_new_GPU_outputs_or_timing", "no_commit_push_tag_or_image_publication"],
+  "public_guide": "docs/experiments.md",
+  "acceptance": {
+    "tests_passed": 74,
+    "test_seconds": 8.41,
+    "docker_image": "rightpriordir:release-local",
+    "docker_image_id": "sha256:4eab64551bfc11d0007a392d83147d8737a32652fc683798369b3e31507c8e0c",
+    "docker_image_bytes": 14400276341,
+    "public_release_manifest_sha256": "9de8952f50eacdd52912e0825ef2f626bb8081807d04b4a672e8dcc8ab4432a4",
+    "source_snapshot_files_including_manifest": 163,
+    "source_snapshot_bytes": 13654328,
+    "figure2_png_sha256": "eb0db83bbd1f96d34c3afc9c25576e56c7944c07cc04ce74ece6f615d23e3e16",
+    "artifact_root": "${ARTIFACT_ROOT}/repo_experiments/2026-09-29_public_release_layer2_acceptance_v1",
+    "reports": [
+      {"path": "final-tests.xml", "sha256": "2468c9c3cd844799c4ddc5f327de72aa4a3346ca25c5b7eb6a64c02a2924da8c"},
+      {"path": "final-frozen/render_manifest.json", "sha256": "ced8f5b88fc40b0bf063b3c59c76682e1caeb4f7e50b1b004f59dc29bebcd7e1"}
+    ],
+    "resolved_test_issue": "subprocess_mock_was_too_broad_for_Matplotlib_font_discovery; isolated_runner_boundary_then_all_tests_passed"
+  }
+}
