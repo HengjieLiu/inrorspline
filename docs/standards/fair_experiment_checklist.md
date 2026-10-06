@@ -30,6 +30,10 @@ tables or plots.
 - Method family and variant are named with enough detail to reproduce the run.
 - Optimizer, schedule, learning rate, iterations, random seed, and initialization
   are recorded.
+- CUDA registration runs default to `cudnn.benchmark=False` and
+  `cudnn.deterministic=True` unless an explicit protocol override is recorded.
+- Requested and effective cuDNN benchmark/deterministic flags are captured in
+  run provenance; timing tables do not silently mix backend settings.
 - Regularization type and scale are documented in method-native units.
 - Any multistage schedule records every stage's control spacing, resolution, and
   iteration count.
@@ -50,4 +54,3 @@ tables or plots.
 - Known limitations are written near the top of each run log before launch.
 - Raw data, checkpoints, generated outputs, credentials, and private host details
   are not committed to Git.
-

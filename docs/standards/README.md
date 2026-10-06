@@ -19,7 +19,10 @@ Before a real run:
    - LungCT/4DCT/COPD: `lungct_protocol_tags.md`
 3. Record the split, manifest, protocol tag, and known limitations in
    `docs/04_experiment_registry.md`.
-4. Keep raw data and generated outputs outside Git.
+4. Confirm the default CUDA backend is
+   `cudnn.benchmark=False, cudnn.deterministic=True`, or document an explicit
+   protocol override and prevent mixed-backend timing claims.
+5. Keep raw data and generated outputs outside Git.
 
 ## Standard Files
 

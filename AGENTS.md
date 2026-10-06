@@ -462,6 +462,17 @@ Do not copy private absolute paths from `private/data_sources.md` into `README.m
 
 ## Experiment Rules
 
+### Default CUDA Backend
+
+Future GPU registration experiments must default to
+`torch.backends.cudnn.benchmark=False` and
+`torch.backends.cudnn.deterministic=True` when the experiment does not specify
+otherwise. Launchers must record both requested and effective values in the
+manifest or per-run summary. Any override must be explicit in the execution
+specification, registry entry, command, and report; timing comparisons must
+not silently mix backend settings. Historical experiments retain their
+recorded backend as an explicit protocol override.
+
 Before launching a real run:
 
 1. Update `docs/04_experiment_registry.md`.
