@@ -2,9 +2,23 @@
 
 Repo-local OASIS alpha-sweep runner for the seed-3 shuffled BrainMR protocol.
 
+The separate `run_oasis_sitreg_training.py` trains native SITReg networks, not
+per-case spline/dense parameters. It requires a successful reference preflight
+before training. `launch_oasis_sitreg_training.py` launches exactly the four
+approved lambda0.1/1over3/3/10 jobs on GPUs0..3. See
+`experiments/2026-10-09_oasis_sitreg_training_lambda_sweep/codex_execution_spec.md`
+for native training contracts, tight shared-GPU memory budgets and provenance.
+
 These scripts intentionally do not import or execute legacy task9 experiment
 scripts. They load OASIS NIfTI files directly, apply the same OASIS orientation
 conversion used by prior runs, and write large artifacts outside Git.
+
+The separate DL-matched NCC9/diffusion sweep is launched by
+`launch_oasis_dl_ncc_diffusion_sweep.py`, with `--stop-after smoke` for its six
+full-geometry preflight outputs and `--stop-after full` for the420-output
+experiment. See `--help` for the required external data/DL-source paths and
+`docs/implementation/dl_ncc9_diffusion_sweep.md` for its coordinate, loss,
+checkpoint and comparison conventions. It does not change historical runners.
 
 Default paths inside the Docker container:
 

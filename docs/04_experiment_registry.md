@@ -5,6 +5,171 @@ status: active
 
 # Experiment Registry
 
+### P58: FeDDA squared global NCC training lambda sweep
+
+- Status: production launched 2026-10-12 17:05:11 PDT
+  (2026-10-13 00:05:11 UTC); controller PID 96452, workers on GPUs 0/1/2/3.
+  CPU tests and GPU 3 preflight passed; detailed evaluation/report auto-queued.
+- Four fresh FeDDA-1MF trainings at lambda 0.1/exact 1over3/1/3 on GPUs 0/1/2/3,
+  followed by automatic best-validation-checkpoint first100 evaluation.
+- Only replace signed `1-rho` with per-image `1-rho^2`; population moments,
+  FP32 variance-product floor, ordinary autograd, no similarity rescaling.
+- Preserve native unmasked voxel L2 diffusion, seed 42, 200 epochs, 50 pairs per
+  epoch, two sequential directional Adam AMSGrad updates per pair, 20,000
+  updates, constant LR 1e-4, forward validation, initialization/pair hashes.
+- Explicit historical backend override: cuDNN benchmark True, deterministic
+  False, cuDNN TF32 True, matmul TF32 False. No bitwise reproducibility claim.
+- Require 400 new case records and 14,000 per-label rows; compare immutable
+  GNCC four-lambda and LNCC five-lambda references on the same 100 pairs.
+- Final three-loss report: 13 settings, 1,300 case records, detailed accuracy
+  and foreground regularity; primary ARC 2x3 has Dice/HD95/symmetric ASD versus
+  foreground std(log J), means above and marginal sample-SD ellipses below.
+- Preserve historical sources/results; new adapters and artifact identities.
+  No range extension, retraining of references, or extra seeds in this plan.
+- Run key: `oasis_fedda_gncc2_diffusion_training_lambda_sweep_v1`;
+  report key: `oasis_seed3_first100_fedda_three_ncc_v1`.
+- Spec/log: `experiments/2026-10-12_oasis_fedda_gncc2_training/`.
+- Formula audit: `docs/implementation/ncc_loss_normalization.md`.
+- Preflight: original parity tolerances passed without changes; four fresh
+  directional smokes and restored Adam continuations, warm/trained updates,
+  and rank 0/10 serialization/35-label metrics passed. Peak reserved 21.2168 GiB;
+  production free-memory gate 24 GiB. Historical numerical sources unchanged.
+
+### P57: FeDDA-1MF Signed Global NCC Training Lambda Sweep
+
+- Status:production launched2026-10-12 08:12:09UTC (01:12:09PDT),
+  controllerPID95152; four workers on GPUs0/1/2/3 with finite initial updates.
+- GNCC0.1/exact1over3/1/3 on GPUs0/1/2/3;original2854079-parameter FeDDA-1MF,
+  seed42,200epochs,50pairs/epoch,TWO sequential directional AdamAMSGrad
+  updates/pair,20000updates,constantLR1e-4,native voxel L2diffusion.
+- Reuse stateless P56 signed populationGNCC; retain original model,preprocessing,
+  forward validation,initialization,pair sequence and historical CUDA override.
+  Separate new adapters; preserve old sources/results,failed gates and GPU jobs.
+- Four best-validation-checkpoint first100 evaluations;400cases/14000labelrows.
+  Compare immutableLNCC0.1/1over3/1/3/10;historicalLNCC1 explicitly marked.
+- All32 CPU tests passed. Independent CPU qualification verified a complete
+  zero-issue GPU3 audit:exact historical and native/adapter field equality,
+  unchanged validation/metric gates,four fresh sequential-update/checkpoint
+  smokes,trained gradient smoke and ranks0/10 detailed serialization. Peak
+  reserved21.2168GiB; production free-memory gate24GiB. Preserved dependency
+  and historical-CUDA-variability preflight failures; no tolerance changes.
+- Full-cohort CSV/JSON/Markdown and2x3ARC:mean curves top,across-caseSD ellipses
+  bottom;Dice/HD95/symmetricASD versus foregroundstdlogJ,folding separate.
+- Run key:`oasis_fedda_gncc_diffusion_training_lambda_sweep_v1`;
+  report key:`oasis_seed3_first100_fedda_gncc_vs_lncc_v1`.
+- Spec/log:`experiments/2026-10-12_oasis_fedda_gncc_training/`.
+
+### P56: SITReg Signed Global NCC Training Lambda Sweep
+
+- Status: completed/accepted2026-10-12; four trainings,400 new case evaluations
+  and14000 per-label rows. Launched2026-10-11 18:40:21UTC (11:40:21PDT),
+  controller PID93592; four workers on GPUs0/1/2/3.
+- FreshGNCC1-rho lambda0.1/exact1over3/1/3 on GPUs0/1/2/3; native joint
+  bidirectional diffusion,seed42,200epochs,10000AdamAMSGrad updates,LR1e-4.
+- Preserve all historicalLNCC sources/results and explicitly retain native
+  backend override. Verify initialization and per-epoch pair-stream hashes.
+- Automatic best-validation-checkpoint first100 evaluation; all35 label rows
+  percase,3accuracy/2foregroundregularity metrics; compareLNCC0.1/1over3/1/3/10.
+- HistoricalLNCC1 remains contextual. New output identities, full preflight
+  gates, source hashes, no automatic retraining/range expansion.
+- All27 CPU tests and full GPU3 preflight passed. Initial-state hash matches
+  historicalLNCC; numerical checkpoint/30-pair validation parity passed unchanged
+  tolerances. GNCC fresh/trained updates, serialization and70 label rows passed.
+- Peak reserved36.49GiB; launch guard38GiB. Preserved an initial dependency-path
+  failure; restored read-only historical isolatedpystrum, no shared installation.
+- Artifact key:`oasis_sitreg_gncc_diffusion_training_lambda_sweep_v1`.
+- Spec/log:`experiments/2026-10-11_oasis_sitreg_gncc_training/`.
+- Validation-selected GNCC lambda1/3 (Dice0.81225398,epoch193); not a boundary.
+  User-requested presentation export:`arc_lines_top_v1/` under the report root,
+  with mean curves top and across-case SD ellipses bottom. All nine operating
+  points use100 matched cases; historicalLNCC1 explicitly marked. This export
+  preserves the original accepted report and hash-locked experiment sources.
+
+### P55: Full-Resolution Signed/Squared GNCC Dense Sweep
+
+- Status: production running since2026-10-11 13:55:09UTC (06:55:09PDT);
+  controller PID89865, four workers on GPUs0-3. IDIR deferred.
+- 140 fresh fits: GNCC1-rho and GNCC1-rho² x lambda.01/.1/.3/1/3/10/100 x first10.
+- P43/P44 full-resolution cps8/4/2 then direct dense, normalized LR.03/.01/.003/.001,
+  unchanged adaptive Adam and unmasked total voxel-field FD diffusion.
+- Population moments, ordinary autograd, documented epsilon; no historical
+  StableStd or initial-loss normalization. Common-field calibration is diagnostic.
+- GPUs0-3, one added worker/GPU, UID:GID1009:1020; other workloads untouched.
+- Gates: unit contracts, three full-geometry smokes, LNCC rank0/lambda1 reproduction.
+- All38 tests and three GPU smokes passed. Full LNCC reproduction had exactly
+  zero field/metric differences and identical stopping/best epochs. Calibration
+  completed30 common-field states; no training weights were rescaled.
+- Require140 finite fields/4900 label records; compare70 accepted full-loss LNCC
+  and20 VFA/SITReg references. Three-NCC tables plus2x3 ARC: three accuracy columns,
+  stdlogJ x-axis, ellipses top and lines-only bottom. Eight-loss context is separate.
+- Artifact key:`oasis_seed3_first10_mrdbscp842_dense_fullres_gncc_signed_squared_diffusion_v1`.
+- Spec/log:`experiments/2026-10-11_oasis_gncc_dense_sweep/`.
+
+### P54: Fourier-Input IDIR Bandwidth/Diffusion and Capacity Controls
+
+- Status: running since 2026-10-11 05:54:37 UTC (2026-10-10 22:54:37 PDT).
+  Controller PID79480; four workers verified on GPUs0/1/2/3. All38 IDIR tests
+  and four fresh GPU smokes passed, with exact native-control field reproduction.
+- Preserve P53 sampled global1-NCC/analytic voxel diffusion, 10000coordinates,
+  Adam1e-4/2500updates/terminal checkpoint. No dense training or localNCC9.
+- Initial230 new fits: six Fourier bandwidths x three lambdas x first10 (180),
+  two additional native-control lambdas (20), width286 capacity controls (30).
+  Read-only P53 omega32/64 lambda1 references; no old outputs overwritten.
+- Fixed64 Gaussian sine/cosine pairs plus XYZ, native fan-in initialization;
+  audit coordinate-chain-rule derivatives and initial activation/gradient scales.
+- All four GPUs0–3, one new worker/GPU, UID:GID1009:1020; other jobs unchanged.
+- Full-cohort boundary extension and explicitly gated optional confirmation;
+  five case metrics and all35label records, hashes and persistent monitoring.
+- Artifact key: `oasis_seed3_first10_idir_fourier_sampled_diffusion_v2`.
+  Rejected v1 qualification preserved; pre-training diagnostic autograd was
+  moved to a saved-initialization CPU copy after training to restore exact
+  native-control reproduction. No tolerance relaxation or objective change.
+- Spec/log: `experiments/2026-10-10_oasis_idir_fourier_diffusion/`.
+
+### P53: Sampled IDIR Diffusion-First Then Frozen-Lambda Frequency Search
+
+- Status: completed/accepted, 110 successful fits and3850label records in36.7min.
+  Selected lambda1 atomega32 (interior), then omega64 by mean Dice at frozenlambda.
+  Historical launch: 2026-10-10 21:54:45 UTC (14:54:45 PDT), after 21
+  unit/canonical-evaluator tests and four concurrent 100-update smokes passed.
+  Detached controller PID 73655; production slots GPU 1/1/3/3.
+- Preserve10,000 fixed-foreground random coordinates/update, original SIREN,
+  pair-minmax/zero padding, seed1, Adam1e-4,2500updates, terminal checkpoint.
+- Signed sampled global1-NCC plus analytic voxel-coordinate diffusion; NOT
+  full-volume/localNCC9 or forward-FD. No extra batch-size divisor for diffusion.
+- Atomega32, initiallambda1e-3..1e3 across first10 (70fits). Select highest
+  mean Dice, ties ASD/HD95; extend a boundary winner one decade at a time.
+  Then freeze selectedlambda and testomega8/16/32/64/128, adding40fresh fits.
+  Full2Dsweep postponed. All selection requires complete validated10case cohorts.
+- Four concurrent slotsGPU1/1/3/3, UID:GID1009:1020; other jobs unchanged.
+  Read-only BE scale calibration and four100-update co-resident smokes gate runs.
+- Five canonical case metrics,35labels/case, sample-sequence hashes, full
+  checkpoints/fields/history, incremental reports and logged adaptive decisions.
+- Artifact key:`oasis_seed3_first10_idir_sampled_global_ncc_analytic_diffusion_staged_v1`.
+- Spec/log:`experiments/2026-10-10_oasis_idir_sampled_diffusion_staged/`.
+
+### P52: IDIR SIREN Frequency × Full-Resolution NCC9/Diffusion Lambda — CANCELLED
+
+- Status:cancelled by the user2026-10-10. The full-volume training domain
+  exceeded the intended old10,000-point IDIR sampling workflow. Controller
+  PID72359 and workers72493/72494 were stopped and verified absent; existing
+  other jobs untouched. Active outputs cleared into recoverable artifact-store
+  trash (about411MiB); no review directory existed. Superseded by sampled P53.
+- Historical launch:2026-10-10 21:22:27UTC (14:22PDT), after36CPU contracts
+  and five full-volume GPU1/3 smokes. No accepted production result is claimed.
+- 250fresh registrations:omega8/16/32/64/128 ×lambda0.1/1over3/1/3/10 ×
+  canonical seed3first10. Old omega32 sampled-global-NCC/BE outputs not reused.
+- Standalone native SIREN256×3, seed1, raw-image full-volume NCC_vfa9 and
+  total voxel-field forward-valid diffusion; Adam1e-4,2500updates, terminal
+  checkpoint primary. No Fourier features, analytic BE or B-spline prefix.
+- Exact-chain-rule two-pass coordinate chunking; native loss/gradient and
+  monolithic/chunked update parity plus five full-volume smokes gate production.
+- GPU1/3 only, one new worker/GPU, UID:GID1009:1020; preserve existing jobs.
+- Save five accuracy/regularity case metrics and all35label rows/case, fields,
+  checkpoints, histories, source/input hashes; final250case/8750label acceptance.
+- Artifact key:`oasis_seed3_first10_idir_siren_omega_ncc9_diffusion_2500_v1`.
+- Spec/log:`experiments/2026-10-10_oasis_idir_omega_ncc9_diffusion/`.
+
 > Historical LungCT dataset paths below record the locations used when each run
 > executed. Since 2026-07-11, their current pTVReg-equivalent root is
 > `/database/datasets/lungCT/DIR-Lab/processed/pTVReg_iso1mm`; see
@@ -4191,3 +4356,385 @@ Next decision:
   provenance, and any alternative must be an explicit protocol override.
 - Execution spec:
   `experiments/2026-09-29_lungct_mrdbscp_cudnn_ft_gpu1/`.
+
+### P37: OASIS Rank-0 MR-D-BSCP 8-4-2-1 Lambda Sweep
+
+- Run ID: `oasis_seed3_rank000_mrdbscp8421_cps1_lambda_sweep_v1`.
+- Status: completed and technically accepted 2026-10-06; 5/5 production
+  registrations, finite DVFs, strict metadata validation, and deterministic
+  prefix validation passed.
+- Dataset: shuffled OASIS test rank 0, fixed `0333`, moving `0115`, original
+  test index `158`, moving-to-fixed.
+- Protocol: camera-ready adaptive cps `8,4,2` prefix with lambda `1000`, plus
+  a full-resolution cps1 stage at LR `1e-3`. The cps1 lambda sweep is
+  `10,100,1000,10000,100000`; cuDNN flags are F/T and seed is `1`.
+- Execution: one added worker per GPU 0-3 without altering existing jobs;
+  lambda 100000 queued to the first released GPU. The accepted run required
+  no OOM retry.
+- Result: lambda 10 won Dice and symmetric ASD within the sweep
+  (`0.762269`, `0.589742`); lambda 10000 won HD95 (`2.545912`). Lambda 10 is
+  the frozen overall selection. It improves Dice/ASD but worsens HD95 versus
+  the original 8-4-2 result and does not beat Greedy, VFA, or SITReg.
+- Integrity: all five cps8/4/2 prefixes stopped at `125/150/175` epochs with
+  exactly zero terminal loss deltas across candidates.
+- Execution spec:
+  `experiments/2026-10-06_oasis_mrdbscp8421_lambda_sweep/`.
+
+### P38: OASIS Rank-0 MR-D-BSCP 8-4-2 to Dense-Field Lambda Sweep
+
+- Run ID: `oasis_seed3_rank000_mrdbscp842_dense_lambda_sweep_v1`.
+- Status: completed and technically accepted 2026-10-06; 5/5 registrations,
+  finite DVFs, dense-final metadata validation, exact initialization checks,
+  and deterministic prefix validation passed.
+- Dataset: shuffled OASIS test rank 0, fixed `0333`, moving `0115`, original
+  test index `158`, moving-to-fixed.
+- Protocol: unchanged camera-ready adaptive cps8/4/2 prefix at lambda 1000,
+  then direct full-resolution dense-voxel Adam refinement at LR `1e-3` using
+  global NCC and unmasked forward-valid finite-difference bending energy.
+  Dense lambda is swept over `10,100,1000,10000,100000`; seed is `1` and
+  cuDNN flags are F/T.
+- Result: lambda 100 wins Dice (`0.761925`) and is the frozen overall
+  selection. Lambda 10000 wins HD95 (`2.472854`); lambda 10 wins symmetric
+  ASD (`0.578115`).
+- Paired result: at selected lambda 100, dense minus matched cps1 B-spline is
+  `+0.003449` Dice, `-0.027524` HD95, and `-0.012393` ASD.
+- Integrity: every cps2-to-dense initialization difference is exactly zero;
+  all cps8/4/2 prefixes stopped at `125/150/175` with exactly zero terminal
+  loss deltas across candidates. No final cps1 control representation exists.
+- Execution spec:
+  `experiments/2026-10-06_oasis_mrdbscp842_dense_lambda_sweep/`.
+
+### P39: OASIS Rank-0 VFA/SITReg Independent B-Spline Approximation
+
+- Run ID: `oasis_seed3_rank000_vfa_sitreg_bspline_cps8421_fullvoxel_mse_v1`.
+- Status: completed and technically accepted 2026-10-06. All 24 independent
+  candidates, eight selected fits, external reports, curves, and strict
+  acceptance checks passed.
+- Dataset: shuffled OASIS test rank 0, fixed `0333`, moving `0115`, original
+  test index `158`, moving-to-fixed.
+- Targets: immutable canonical best-Dice VFA and SITReg displacement fields,
+  loaded as saved channel-first `zyx` voxel fields and converted to
+  normalized-grid `xyz` for cubic B-spline expansion.
+- Matrix: independent zero-initialized direct cubic B-spline fits at cps
+  `8,4,2,1`, each with Adam learning rates `1e-2,3e-3,1e-3` (24 fits).
+- Objective: full-volume voxel/mm MSE over all `160x224x192x3` residual
+  values. No image loss, training mask, or regularizer is used. The fixed raw
+  image-positive mask is secondary-metric-only.
+- Schedule: maximum/minimum epochs `5000/500`, checks every 50 epochs, median
+  window 50, patience 200, relative MSE threshold `1e-6`, seed 1, and cuDNN
+  F/T. The lowest-loss checkpoint is evaluated and retained.
+- Execution: schedule longest jobs first across physical GPUs 0-3 with at
+  most one new worker per GPU; existing GPU jobs are not changed. Preserve
+  failed attempts; retry one CUDA OOM only after another sweep worker exits,
+  on the GPU with the most free memory.
+- Selection/recovery: choose the lowest full voxel MSE per target/cps, then
+  normalized-grid MSE and lower LR. A nested-space violation above 0.1%
+  triggers one best-checkpoint continuation at one-tenth LR for up to 5000
+  additional epochs; acceptance is forbidden if ordering remains invalid.
+- Outputs: `${ARTIFACT_ROOT}/runs/oasis_seed3_rank000_vfa_sitreg_bspline_cps8421_fullvoxel_mse_v1`
+  and the matching external review root.
+- Primary metrics: voxel MSE/RMSE/rRMSE and residual endpoint-error summaries;
+  secondary metrics include normalized-grid and fixed-positive-mask errors,
+  component MSE, and canonical Dice/HD95/symmetric ASD changes from each
+  source field.
+- Result: selected VFA voxel MSE at cps `8/4/2/1` is
+  `0.1146656573/0.0288353432/0.0053879051/1.6147702e-7`; selected SITReg MSE
+  is `0.1258704364/0.0267495271/0.0037603469/1.2670101e-7`. The selected
+  RMSE sequences are `0.338623/0.169810/0.073402/0.000402` and
+  `0.354782/0.163553/0.061322/0.000356`, respectively.
+- Selection: LR `1e-3` won every VFA cps and SITReg cps8/4/2; LR `1e-2` won
+  SITReg cps1. Nested-space ordering passed directly, so no continuation was
+  launched. All 24 candidates completed on attempt 0 with no OOM.
+- Execution spec:
+  `experiments/2026-10-06_oasis_rank000_vfa_sitreg_bspline_fit/`.
+
+### P40: OASIS 8-4-2 to Frozen-VFA-Feature Dense Refinement
+
+- Run ID: `oasis_seed3_first10_mrdbscp842_dense_vfa_features_v1`.
+- Status: completed and technically accepted 2026-10-07 02:01 UTC (Oct6 PDT).
+  All 96 rank0 fits and 18 frozen confirmation fits completed. No feature
+  candidate met all three rank0 tolerances; ranks1–9 mean also missed HD95.
+  Native VFA parity passed and prefix terminal scalar losses match P38 exactly.
+  The accepted external reports are authoritative; no P40 workers remain.
+- Dataset: seed-3 shuffled rank0 (fixed0333/moving0115) for exploratory
+  selection; freeze one feature and one control configuration for ranks1–9.
+- Method: unchanged camera-ready analytic-BE cps8/4/2 prefix, then direct
+  dense voxel Adam with frozen VFA full-resolution projected-feature MSE/NCC
+  and unmasked voxel-unit L2 diffusion. No cps1 or spline BE in refinement.
+- Search: 48 primary + up to24 local tuning + up to20 fallback + four raw-NCC
+  diffusion controls, capped at96 production rank0 fits. Stop expansion once
+  one field meets Dice -0.001, HD95 +0.02mm and ASD +0.005mm versus VFA.
+- Native checkpoint/preprocessing parity, strict source/cache hashes, dense
+  initialization checks and one-step canonical-metric smokes precede search.
+- Execution: one new worker per GPU0–3, UID:GID1009:1020; seed1, FP32, cuDNN
+  F/T. Existing workloads remain unchanged. One preserved OOM retry permitted.
+- Outputs: external run/review directories named by the run ID, including
+  every candidate, frozen selection, first10 casewise/mean comparisons and
+  separate technical-completion/scientific-match acceptance flags.
+- Limitations: rank0 test-case tuning; feature objectives are not VFA attention;
+  timing remains diagnostic under concurrent workloads. Matching is not assured.
+- Execution spec:
+  `experiments/2026-10-06_oasis_mrdbscp842_vfa_feature_dense/`.
+
+### P41: First10 Raw-NCC/Diffusion Lambda Boundary Extension
+
+- Run ID: `oasis_seed3_first10_mrdbscp842_dense_raw_ncc_diffusion_lambda_extension_v1`.
+- Status: completed and technically accepted 2026-10-07 19:49 PDT
+  (2026-10-08 02:49 UTC). All 30 production fits and one full-volume smoke
+  passed; 20 CPU contracts passed, with zero failed attempts or OOM retries.
+- Matrix: 30 fresh fits, seed3 shuffled ranks0–9 x lambda100/300/1000; reuse
+  P40's immutable lambda30 results and verified cached camera-ready8/4/2 prefixes.
+- Only lambda changes: full-image normalized global NCC, total voxel-unit L2
+  diffusion, LR0.3, max/min2000/300, patience100, check/window25, two LR halvings,
+  lowest-total-loss checkpoint, seed1, FP32, cuDNN F/T, border sampling.
+- Execution: UID:GID1009:1020, GPUs0–3, one new worker/GPU; no existing job changes.
+- Reports: all casewise metrics, paired VFA/lambda30 deltas, ranks0–9/1–9 means,
+  folding/diffusion and stopping/runtime diagnostics; select mean Dice then ASD/HD95.
+- Result: first10 Dice/HD95/ASD means are `0.826171/1.892240/0.370711`
+  at lambda100, `0.800950/1.986010/0.436688` at lambda300, and
+  `0.748155/2.251212/0.595842` at lambda1000. Prior lambda30 remains
+  `0.830631/1.929211/0.366981`: best Dice/ASD and overall Dice-first selection.
+- Lambda100 wins HD95 among the four raw-NCC settings and lowers mean
+  foreground folding from2.925658% to1.304788%. It matches all three VFA
+  tolerances on6/10 cases versus4/10 at lambda30, but its cohort mean still
+  fails the HD95 tolerance. No raw-NCC lambda meets all three mean tolerances.
+- Integrity: all 30 fields are finite and correctly shaped; cached-prefix and
+  source hashes passed. Independent recomputation verified all14 mean rows,
+  exact prior lambda30 mean preservation and unchanged prior artifact hashes.
+- Limitation: all first10 now exploratory tuning, not held-out confirmation.
+  This separately approved extension does not rewrite or expand P40's artifacts.
+- Execution spec:
+  `experiments/2026-10-07_oasis_raw_ncc_diffusion_lambda_extension/`.
+
+### P43: First10 Six-Way DL NCC9/Diffusion Sweep
+
+- Status: production running since 2026-10-08 14:04 UTC, after 39 passing
+  OASIS unit tests (16 new) and six successful full-geometry GPU smokes;
+  aggregation pending. Scheduler and four distinct GPU workers verified alive.
+- Variant: `oasis_seed3_first10_mrdbscp_dl_ncc9_diffusion_6way_v1`.
+- Matrix: cps8/4/2, cps8/4/2/1 and cps8/4/2-to-dense, each with pyramid
+  versus full-resolution loss evaluation; lambda0.01/0.1/0.3/1/3/10/100 over
+  seed3 shuffled ranks0-9. 140 fresh shared prefixes yield420 outputs.
+- Exact training NCC_vfa(window9,1-mean squared correlation) plus unmasked
+  total-field voxel-unit finite-difference diffusion; raw stored intensities,
+  border image sampling. Normalized parameters at every stage with
+  LR0.03/0.01/0.003/0.001; lambda applied at every stage.
+- Approved audit corrections: endpoint-aligned continuous spline evaluation
+  in the pyramid, state-indexed loss histories, best-total-loss checkpoint
+  including initialization at every stage, explicit backend/source/cache
+  invariants. Historical runners and artifacts remain immutable.
+- Execution: UID:GID1009:1020, GPUs0-3, one added worker/GPU, existing jobs
+  unchanged; seed1, FP32, cuDNN F/T, TF32off. Native parity and six full-geometry
+  smokes gate production. Reports require420 successful finite outputs.
+- Original VFA/SITReg references; Dice/HD95/ASD and foreground SD(log J),
+  folding/diffusion, marginal sample-SD ellipses, paired and mean reports.
+  All ten cases are exploratory; timing and pipeline budgets are not controlled.
+- Audit/spec/log: `experiments/2026-10-08_oasis_dl_ncc9_diffusion_sixway/`.
+
+### P44: Full-Resolution Native DL-Loss Dense Sweep
+
+- Status: complete and technically accepted2026-10-09 07:50UTC
+  (00:50PDT); all350 new fits succeeded without production retries/failures.
+  Preflight included49 passing tests and five native-parity/full-volume smokes.
+- Variant: `oasis_seed3_first10_mrdbscp842_dense_fullres_dl_loss_sweep_v1`.
+- 350 fresh registrations: MSE/MIND/RC/NGF/Feature-MSE × seven weights × first10.
+  Full-resolution cps8→4→2→dense, normalized LR.03/.01/.003/.001 throughout.
+- DL-centered effective lambda .005/.04/.1/.2/.2 respectively, multiplied by
+  .01, .1, 1/3, 1, 3, 10, 100; native similarity scales1/25/10/1/1 preserved.
+- Frozen FEDD-A Feature-MSE encodes warped images; not prior VFA features.
+- Five full-volume native-parity smokes gate four-GPU UID:GID1009:1020 execution;
+  no existing jobs/outputs changed. Complete-only350 output acceptance.
+- Runtime dependencies isolated in artifacts; initial missing-dependency failures
+  preserved. Active run/review subdirectory: `verified_environment_v1`.
+- References:70 immutable P43 full-resolution dense NCC fits plus20 VFA/SITReg.
+  Canonical accuracy, foreground regularity, sample-SD ARC/folding plots.
+- Requested six-loss line-only Dice/HD95/symmetric-ASD ARC replot uses all42
+  lambda cohorts plus two original-DL points, with foreground SD(log J) on x;
+  no ellipses, error bars or smoothing. Outputs: `verified_environment_v1/lines_only_v1`.
+- All first10 exploratory; heterogeneous DL anchors and shared-workload timings
+  limit interpretation. Spec/log: `experiments/2026-10-08_oasis_fullres_dl_loss_sweep/`.
+
+### P42: First10 Raw-NCC vs VFA/SITReg ARC Report
+
+- Status: completed and technically accepted; no registration optimization.
+- Report ID: `oasis_seed3_first10_raw_ncc_vfa_sitreg_arc_v1`.
+- Scope: canonical first10 original VFA/SITReg metrics and common foreground
+  Jacobian statistics; compare accepted raw-NCC lambda30/100/300/1000 cohorts.
+- Main plot: three accuracy metrics versus foreground SD(log J), means and
+  axis-aligned +/-1 sample-SD ellipses across10 cases, not confidence intervals.
+  Companion folding trade-off, CSV/JSON and per-case report are included.
+- Original fields and previous outputs are read-only. All first10 remain
+  exploratory tuning; no GPU jobs are stopped or modified.
+- Results: original SITReg first10 Dice/HD95/ASD mean +/- sample SD is
+  `0.821546 +/- 0.024232`, `1.715898 +/- 0.273759`,
+  `0.350896 +/- 0.075233`. Mean foreground SD(log J) is0.569473 and
+  nonpositive-Jacobian percentage is0.000423%.
+- Verified20 baseline evaluations and40 reused raw-NCC rows, exact VFA
+  agreement with P40, complete paired cohorts and independently recomputed
+  all12 mean/SD rows. Four CPU contracts and rank0 smoke passed. PNG/SVG/PDF
+  figures and casewise CSV/JSON are in the distinct report directory.
+- Execution spec: `experiments/2026-10-07_oasis_raw_ncc_first10_arc/`.
+
+### P45: VFA and SITReg Training Lambda Audit
+
+- Status:audit and sequential GPU3 memory smokes complete; full training
+  and proposed eight-run lambda sweep NOT authorized yet.
+- Recover lambda1 protocol; propose fresh lambda0.1/1over3/3/10 for each
+  model,200 epochs, LR1e-4, Adam AMSGrad, batch1, seed42, NCC9 and diffusion.
+  Preserve model-specific bidirectional updates and historical cuDNN backend.
+- OASIS300 training subjects/30 validation pairs/200 test pairs, disjoint.
+- Six-pair full-volume forward/backward/Adam smokes per network, VFA then
+  SITReg on GPU3 only, UID:GID1009:1020. No saved training weights or changes
+  to existing jobs/data/reference checkpoints.
+- Artifact key:`oasis_vfa_sitreg_training_lambda_audit_v1`.
+- Measured allocated/reserved peaks:VFA36.42/39.55GiB; SITReg startup
+  33.34/35.94GiB and trained phase25.79/28.71GiB. No OOM. Both checkpoints
+  loaded strictly, finite gradients and Adam state verified, source weights
+  unchanged. Missing pystrum resolved in isolated experiment dependencies.
+- Spec/log:`experiments/2026-10-09_oasis_dl_training_lambda_audit/`.
+
+### P46: Four-GPU SITReg Training Lambda Sweep
+
+- Status:production launched2026-10-09 14:29:43UTC (07:29:43PDT), after
+  six CPU tests, numerical/metric reference reproduction, full30-pair
+  validation reproduction and four native Adam/checkpoint-roundtrip smokes.
+- Four fresh SITReg runs at lambda0.1/1over3/3/10 on GPUs0/1/2/3 concurrently.
+  No VFA or new lambda1 training. Preserve P45's native OASIS300/30 data,
+  NCC9/diffusion, seed42, Adam AMSGrad LR1e-4, batch1,200 epochs and50 joint
+  bidirectional updates/epoch; persistent data iterator and historical backend.
+- Strict checkpoint/saved-field parity and native update/serialization gates
+  precede launch. Tight memory on GPUs0/1 explicitly documented; per-worker
+  allocator caps, preserved failures and no automatic protocol changes.
+- Best validation-Dice and latest checkpoints; first10 canonical test export
+  after training. Existing jobs and historical artifacts remain unchanged.
+- Artifact key:`oasis_sitreg_ncc9_diffusion_training_lambda_sweep_v1`.
+- Spec/log:`experiments/2026-10-09_oasis_sitreg_training_lambda_sweep/`.
+
+### P47: Rank4 CPS16 NCC9/Diffusion Rescue
+
+- Status:complete and technically accepted2026-10-09 21:16:58UTC after24 CPU
+  tests, two GPU smokes and two production runs; no failures/retries. All
+  workers ran sequentially onGPU3 only, existing jobs unchanged.
+- Two fresh16/8/4/2/dense registrations, rank4 fixed0084/moving0108,
+  lambda1 throughout. Pyramid factors8/4/2/1/1 first, full1/1/1/1/1 second.
+- Preserve P43 numerical helpers, normalized LR.03/.03/.01/.003/.001,
+  evaluation-grid voxel diffusion, native NCC9 and best-loss adaptive Adam.
+- Native stage fields, all35 label metrics and paired accuracy/regularity
+  differences against saved full/pyramid842-dense and original VFA/SITReg.
+- GPU3 UID:GID1009:1020, CPU/smoke gates, fresh memory checks and explicit
+  source/input/reference hashes; complete-only two-fit report.
+- Exploratory one-case rescue, extra compute, no first10 improvement claim.
+- Pyramid Dice/HD95/ASD0.754233/2.728347/0.588810, folding3.692091%;
+  full0.755956/2.762280/0.601316, folding3.496063%. Small/mixed improvements
+  versus matched8-start baselines, not a rescue of the rank4 DL accuracy gap.
+- Artifact key:`oasis_seed3_rank004_cps16842_dense_ncc9_lambda1_v1`.
+- Spec/log:`experiments/2026-10-09_oasis_rank004_cps16_ncc/`.
+
+### P48: OASIS First100 Pyramid 8→4→2→Dense NCC9/Diffusion Sweep
+
+- Status: accepted2026-10-10 08:37:26UTC after CPU-only report recovery.
+  All400 dense candidates,400 matching prefixes and200 reference evaluations
+  passed finite/hash/identity/pairing checks;23 tests and both serial/spawn
+  metric parity checks passed. Original launch/numerical provenance and GPU
+  outputs remained unchanged. CSV/JSON/Markdown agree, including sample SD
+  and leave-rank4-out summaries; acceptance was written last.
+- Scope: shuffled seed-3 OASIS ranks0–99, pyramid8→4→2→dense, λ0.1/0.3/1/3
+  shared across stages; compare with the matching original best-Dice VFA and
+  SITReg fields using the canonical evaluator.
+- 400 distinct dense candidates; reuse the already accepted P43 first10
+  pyramid cps8/4/2 prefixes and dense outputs only when source/protocol/case/
+  output hashes validate exactly. Run new fits for ranks10–99.
+- Optimizer/loss/backend frozen to P43: native NCC_vfa9 plus unmasked total
+  voxel-field L2 diffusion; normalized LR0.03/0.01/0.003/0.001; seed1,
+  cuDNN F/T, TF32 off, P43 adaptive checks and best-loss checkpoints.
+- Placement: four added workers using physical GPU slots0/2/3/3. Existing jobs
+  remain unchanged. Require4GiB free per worker, including an8GiB reservation
+  for concurrent GPU3 workers; memory rechecked before each launch.
+- Original VFA/SITReg fields exist for all200 shuffled test pairs; first100
+  rows are evaluated/reused with the same canonical metrics. Report per-case
+  and mean/sample-SD Dice/HD95/ASD, foreground regularity, paired baselines and
+  leave-rank4-out sensitivity. Runtime remains diagnostic under active jobs.
+- Run/report artifact key:
+  `oasis_seed3_first100_mrdbscp842_dense_ncc9_diffusion_pyramid_lambda_sweep_v1`.
+- Spec/log: `experiments/2026-10-09_oasis_first100_ncc9_dense_sweep/`.
+
+### P49: SITReg Training Sweep Detailed First100 Evaluation
+
+- Status: all four evaluations complete,400 cases and14000 label rows.
+  Revalidated2026-10-10 for the requested P48/SITReg combined report: all
+  checkpoint/field hashes, canonical metric sources, case identities,
+  label-to-case reconstruction and recomputed mean/sample-SD checks passed.
+  No training or inference rerun was needed. Combined ten-setting export:
+  `oasis_seed3_first100_mrdbscp_vfa_sitreg_sweeps_comparison_v1`.
+- Evaluate P46 lambda0.1/1over3/3/10 best-validation checkpoints on seed3
+  shuffled ranks0–99. Start completed lambda10; others wait for clean training
+  plus first10 completion. Same released GPU slots0/1/2/3, existing jobs unchanged.
+- Preserve P46 sources/checkpoints and reuse saved first10 field bytes exactly.
+  Infer ranks10–99 with native raw-intensity preprocessing and historical
+  benchmarkTrue/deterministicFalse backend override; UID:GID1009:1020.
+- Save all35 label rows/case for Dice/HD95/pooled-area symmetric ASD and both
+  directional ASDs, presence counts and missing-label exclusions. Per-case
+  canonical foreground/full Jacobian statistics and diffusion, fields, warped
+  labels, source/input/checkpoint hashes and complete-only mean/sample SD reports.
+- CPU contracts and reused-rank0/fresh-rank10 GPU3 smoke gate the queue.
+  Both70-label-row smoke cases passed; rank0 metrics exactly reproduced after
+  restoring C-contiguous field layout. Explicit UTF-8 report serialization.
+  Two preliminary failed smokes preserved. Inference peak14.38/16.28GiB
+  allocated/reserved; queue requires24GiB free before each inference worker.
+  No training changes, VFA runs, lambda1 rerun or test-based checkpoint selection.
+- Artifact key: `oasis_seed3_first100_sitreg_training_lambda_eval_v1`.
+- Spec: `experiments/2026-10-09_oasis_sitreg_training_lambda_sweep/first100_evaluation_spec.md`.
+
+### P50: VFA Training Lambda Sweep With Automatic Detailed First100 Evaluation
+
+- Status: launched2026-10-09 23:18PDT; controller PID66434. GPU0/2/3 started;
+  GPU1 waits for its P49 evaluation. Nine CPU tests and native VFA preflight
+  passed: exact historical field reproduction, full30 validation parity,
+  four fresh lambda pair updates, serialization and35 per-label smoke rows.
+  GPU0 lambda10 hit CUDA OOM during its first backward pass; failed attempt
+  preserved and fresh retry queued afterGPU3 lambda3 training/evaluation.
+  GPU2 lambda1/3 and GPU3 lambda3 confirmed training with finite losses.
+- Final mapping:GPU0 lambda10 (explicit tight-memory attempt), GPU1 lambda0.1,
+  GPU2 lambda1/3, GPU3 lambda3. Each waits for its P49 SITReg evaluation exit.
+  If GPU0 lambda10 OOMs, preserve it and append one retry afterGPU3 lambda3
+  training/evaluation. No existing jobs altered; no precision/batch/loss changes.
+- Native bs3_vfa_v0, seed42, batch1, FP32, NCC9+voxel diffusion,200 epochs,
+ 50 pairs/epoch with TWO sequential Adam updates/pair, LR1e-4 AMSGrad,
+ persistent iterator and native30-pair validation-Dice checkpoint selection.
+- Explicit historical backend override benchmarkTrue/deterministicFalse,
+  cuDNN TF32True/matmulFalse. Other training slots require42GiB free; GPU0
+  memory override approved with allocator cap and one documented fallback.
+- Strict reference field/metrics, full30 validation, native directional-update
+  and detailed-label/serialization smokes gate production. Separate sources
+  leave P46/P49 and all original fields/checkpoints unchanged.
+- Automatic first100 evaluation saves3500 per-label rows/run for Dice, HD95,
+  pooled-area symmetric ASD, directional ASDs and exclusions, plus canonical
+  accuracy/regularity summaries, fields and full provenance. UID:GID1009:1020.
+- Artifact key:`oasis_vfa_ncc9_diffusion_training_lambda_sweep_v1`.
+- Spec/log:`experiments/2026-10-09_oasis_vfa_training_lambda_sweep/`.
+
+### P51: FeDDA-1MF Training Lambda Sweep With Detailed First100 Evaluation
+
+- Status:user-approved2026-10-10; launched02:40PDT after12 CPU tests and
+  independently certified exact-field/validation/memory audit. GPU0 lambda3
+  training; other three lambdas dependency-queued. Original200-epoch FeDDA-1MF,
+  not the later101-epoch onepass checkpoint used for Feature-MSE.
+- Placement:GPU0 lambda3 then10,including evaluation between them;GPU1
+  lambda0.1 afterP50 VFA0.1 evaluation;GPU2 lambda1/3 afterP50 VFA1/3
+  evaluation. GPU3 queue unchanged. Preserve all existing jobs and sources.
+- Native NCC_vfa9+voxel L2 diffusion,seed42,fresh FP32 batch1,LR1e-4 AMSGrad,
+  200 epochs,50 pairs/epoch,TWO sequential directional updates/pair,20000
+  updates. Historical benchmarkTrue/deterministicFalse,cudnn TF32True,
+  matmul TF32False override. Best native30-pair validation-Dice checkpoint.
+- Strict original lambda1 checkpoint/field and validation parity,per-label
+  serialization smoke and full-shape training memory smoke gate production.
+  Require max(24GiB,measured reserved peak+2GiB) free memory per new worker.
+  Measured maximum reserved21.22461GiB; gate24GiB. Two initial reference
+  preflight failures are preserved; historical benchmark mode is not
+  cross-process repeatable. Exact reproduction demonstrates adapter correctness,
+  not a guarantee that every fresh process passes tight metric tolerances.
+- Auto first100 evaluation:3500 per-label rows per lambda,canonical Dice/
+  HD95/symmetric ASD and foreground SDlogJ/folding;CSV/JSON/Markdown and
+  line-only sweep comparison against historical FeDDA1,VFA1,SITReg1.
+- Run key:`oasis_fedda_ncc9_diffusion_training_lambda_sweep_v1`.
+- Spec/log:`experiments/2026-10-10_oasis_fedda_training_lambda_sweep/`.

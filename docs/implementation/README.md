@@ -18,18 +18,50 @@ definitions in `docs/03_methods.md`; keep run ledgers in
 
 ## Files
 
+- [NCC loss definitions and normalization](ncc_loss_normalization.md):
+  current local squared, global signed, and global squared formulas; compatible
+  population moments but unequal loss-to-diffusion balance at equal lambda;
+  planned FeDDA squared-GNCC follow-up.
 - `code_sources.md`: map from implementation claims to repo-local source files
   and experiment records.
 - `idir_sinr_architecture_training.md`: IDIR and SINR architecture, training
   losses, and OASIS/LungCT protocol differences.
+- `idir_fullres_ncc9_diffusion.md`: cancelled full-voxel SIREN attempt retained
+  for audit; replacement must preserve old10,000-point IDIR sampling.
+- [Sampled IDIR diffusion-first replacement](../../experiments/2026-10-10_oasis_idir_sampled_diffusion_staged/codex_execution_spec.md):
+  original10k sampling, signed global1-NCC, analytic voxel diffusion, adaptive
+  lambda bracketing atomega32 followed byomega at a frozenlambda.
+- [Fourier-input sampled IDIR](../../experiments/2026-10-10_oasis_idir_fourier_diffusion/codex_execution_spec.md):
+  frozen Gaussian input features, explicit frequency convention, original-XYZ
+  analytic diffusion, native initialization audit and parameter-count controls.
 - `directcp_bspline_optimization.md`: DirectCP optimization, cubic B-spline
   formulas, analytic derivatives, finite-difference comparisons, and
   multistage knot insertion.
 - `mr_d_bscp_fast_842.md`: comprehensive code-derived specification of the
   OASIS MR-D-BSCP fast 8-4-2 schedule, implementation conventions, timing
   semantics, and acceleration-audit invariants.
+- `vfa_feature_dense_refinement.md`: frozen full-resolution VFA projections,
+  dense-voxel refinement, diffusion units, and exploratory selection semantics.
+- `dl_ncc9_diffusion_sweep.md`: DL-matched squared local NCC9, voxel-unit
+  diffusion with normalized parameters, aligned pyramid geometry and six-way
+  spline/dense comparison.
 - `paper_claims_crosswalk.md`: paper claims mapped to code paths, experiment
   evidence, metrics, and caveats.
+- [VFA and SITReg lambda1 training audit](../../experiments/2026-10-09_oasis_dl_training_lambda_audit/codex_execution_spec.md):
+  native NCC9/diffusion, model-specific directional Adam counts, persistent
+  data iteration, checkpoint-selection conventions and approval-gated DL sweep.
+- [Four-GPU SITReg training adapter](../../experiments/2026-10-09_oasis_sitreg_training_lambda_sweep/codex_execution_spec.md):
+  fresh DL lambda runs, numerical reference-reproduction gates, native joint
+  updates, validation-selected checkpoints and first10 posthoc metrics.
+- [SITReg detailed first100 evaluator](../../experiments/2026-10-09_oasis_sitreg_training_lambda_sweep/first100_evaluation_spec.md):
+  non-invasive post-training queue, byte-preserved first10 fields, all35
+  per-label metrics with explicit absent-label handling and canonical regularity.
+- [Native VFA training and automatic first100 evaluation](../../experiments/2026-10-09_oasis_vfa_training_lambda_sweep/codex_execution_spec.md):
+  sequential directional Adam updates, forward validation, per-GPU SITReg
+  dependency queue and one explicitly approved GPU0-to-GPU3 OOM fallback.
+- [Native FeDDA-1MF training sweep](../../experiments/2026-10-10_oasis_fedda_training_lambda_sweep/codex_execution_spec.md):
+  original200-epoch sequential-directional protocol, GPU0 memory preflight,
+  VFA-dependent queue and automatic detailed first100 comparison.
 
 ## Review Safety
 
@@ -39,3 +71,22 @@ private hostnames, W&B entities, or identity-breaking metadata.
 
 Use repo-relative paths, dataset handles, protocol tags, and environment
 variables when a path or artifact location is needed.
+## Native full-resolution loss sweep
+
+See [full-resolution DL-loss dense sweep](fullres_dl_loss_sweep.md) for P44's
+MSE/MIND/RC/NGF/Feature-MSE protocol and its distinction from VFA-feature matching.
+
+P55 adds [signed/squared global NCC](../../experiments/2026-10-11_oasis_gncc_dense_sweep/codex_execution_spec.md)
+using consistent population moments and ordinary autograd. It retains P43/P44
+geometry, diffusion and Adam, with no initial-loss normalization. IDIR is deferred.
+
+P56 uses [signed global NCC for native SITReg training](../../experiments/2026-10-11_oasis_sitreg_gncc_training/codex_execution_spec.md),
+with a stateless per-image loss and immutable historical training/evaluation
+loops bound to a separate process-local adapter. Joint bidirectional updates,
+voxel diffusion, initialization, pair order and validation selection are retained.
+
+P57 uses [the same signed GNCC for original FeDDA-1MF](../../experiments/2026-10-12_oasis_fedda_gncc_training/codex_execution_spec.md),
+but retains FeDDA's two sequential directional Adam updates per pair and
+forward-only validation,not SITReg's jointly averaged update. Historical LNCC
+sources and results remain immutable; the new comparison uses full100-case
+cohorts and ARC mean curves above sample-SD ellipses.

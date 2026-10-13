@@ -134,6 +134,70 @@ This repo carries audited generated results together with planning reports.
   was observed. Complete casewise timing and acceptance are in
   `${ARTIFACT_ROOT}/repo_experiments/2026-09-29_lungct_mrdbscp_cudnn_ft_gpu1/lungct_mrdbscp_cudnn_ft_gpu1_20260930T032535Z/`.
 
+## OASIS Rank-0 MR-D-BSCP 8-4-2-1 Lambda Sweep (2026-10-06)
+
+- Five cps1 lambda candidates completed with the camera-ready adaptive
+  cps8/4/2 prefix frozen at lambda 1000. All five finite DVFs and canonical
+  Dice/HD95/symmetric-ASD outputs passed strict validation.
+- The cps8/4/2 prefix was bitwise-consistent at the recorded scalar level:
+  every candidate stopped at `125/150/175` epochs with zero terminal loss,
+  data-loss, and regularizer-loss deltas.
+- Cps1 lambda 10 won Dice (`0.762269`) and symmetric ASD (`0.589742`), while
+  lambda 10000 won HD95 (`2.545912`). The predefined Dice-first rule selects
+  lambda 10.
+- Versus the original 8-4-2 result, selected lambda 10 changes Dice from
+  `0.760745` to `0.762269` and ASD from `0.592500` to `0.589742`, but HD95
+  worsens from `2.652342` to `2.741775`. Greedy, VFA, and SITReg remain better
+  than the selected 8-4-2-1 result on all three metrics for this one case.
+- Complete metrics, stage stopping diagnostics, validation, and provenance
+  are under
+  `${ARTIFACT_ROOT}/repo_experiments/oasis_seed3_rank000_mrdbscp8421_cps1_lambda_sweep_v1/`.
+
+## OASIS Rank-0 MR-D-BSCP 8-4-2 to Dense-Field Sweep (2026-10-06)
+
+- Five direct dense-refinement candidates completed after the unchanged
+  camera-ready cps8/4/2 prefix. All finite DVFs, canonical metrics, exact
+  cps2-to-dense initialization checks, and dense-final representation checks
+  passed.
+- Dense lambda 100 won Dice (`0.761925`) and is selected by the predefined
+  Dice-first rule. Lambda 10000 won HD95 (`2.472854`), while lambda 10 won
+  symmetric ASD (`0.578115`).
+- At selected lambda 100, dense refinement improved over matched cps1
+  B-spline refinement by `+0.003449` Dice, `-0.027524` HD95, and `-0.012393`
+  ASD. It also exceeds the original 8-4-2 Dice/ASD slightly, while its HD95
+  is `0.007117` higher.
+- Greedy, VFA, and SITReg remain better than the selected dense candidate on
+  all three metrics for this one case.
+- Every independent cps8/4/2 prefix stopped at `125/150/175` epochs with zero
+  terminal scalar deltas. Dense stopping epochs were 150, 150, 150, 275, and
+  900 for lambda 10, 100, 1000, 10000, and 100000, respectively.
+- Complete metrics, matched B-spline deltas, stopping diagnostics, GPU
+  provenance, and validation are under
+  `${ARTIFACT_ROOT}/repo_experiments/oasis_seed3_rank000_mrdbscp842_dense_lambda_sweep_v1/`.
+
+## OASIS Rank-0 VFA/SITReg B-Spline Approximation (2026-10-06)
+
+- The 24-fit independent cubic B-spline benchmark completed and passed strict
+  acceptance. It fits the immutable VFA and SITReg rank-0 fields at cps
+  `8/4/2/1` with three Adam learning rates each using full-volume voxel/mm MSE
+  and no image loss, mask, or regularizer.
+- Selected VFA voxel MSE decreases from `0.114666` at cps8 to `0.028835` at
+  cps4, `0.005388` at cps2, and `1.61e-7` at cps1. Selected SITReg MSE is
+  `0.125870`, `0.026750`, `0.003760`, and `1.27e-7`, respectively. The
+  predefined 0.1%-tolerance nested-space ordering passed for both targets.
+- The selected cps1 approximations are effectively exact at the field level:
+  RMSE is `0.000402` mm for VFA and `0.000356` mm for SITReg. Their canonical
+  Dice changes from the saved targets are `+0.000013` and `-0.000002`; HD95
+  is unchanged for both, and ASD changes are `-0.000040` and `+0.000005` mm.
+- LR `1e-3` won all VFA rows and SITReg cps8/4/2; LR `1e-2` won SITReg cps1.
+  All 24 fits completed on first attempts, no monotonicity continuation was
+  needed, and runtime remains diagnostic because existing GPU workloads were
+  retained.
+- Complete candidate/selected tables, masked and component metrics,
+  registration deltas, histories, checkpoints, curves, validation, and
+  provenance are under
+  `${ARTIFACT_ROOT}/repo_experiments/oasis_seed3_rank000_vfa_sitreg_bspline_cps8421_fullvoxel_mse_v1/`.
+
 ## Camera-Ready Figure Artifacts
 
 - Final Figure 2 for camera-ready:
@@ -149,6 +213,131 @@ This repo carries audited generated results together with planning reports.
   foreground means fixed raw image-positive foreground; DIR-LAB foreground
   means the fixed T00 lung/lobe foreground used by each row's documented metric
   protocol.
+
+## OASIS First10 Raw-NCC/Diffusion Lambda Extension (2026-10-07)
+
+- P41 completed all 30 requested fits: first10 ranks times lambda100/300/1000.
+  Only lambda changed from P40's raw-NCC control; verified prefix caches,
+  voxel units, normalized global NCC, diffusion, LR0.3, stopping schedule,
+  border sampling and best-loss checkpoint selection remained fixed.
+- First10 mean Dice/HD95/symmetric ASD at lambda30/100/300/1000:
+  `0.830631/1.929211/0.366981`, `0.826171/1.892240/0.370711`,
+  `0.800950/1.986010/0.436688`, `0.748155/2.251212/0.595842`.
+- Lambda30 remains best for mean Dice/ASD and the overall Dice-first selection.
+  Lambda100 improves mean HD95 by0.036971 mm while losing0.004460 Dice and
+  increasing ASD by0.003730 mm versus30. Mean foreground folding falls from
+  2.925658% to1.304788%; stronger lambdas further reduce folding but worsen
+  registration accuracy substantially.
+- Lambda100 meets all three VFA tolerances on6/10 cases versus4/10 for30.
+  No raw-NCC setting meets all three mean tolerances; lambda100's HD95 gap
+  versus VFA remains0.117899 mm (allowed0.02 mm).
+- All prior fields/reports remain unchanged. All first10 cases, including
+  ranks1–9, now participate in exploratory tuning; this is not a held-out
+  validation result. Ranks1–9 are still separately tabulated descriptively.
+- Complete per-case metrics, paired differences, means, folding/diffusion,
+  stopping diagnostics and provenance are under
+  `${ARTIFACT_ROOT}/repo_experiments/oasis_seed3_first10_mrdbscp842_dense_raw_ncc_diffusion_lambda_extension_v1/`.
+
+## OASIS First10 Original SITReg/VFA ARC Comparison
+
+- P42 re-evaluated20 original saved best-Dice VFA/SITReg fields with the same
+  canonical accuracy and foreground Jacobian code as P41. VFA metrics match
+  the previous report exactly; none of these baseline fields is a spline fit.
+- SITReg first10 mean +/- sample SD: Dice `0.821546 +/- 0.024232`,
+  HD95 `1.715898 +/- 0.273759` mm, symmetric ASD
+  `0.350896 +/- 0.075233` mm. VFA means are
+  `0.819772/1.774341/0.366851` respectively.
+- Raw-NCC lambda30 has higher mean Dice than SITReg but worse HD95/ASD and
+  much more foreground folding: `2.925658%` versus `0.000423%`. These are
+  different alignment/regularity operating points, not a uniform method win.
+- ARC figures compare raw-NCC lambda30/100/300/1000 against original VFA and
+  SITReg using foreground SD(log J), with a separate folding companion.
+  Ellipses denote marginal +/-1 across-case sample SD, not confidence regions.
+- Verified60 paired case rows and12 independently reproduced mean/SD rows.
+  Reports and PNG/SVG/PDF figures are under
+  `${ARTIFACT_ROOT}/repo_experiments/oasis_seed3_first10_raw_ncc_vfa_sitreg_arc_v1/`.
+
+## OASIS First10 Native DL-Loss Dense Sweep (2026-10-09)
+
+- P44 completed350/350 new registrations with no production failures/retries;
+  report accepted2026-10-09 00:50PDT. Includes70 read-only P43 full-resolution
+  dense NCC fits and20 original VFA/SITReg rows: six seven-weight sweeps.
+- Dice-first selected Feature-MSE lambda0.2 has mean Dice/HD95/ASD
+  `0.836136/1.790880/0.337951`; selected MIND lambda0.04 has
+  `0.829749/1.675762/0.335328`. Corresponding mean foreground folding is
+  4.077982% and3.759377%, versus VFA0.218560% and SITReg0.000423%.
+  Strong accuracy does not imply matched deformation regularity.
+- User-requested line-only ARC export compares Dice, HD95 and symmetric ASD
+  versus foreground positive-J SD(log J), with all six sweep curves and
+  original VFA/SITReg reference points, without ellipses or error bars.
+- Complete reports and the `lines_only_v1/` presentation export are under
+  `${ARTIFACT_ROOT}/repo_experiments/oasis_seed3_first10_mrdbscp842_dense_fullres_dl_loss_sweep_v1/verified_environment_v1/`.
+  All first10 cases remain exploratory tuning; this is not an unbiased test claim.
+
+## OASIS Rank4 CPS16 NCC9/Diffusion Rescue (2026-10-09)
+
+- P47 completed two approved16/8/4/2/dense lambda1 registrations sequentially
+  onGPU3, after24 CPU tests and two five-stage native-geometry smokes. Preserved
+  all prior outputs/numerical helpers and existing jobs; all35 labels valid.
+- Full-resolution loss gives Dice/HD95/ASD0.755956/2.762280/0.601316:
+  +0.001619/-0.016224/-0.009677 versus the matched8-start pipeline. Foreground
+  folding increases3.402029%-to3.496063%; SDlogJ0.850896-to0.855863.
+- Pyramid factors8/4/2/1/1 give0.754233/2.728347/0.588810:
+  -0.001178/+0.004001/-0.013499 versus the saved4/2/1/1 image pyramid.
+  Foreground folding falls3.854271%-to3.692091%; SDlogJ0.836562-to0.828301.
+- Neither resolves this case's DL gap:VFA0.760943/2.216616/0.534639 and
+  SITReg0.768742/2.134475/0.510531. Left-caudate Dice remains about0.45 versus
+  SITReg0.71717. Adding a coarser stage yields small/mixed gains under this
+  frozen schedule, not evidence of a general first10 improvement.
+- New cps2-stage folding3.913655%/3.638515% decreases during dense refinement
+  to3.692091%/3.496063%, so dense refinement is not the sole folding source.
+- Complete CSV/JSON/Markdown, per-label differences, best/stopping epochs,
+  histories, checkpoints and native stage fields are under
+  `${ARTIFACT_ROOT}/repo_experiments/oasis_seed3_rank004_cps16842_dense_ncc9_lambda1_v1/`;
+  source spec/log in `experiments/2026-10-09_oasis_rank004_cps16_ncc/`.
+
+## OASIS First100 Pyramid NCC9/Diffusion Dense Sweep (2026-10-10)
+
+- P48 accepted400 dense candidates (100 pairs × λ0.1/0.3/1/3),400 matching
+  prefixes and200 original VFA/SITReg evaluations. Forty dense first10 outputs
+  are reused;360 are new. A report provenance-path failure was repaired with
+  CPU-only resumable scoring, without changing numerical code or GPU outputs.
+- Lambda1 is best among the four weights on all three mean accuracy metrics:
+  Dice `0.833679 ± 0.026726`, HD95 `1.820084 ± 0.508698` mm and ASD
+  `0.343654 ± 0.100760` mm (across-case sample SD). Original VFA is
+  `0.821588/1.884796/0.370851`; SITReg is `0.824610/1.815750/0.355635`.
+  SITReg retains slightly lower HD95; no statistical superiority claim is made.
+- Lambda1 foreground SDlogJ/folding is `0.754557/3.145283%`, versus
+  VFA `0.613349/0.188933%` and SITReg `0.566181/0.000502%`.
+  Lambda3 brings SDlogJ to `0.574104` but folding remains `1.085931%`.
+  Similar SDlogJ therefore does not establish similar folding behavior.
+- Excluding rank4 leaves lambda1 selected, with mean Dice/HD95/ASD
+  `0.834469/1.810951/0.341041`; the accuracy/regularity tradeoff is not solely
+  explained by this case. The first10 were exploratory tuning, so this is a
+  broader descriptive comparison, not an untouched confirmatory test.
+- Complete CSV/JSON/Markdown, paired per-case differences, all mean/sample-SD
+  values, leave-rank4-out sensitivity and checksummed acceptance are under
+  `${ARTIFACT_ROOT}/repo_experiments/oasis_seed3_first100_mrdbscp842_dense_ncc9_diffusion_pyramid_lambda_sweep_v1/`.
+
+## SITReg Training Sweep First100 Comparison (2026-10-10)
+
+- All four P49 checkpoints have complete canonical100-case evaluations and
+  3500 label rows each. Recomputed cohort statistics agree with the saved
+  summaries;400 field hashes and all checkpoint hashes passed validation.
+- Among the new seed42 SITReg runs (λ0.1,1/3,3,10), λ1/3 has the best
+  mean Dice/HD95/ASD: `0.825681/1.820617/0.349815`, with foreground
+  SDlogJ `0.679408` and folding `0.013091%`. The original historical λ1
+  checkpoint has slightly lower HD95 `1.815750`, but lower Dice and higher ASD.
+- New λ3/10 have zero measured foreground folding across these100 cases,
+  at lower mean Dice `0.810004/0.767804`. Zero measured folding is not a
+  proof of globally invertible continuous deformations.
+- P48 MR-D-BSCP λ1 retains higher Dice `0.833679` and lower ASD `0.343654`
+  than SITReg λ1/3, with nearly equal HD95 but much higher foreground folding
+  `3.145283%`. Similar accuracy does not imply matched regularity.
+- The combined10-setting table,1000 per-case rows and checksum provenance
+  are saved under
+  `${ARTIFACT_ROOT}/repo_experiments/oasis_seed3_first100_mrdbscp_vfa_sitreg_sweeps_comparison_v1/`.
+  Original SITReg λ1 is historical, not a newly retrained seed42 sweep point.
 
 ## Source Reports
 
