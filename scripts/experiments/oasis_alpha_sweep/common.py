@@ -231,6 +231,7 @@ def cuda_backend_metadata(device: Optional[torch.device] = None) -> Dict[str, ob
         "cudnn_version": None,
         "cudnn_benchmark": bool(torch.backends.cudnn.benchmark),
         "cudnn_deterministic": bool(torch.backends.cudnn.deterministic),
+        "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
         "cuda_device_index": None,
         "cuda_device_name": None,
     }

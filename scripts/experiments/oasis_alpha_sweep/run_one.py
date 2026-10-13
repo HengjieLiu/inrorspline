@@ -35,6 +35,8 @@ METHODS = [
     "direct_cp_cps4_be_bspline_analytic",
     "direct_cp_cps2_be_bspline_analytic",
     "direct_cp_8_4_2_be_bspline_analytic_multistage",
+    "direct_cp_8_4_2_1_be_bspline_analytic_multistage",
+    "direct_cp_8_4_2_then_dense_fd_be_multistage",
     "mr_sinr842_composed",
     "mr_sinr842_requery",
 ]
@@ -75,6 +77,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stage-downsample", type=str, default="4,2,1")
     parser.add_argument("--stage-epochs", type=str, default="400,800,1300")
     parser.add_argument("--stage-lr", type=str, default="")
+    parser.add_argument(
+        "--stage-alpha",
+        type=str,
+        default="",
+        help="Comma-separated per-stage regularization weights; defaults to --alpha for every stage.",
+    )
     parser.add_argument("--stage-early-stop-mode", choices=["none", "adaptive"], default="none")
     parser.add_argument("--stage-min-epochs", type=str, default="")
     parser.add_argument("--stage-patience", type=str, default="100")
@@ -82,6 +90,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stage-rel-delta-total", type=str, default="5e-5")
     parser.add_argument("--stage-rel-delta-data", type=str, default="2e-5")
     parser.add_argument("--stage-min-delta", type=str, default="")
+    parser.add_argument("--dense-stage-alpha", type=float, default=None)
+    parser.add_argument("--dense-stage-lr", type=float, default=1e-3)
+    parser.add_argument("--dense-stage-epochs", type=int, default=1300)
+    parser.add_argument("--dense-stage-early-stop-mode", choices=["none", "adaptive"], default="adaptive")
+    parser.add_argument("--dense-stage-min-epochs", type=int, default=130)
+    parser.add_argument("--dense-stage-patience", type=int, default=50)
+    parser.add_argument("--dense-stage-check-interval", type=int, default=25)
+    parser.add_argument("--dense-stage-rel-delta-total", type=float, default=1e-4)
+    parser.add_argument("--dense-stage-rel-delta-data", type=float, default=5e-5)
     parser.add_argument("--runtime-candidate", type=str, default="")
     parser.add_argument("--timing-detail", choices=["off", "coarse", "deep", "endpoints", "components"], default="off")
     parser.add_argument("--loss-history-mode", choices=["cpu", "gpu_buffer"], default="cpu")
@@ -100,6 +117,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-moving-id", type=str, default=None)
     parser.add_argument("--run-name", type=str, default=None)
     parser.add_argument("--variant", type=str, default="oasis_seed3_alpha_prerun_repo_local")
+    parser.add_argument("--source-revision", type=str, default="")
     parser.add_argument("--save-final-dense", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--sample-checkpoints", action="store_true")
     parser.add_argument("--checkpoint-sample-count", type=int, default=100000)
@@ -587,6 +605,10 @@ def method_cps(method: str) -> Optional[int]:
         return 2
     if method == "direct_cp_8_4_2_be_bspline_analytic_multistage":
         return 2
+    if method == "direct_cp_8_4_2_1_be_bspline_analytic_multistage":
+        return 1
+    if method == "direct_cp_8_4_2_then_dense_fd_be_multistage":
+        return None
     if method in {"sinr_cps2_be_bspline_analytic", "direct_cp_cps2_be_bspline_analytic"}:
         return 2
     if method in {"sinr_cps4_be_bspline_analytic", "direct_cp_cps4_be_bspline_analytic"}:
@@ -606,6 +628,8 @@ def build_run_name(args: argparse.Namespace, lr: float) -> str:
         return args.run_name
     if args.method in {
         "direct_cp_8_4_2_be_bspline_analytic_multistage",
+        "direct_cp_8_4_2_1_be_bspline_analytic_multistage",
+        "direct_cp_8_4_2_then_dense_fd_be_multistage",
         "mr_sinr842_composed",
         "mr_sinr842_requery",
     }:
@@ -616,10 +640,27 @@ def build_run_name(args: argparse.Namespace, lr: float) -> str:
                 f"_min{args.stage_min_epochs.replace(',', '-')}"
                 f"_pat{args.stage_patience.replace(',', '-')}"
             )
+        stage_alpha_suffix = ""
+        if str(args.stage_alpha).strip():
+            stage_alpha_suffix = f"_sa{args.stage_alpha.replace(',', '-').replace('.', 'p')}"
+        dense_suffix = ""
+        if args.method == "direct_cp_8_4_2_then_dense_fd_be_multistage":
+            dense_alpha = float(args.alpha if args.dense_stage_alpha is None else args.dense_stage_alpha)
+            dense_suffix = (
+                f"_dense_e{int(args.dense_stage_epochs)}"
+                f"_a{c.format_float(dense_alpha)}_lr{c.format_float(float(args.dense_stage_lr))}"
+                f"_es{args.dense_stage_early_stop_mode}"
+                f"_min{int(args.dense_stage_min_epochs)}"
+                f"_pat{int(args.dense_stage_patience)}"
+                f"_ci{int(args.dense_stage_check_interval)}"
+                f"_rt{c.format_float(float(args.dense_stage_rel_delta_total))}"
+                f"_rd{c.format_float(float(args.dense_stage_rel_delta_data))}"
+            )
         return (
             f"{key}_rank{args.case_rank:03d}_sched{args.stage_full_cps.replace(',', '-')}"
             f"_ds{args.stage_downsample.replace(',', '-')}_e{args.stage_epochs.replace(',', '-')}"
-            f"_a{c.format_float(args.alpha)}_lr{c.format_float(lr)}{early_stop_suffix}"
+            f"_a{c.format_float(args.alpha)}{stage_alpha_suffix}_lr{c.format_float(lr)}"
+            f"{dense_suffix}{early_stop_suffix}"
         )
     if args.method == "dctfield_sampled_ncc_fd_be":
         return (
@@ -2234,6 +2275,7 @@ def optimize_multistage_stage(
     downsample: int,
     epochs: int,
     lr: float,
+    alpha: float,
     stage_idx: int,
     global_epoch_offset: int,
     total_epochs: int,
@@ -2259,6 +2301,7 @@ def optimize_multistage_stage(
             "downsample": int(downsample),
             "requested_epochs": int(epochs),
             "lr": float(lr),
+            "alpha": float(alpha),
         },
     ) if timer is not None else None
     loss_token = timer.start(
@@ -2326,6 +2369,7 @@ def optimize_multistage_stage(
                 "eval_shape_zyx": list(eval_shape),
                 "epochs": int(epochs),
                 "lr": float(lr),
+                "alpha": float(alpha),
                 "early_stop_mode": str(early_stop_mode),
                 "min_epochs": int(min_epochs),
                 "patience": int(patience),
@@ -2345,7 +2389,7 @@ def optimize_multistage_stage(
             iteration_token = components.start("iteration")
             dense_disp, data_loss, reg_loss, loss = components.training_step(
                 c, control, control_shape, full_cps, eval_shape, downsample,
-                moving_l, fixed_l, id_grid, domain_cps, args.alpha, optimizer)
+                moving_l, fixed_l, id_grid, domain_cps, alpha, optimizer)
         else:
             with phase_acc.phase("control_grid"):
                 control_grid = c.flat_to_grid(control, control_shape)
@@ -2357,7 +2401,7 @@ def optimize_multistage_stage(
             with phase_acc.phase("regularizer"):
                 reg_loss = c.analytic_bspline_sampled_be(
                     control_grid, eval_shape, int(domain_cps), component_reduction="mean")
-            loss = data_loss + float(args.alpha) * reg_loss
+            loss = data_loss + float(alpha) * reg_loss
             with phase_acc.phase("backward_step"):
                 optimizer.zero_grad(set_to_none=True)
                 loss.backward()
@@ -2375,7 +2419,7 @@ def optimize_multistage_stage(
             "loss": float(loss.detach().cpu()) if loss_buffer is None else None,
             "data_loss": float(data_loss.detach().cpu()) if loss_buffer is None else None,
             "reg_loss": float(reg_loss.detach().cpu()) if loss_buffer is None else None,
-            "alpha": float(args.alpha),
+            "alpha": float(alpha),
             "lr": float(lr),
         }
         rows.append(row)
@@ -2533,12 +2577,26 @@ def optimize_multistage_stage(
     ) if timer is not None else None
     ctrl_abs = control.detach().abs().reshape(-1)
     control_abs_max_norm = float(ctrl_abs.max().detach().cpu())
-    control_abs_p95_norm = float(torch.quantile(ctrl_abs, 0.95).detach().cpu())
+    if int(ctrl_abs.numel()) <= 16_000_000:
+        control_abs_p95 = torch.quantile(ctrl_abs, 0.95)
+        control_abs_p95_definition = "torch_quantile_linear"
+    else:
+        # torch.quantile rejects very large tensors because its flattened sort
+        # index is limited. The cps1 grid crosses that limit, so use the
+        # standard nearest-rank percentile without copying ~22M values to CPU.
+        kth = max(1, min(int(ctrl_abs.numel()), int(math.ceil(0.95 * int(ctrl_abs.numel())))))
+        control_abs_p95 = torch.kthvalue(ctrl_abs, kth).values
+        control_abs_p95_definition = "nearest_rank_kthvalue"
+    control_abs_p95_norm = float(control_abs_p95.detach().cpu())
     if timer is not None:
         stage_timing["control_summary_stats_sec"] = timer.stop(stats_token)
     actual_epochs = int(rows[-1]["epoch"]) if rows else 0
     summary = {
         "stage_idx": int(stage_idx),
+        "representation": "bspline_control",
+        "parameterization": "cubic_bspline_control_displacement",
+        "bspline_order": 3,
+        "regularizer": "analytic_cubic_bspline_be",
         "full_cps": int(full_cps),
         "downsample": int(downsample),
         "domain_cps": int(domain_cps),
@@ -2549,7 +2607,7 @@ def optimize_multistage_stage(
         "requested_epochs": int(epochs),
         "actual_epochs": int(actual_epochs),
         "lr": float(lr),
-        "alpha": float(args.alpha),
+        "alpha": float(alpha),
         "early_stop_mode": str(early_stop_mode),
         "min_epochs": int(min_epochs),
         "patience": int(patience),
@@ -2565,10 +2623,235 @@ def optimize_multistage_stage(
         "timing_phase_totals_sec": phase_summary,
         "control_abs_max_norm": control_abs_max_norm,
         "control_abs_p95_norm": control_abs_p95_norm,
+        "control_abs_p95_definition": control_abs_p95_definition,
     }
     if timer is not None:
         stage_timing["stage_total_sec"] = timer.stop(stage_token)
     return dense_full.detach() if dense_full is not None else None, summary, rows
+
+
+def optimize_dense_stage(
+    args: argparse.Namespace,
+    fixed_image: torch.Tensor,
+    moving: torch.Tensor,
+    initial_dense: torch.Tensor,
+    stage_idx: int,
+    global_epoch_offset: int,
+    total_epochs: int,
+    sampler: Optional[CheckpointSampler] = None,
+    timer: Optional[TimingRecorder] = None,
+) -> Tuple[torch.Tensor, Dict[str, object], List[Dict[str, object]]]:
+    """Optimize an absolute, full-resolution dense displacement initialized from cps2."""
+    alpha = float(args.alpha if args.dense_stage_alpha is None else args.dense_stage_alpha)
+    lr = float(args.dense_stage_lr)
+    epochs = int(args.dense_stage_epochs)
+    min_epochs = int(args.dense_stage_min_epochs)
+    patience = int(args.dense_stage_patience)
+    check_interval = int(args.dense_stage_check_interval)
+    rel_delta_total = float(args.dense_stage_rel_delta_total)
+    rel_delta_data = float(args.dense_stage_rel_delta_data)
+    early_stop_mode = str(args.dense_stage_early_stop_mode)
+
+    if tuple(initial_dense.shape) != (*c.IMAGE_SHAPE, 3):
+        raise ValueError(
+            f"Dense initialization shape {tuple(initial_dense.shape)} != expected {(*c.IMAGE_SHAPE, 3)}"
+        )
+    if not torch.isfinite(initial_dense).all():
+        raise ValueError("Dense initialization contains non-finite values.")
+
+    stage_timing: Dict[str, float] = {}
+    stage_token = timer.start(
+        f"stage_{stage_idx}",
+        category="training_stage",
+        metadata={
+            "stage_idx": int(stage_idx),
+            "representation": "dense_voxel",
+            "requested_epochs": epochs,
+            "lr": lr,
+            "alpha": alpha,
+        },
+    ) if timer is not None else None
+    setup_token = timer.start(
+        f"stage_{stage_idx}.stage_setup",
+        category="fixed_stage_overhead",
+        metadata={"stage_idx": int(stage_idx), "representation": "dense_voxel"},
+    ) if timer is not None else None
+    dense = torch.nn.Parameter(initial_dense.detach().clone())
+    initialization_audit = c.field_difference_metrics(
+        dense.detach() - initial_dense.detach(), prefix="dense_init_"
+    )
+    if any(float(value) != 0.0 for value in initialization_audit.values()):
+        raise RuntimeError(f"Dense initialization was not exact: {initialization_audit}")
+    id_grid = c.make_coordinate_grid(c.IMAGE_SHAPE, fixed_image.device).detach()
+    optimizer = torch.optim.Adam([dense], lr=lr)
+    if timer is not None:
+        stage_timing["stage_setup_sec"] = timer.stop(setup_token)
+
+    print(
+        json.dumps(
+            {
+                "stage_start": int(stage_idx),
+                "representation": "dense_voxel",
+                "dense_shape_zyx3": list(dense.shape),
+                "epochs": epochs,
+                "lr": lr,
+                "alpha": alpha,
+                "early_stop_mode": early_stop_mode,
+                "min_epochs": min_epochs,
+                "patience": patience,
+                "check_interval": check_interval,
+                "rel_delta_total": rel_delta_total,
+                "rel_delta_data": rel_delta_data,
+                "image_loss": "full_image_global_ncc",
+                "regularizer": "unmasked_forward_valid_dense_fd_be",
+                "regularizer_component_reduction": "mean",
+                "initialization": "expanded_cps2_absolute_field_detach_clone",
+                **initialization_audit,
+            }
+        ),
+        flush=True,
+    )
+
+    rows: List[Dict[str, object]] = []
+    stop_reason = "requested_epochs_complete"
+    stage_start = time.time()
+    loop_token = timer.start(
+        f"stage_{stage_idx}.optimizer_loop",
+        category="step_proportional",
+        metadata={"stage_idx": int(stage_idx), "requested_epochs": epochs},
+    ) if timer is not None else None
+    for epoch in range(1, epochs + 1):
+        warped = c.warp_full(moving, id_grid + dense, mode="bilinear")
+        data_loss = c.ncc_loss(fixed_image[None, None], warped[None, None])
+        reg_loss = c.forward_valid_be(
+            dense.permute(3, 0, 1, 2).unsqueeze(0),
+            None,
+            component_reduction="mean",
+        )
+        loss = data_loss + alpha * reg_loss
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
+
+        row: Dict[str, object] = {
+            "stage_idx": float(stage_idx),
+            "representation": "dense_voxel",
+            "epoch": float(epoch),
+            "global_epoch": float(int(global_epoch_offset) + epoch),
+            "full_cps": None,
+            "downsample": 1.0,
+            "domain_cps": None,
+            "loss": float(loss.detach().cpu()),
+            "data_loss": float(data_loss.detach().cpu()),
+            "reg_loss": float(reg_loss.detach().cpu()),
+            "alpha": alpha,
+            "lr": lr,
+        }
+        rows.append(row)
+        if sampler is not None and sampler.should_record(int(row["global_epoch"])):
+            sampler.record_dense(
+                epoch=int(row["global_epoch"]),
+                dense_disp_norm_xyz=dense,
+                row_extra={
+                    "method": args.method,
+                    "checkpoint_source": "post_optimizer_step",
+                    "stage_idx": int(stage_idx),
+                    "stage_epoch": int(epoch),
+                    "representation": "dense_voxel",
+                    "loss": row["loss"],
+                    "data_loss": row["data_loss"],
+                    "reg_loss": row["reg_loss"],
+                },
+            )
+        if epoch == 1 or epoch % int(args.eval_interval) == 0 or epoch == epochs:
+            print(json.dumps(row), flush=True)
+        if early_stop_mode == "adaptive":
+            should_stop, reason = stage_stop_decision(
+                rows,
+                min_epochs=min_epochs,
+                patience=patience,
+                check_interval=check_interval,
+                rel_delta_total=rel_delta_total,
+                rel_delta_data=rel_delta_data,
+            )
+            if should_stop:
+                stop_reason = reason
+                print(
+                    json.dumps(
+                        {
+                            "stage_stop": int(stage_idx),
+                            "representation": "dense_voxel",
+                            "epoch": int(epoch),
+                            "requested_epochs": epochs,
+                            "stop_reason": stop_reason,
+                        }
+                    ),
+                    flush=True,
+                )
+                break
+
+    if timer is not None:
+        stage_timing["optimizer_loop_sec"] = timer.stop(loop_token)
+    final_dense = dense.detach()
+    if not torch.isfinite(final_dense).all():
+        raise RuntimeError("Dense optimization produced non-finite displacement values.")
+    if timer is not None:
+        timer.mark(
+            "dvf_in_memory_ready",
+            metadata={
+                "stage_idx": int(stage_idx),
+                "representation": "dense_voxel",
+                "definition": "immediately after final dense-voxel optimizer stage",
+            },
+            sync=False,
+        )
+    actual_epochs = int(rows[-1]["epoch"]) if rows else 0
+    summary: Dict[str, object] = {
+        "stage_idx": int(stage_idx),
+        "representation": "dense_voxel",
+        "parameterization": "direct_full_resolution_voxel_displacement",
+        "bspline_order": None,
+        "full_cps": None,
+        "downsample": 1,
+        "domain_cps": None,
+        "control_shape_zyx": None,
+        "eval_shape_zyx": list(c.IMAGE_SHAPE),
+        "dense_shape_zyx3": list(final_dense.shape),
+        "n_control": None,
+        "param_count": int(final_dense.numel()),
+        "epochs": actual_epochs,
+        "requested_epochs": epochs,
+        "actual_epochs": actual_epochs,
+        "lr": lr,
+        "alpha": alpha,
+        "early_stop_mode": early_stop_mode,
+        "min_epochs": min_epochs,
+        "patience": patience,
+        "check_interval": check_interval,
+        "rel_delta_total": rel_delta_total,
+        "rel_delta_data": rel_delta_data,
+        "stop_reason": stop_reason,
+        "loss_mode": "full_image_global_ncc_dense_fd_be",
+        "image_loss": "full_image_global_ncc",
+        "regularizer": "unmasked_forward_valid_dense_fd_be",
+        "regularizer_component_reduction": "mean",
+        "initialization": "expanded_cps2_absolute_field_detach_clone",
+        "elapsed_sec": float(time.time() - stage_start),
+        "timing_breakdown": stage_timing,
+        **initialization_audit,
+    }
+    if timer is not None:
+        stage_timing["stage_total_sec"] = timer.stop(stage_token)
+        timer.add_stage_phase_summary(
+            {
+                "stage_idx": int(stage_idx),
+                "representation": "dense_voxel",
+                "requested_epochs": epochs,
+                "actual_epochs": actual_epochs,
+                "optimizer_loop_sec": float(stage_timing.get("optimizer_loop_sec", 0.0)),
+            }
+        )
+    return final_dense, summary, rows
 
 
 def train_multistage_direct_cp(
@@ -2582,10 +2865,12 @@ def train_multistage_direct_cp(
     total_start: Optional[float] = None,
     case_load_complete_sec: Optional[float] = None,
 ) -> Dict[str, object]:
+    is_dense_hybrid = args.method == "direct_cp_8_4_2_then_dense_fd_be_multistage"
     stage_cps = c.parse_int_list(str(args.stage_full_cps))
     stage_downsample = c.parse_stage_ints(str(args.stage_downsample), len(stage_cps))
     stage_epochs = c.parse_stage_ints(str(args.stage_epochs), len(stage_cps))
     stage_lr = c.parse_float_list(str(args.stage_lr), len(stage_cps), float(lr))
+    stage_alpha = c.parse_float_list(str(args.stage_alpha), len(stage_cps), float(args.alpha))
     stage_early_stop_mode = str(args.stage_early_stop_mode)
     if str(args.stage_min_epochs).strip():
         stage_min_epochs = c.parse_stage_ints(str(args.stage_min_epochs), len(stage_cps))
@@ -2595,6 +2880,11 @@ def train_multistage_direct_cp(
     stage_check_interval = c.parse_stage_ints(str(args.stage_check_interval), len(stage_cps))
     stage_rel_delta_total = c.parse_float_list(str(args.stage_rel_delta_total), len(stage_cps), 5e-5)
     stage_rel_delta_data = c.parse_float_list(str(args.stage_rel_delta_data), len(stage_cps), 2e-5)
+    if is_dense_hybrid and stage_cps != [8, 4, 2]:
+        raise ValueError(
+            "direct_cp_8_4_2_then_dense_fd_be_multistage requires the frozen prefix "
+            f"--stage-full-cps 8,4,2; got {stage_cps}."
+        )
     base_spacing = int(stage_cps[0])
     nested_shapes = c.build_nested_cp_shapes(c.IMAGE_SHAPE, base_spacing=base_spacing, spacings=stage_cps)
     c.assert_nested_schedule(nested_shapes, stage_cps)
@@ -2633,6 +2923,7 @@ def train_multistage_direct_cp(
             "stage_full_cps": stage_cps,
             "stage_downsample": stage_downsample,
             "stage_requested_epochs": stage_epochs,
+            "stage_alpha": stage_alpha,
         },
     ) if timer is not None else None
     torch.cuda.synchronize()
@@ -2646,9 +2937,11 @@ def train_multistage_direct_cp(
                 row_extra={"method": args.method, "checkpoint_source": "model_init"},
             )
     global_epoch_offset = 0
-    requested_total_epochs = int(sum(stage_epochs))
-    for stage_idx, (full_cps, downsample, epochs, stage_lr_value) in enumerate(
-        zip(stage_cps, stage_downsample, stage_epochs, stage_lr)
+    requested_total_epochs = int(sum(stage_epochs)) + (
+        int(args.dense_stage_epochs) if is_dense_hybrid else 0
+    )
+    for stage_idx, (full_cps, downsample, epochs, stage_lr_value, stage_alpha_value) in enumerate(
+        zip(stage_cps, stage_downsample, stage_epochs, stage_lr, stage_alpha)
     ):
         control_shape = tuple(int(v) for v in nested_shapes[int(full_cps)])
         components = timer.components if timer is not None else None
@@ -2680,9 +2973,11 @@ def train_multistage_direct_cp(
                 row["timing_prolongation_sec"] = float(prolong_elapsed)
             prolong_rows.extend(rows)
             print(json.dumps({"prolongation": rows}, allow_nan=True), flush=True)
-        is_final_stage = stage_idx == len(stage_cps) - 1
+        is_prefix_last_stage = stage_idx == len(stage_cps) - 1
+        is_final_stage = is_prefix_last_stage and not is_dense_hybrid
         require_stage_dense = bool(
             is_final_stage
+            or (is_dense_hybrid and is_prefix_last_stage)
             or args.prolongation_preserve_check
             or args.save_intermediate_dense
         )
@@ -2697,6 +2992,7 @@ def train_multistage_direct_cp(
             int(downsample),
             int(epochs),
             float(stage_lr_value),
+            float(stage_alpha_value),
             int(stage_idx),
             int(global_epoch_offset),
             int(requested_total_epochs),
@@ -2752,13 +3048,46 @@ def train_multistage_direct_cp(
         if components is not None:
             with components.scope("instrumentation_stage_resolve", cuda=False):
                 components.resolve()
+    prefix_final_control = final_control
+    prefix_final_control_shape = final_control_shape
+    prefix_final_cps = final_cps
+    dense_initialization_audit: Dict[str, float] = {}
+    if is_dense_hybrid:
+        if dense_full is None or prefix_final_cps != 2:
+            raise RuntimeError("Dense hybrid requires a full-resolution displacement expanded from cps2.")
+        dense_stage_idx = len(stage_cps)
+        final_dense, dense_summary, dense_rows = optimize_dense_stage(
+            args,
+            fixed_image,
+            moving,
+            dense_full,
+            dense_stage_idx,
+            global_epoch_offset,
+            requested_total_epochs,
+            sampler=sampler,
+            timer=timer,
+        )
+        dense_initialization_audit = {
+            key: float(value)
+            for key, value in dense_summary.items()
+            if str(key).startswith("dense_init_")
+        }
+        stage_summaries.append(dense_summary)
+        history.extend(dense_rows)
+        dense_actual_epochs = int(dense_summary.get("actual_epochs", args.dense_stage_epochs))
+        actual_stage_epochs.append(dense_actual_epochs)
+        global_epoch_offset += dense_actual_epochs
     torch.cuda.synchronize()
     training_elapsed_sec = time.time() - train_start
     training_peak_mem_gb = torch.cuda.max_memory_allocated() / (1024**3)
     if timer is not None:
         timer.stop(train_token)
-    if final_dense is None or final_control is None or final_control_shape is None or final_cps is None:
-        raise RuntimeError("Multistage training produced no final control field.")
+    if final_dense is None:
+        raise RuntimeError("Multistage training produced no final dense field.")
+    if not is_dense_hybrid and (
+        final_control is None or final_control_shape is None or final_cps is None
+    ):
+        raise RuntimeError("B-spline multistage training produced no final control field.")
     is_dvf_only = str(getattr(args, "output_mode", "full")) == "dvf_only"
     dvf_endpoint_info: Dict[str, object] = {}
     if not is_dvf_only and run_dir is not None:
@@ -2798,9 +3127,11 @@ def train_multistage_direct_cp(
         metrics["post_dvf_evaluation_sec"] = float(time.time() - eval_start)
         if timer is not None:
             timer.stop(eval_token)
-        final_control_grid = c.flat_to_grid(final_control, final_control_shape).detach()
-        metrics["control_coords"] = torch.empty(0, 3, dtype=torch.float32)
-        metrics["control_disp"] = final_control_grid
+        if not is_dense_hybrid:
+            assert final_control is not None and final_control_shape is not None
+            final_control_grid = c.flat_to_grid(final_control, final_control_shape).detach()
+            metrics["control_coords"] = torch.empty(0, 3, dtype=torch.float32)
+            metrics["control_disp"] = final_control_grid
     metrics.update(dvf_endpoint_info)
     metrics["history"] = [
         {
@@ -2814,24 +3145,43 @@ def train_multistage_direct_cp(
     metrics["global_ncc_diagnostic"] = global_ncc_diagnostic
     metrics["stage_summaries"] = stage_summaries
     metrics["prolongation_diagnostics"] = prolong_rows
-    metrics["control_shape"] = final_control_shape
+    metrics["control_shape"] = None if is_dense_hybrid else final_control_shape
+    metrics["prefix_final_control_shape"] = prefix_final_control_shape
     metrics["dense_disp"] = final_dense.detach()
     metrics["training_elapsed_sec"] = training_elapsed_sec
     metrics["training_peak_mem_gb"] = training_peak_mem_gb
-    metrics["param_count"] = int(final_control.numel())
-    metrics["cps"] = int(final_cps)
-    metrics["stage_full_cps"] = stage_cps
-    metrics["stage_downsample"] = stage_downsample
-    metrics["stage_epochs"] = stage_epochs
-    metrics["stage_requested_epochs"] = stage_epochs
+    if is_dense_hybrid:
+        metrics["param_count"] = int(final_dense.numel())
+        metrics["cps"] = None
+    else:
+        assert final_control is not None and final_cps is not None
+        metrics["param_count"] = int(final_control.numel())
+        metrics["cps"] = int(final_cps)
+    metrics["prefix_final_cps"] = prefix_final_cps
+    metrics["stage_full_cps"] = stage_cps + ([None] if is_dense_hybrid else [])
+    metrics["stage_downsample"] = stage_downsample + ([1] if is_dense_hybrid else [])
+    metrics["stage_epochs"] = stage_epochs + ([int(args.dense_stage_epochs)] if is_dense_hybrid else [])
+    metrics["stage_requested_epochs"] = list(metrics["stage_epochs"])
     metrics["stage_actual_epochs"] = actual_stage_epochs
-    metrics["stage_lr"] = stage_lr
+    metrics["stage_lr"] = stage_lr + ([float(args.dense_stage_lr)] if is_dense_hybrid else [])
+    dense_alpha = float(args.alpha if args.dense_stage_alpha is None else args.dense_stage_alpha)
+    metrics["stage_alpha"] = stage_alpha + ([dense_alpha] if is_dense_hybrid else [])
     metrics["stage_early_stop_mode"] = stage_early_stop_mode
-    metrics["stage_min_epochs"] = stage_min_epochs
-    metrics["stage_patience"] = stage_patience
-    metrics["stage_check_interval"] = stage_check_interval
-    metrics["stage_rel_delta_total"] = stage_rel_delta_total
-    metrics["stage_rel_delta_data"] = stage_rel_delta_data
+    metrics["stage_min_epochs"] = stage_min_epochs + (
+        [int(args.dense_stage_min_epochs)] if is_dense_hybrid else []
+    )
+    metrics["stage_patience"] = stage_patience + (
+        [int(args.dense_stage_patience)] if is_dense_hybrid else []
+    )
+    metrics["stage_check_interval"] = stage_check_interval + (
+        [int(args.dense_stage_check_interval)] if is_dense_hybrid else []
+    )
+    metrics["stage_rel_delta_total"] = stage_rel_delta_total + (
+        [float(args.dense_stage_rel_delta_total)] if is_dense_hybrid else []
+    )
+    metrics["stage_rel_delta_data"] = stage_rel_delta_data + (
+        [float(args.dense_stage_rel_delta_data)] if is_dense_hybrid else []
+    )
     metrics["stage_stop_reasons"] = [str(row.get("stop_reason")) for row in stage_summaries]
     metrics["requested_epochs"] = requested_total_epochs
     metrics["actual_epochs"] = int(sum(actual_stage_epochs))
@@ -2839,6 +3189,24 @@ def train_multistage_direct_cp(
     metrics["save_intermediate_dense"] = bool(args.save_intermediate_dense)
     metrics["nested_control_shapes_zyx"] = {str(k): list(v) for k, v in nested_shapes.items()}
     metrics["prolongation"] = "exact crop-aligned cubic B-spline dyadic knot insertion"
+    metrics["stage_representation"] = ["bspline_control"] * len(stage_cps) + (
+        ["dense_voxel"] if is_dense_hybrid else []
+    )
+    metrics["stage_regularizer"] = ["analytic_cubic_bspline_be"] * len(stage_cps) + (
+        ["unmasked_forward_valid_dense_fd_be"] if is_dense_hybrid else []
+    )
+    metrics["final_field_representation"] = (
+        "dense_voxel_displacement" if is_dense_hybrid else "cubic_bspline_control_displacement"
+    )
+    metrics["final_field_is_single_bspline"] = not is_dense_hybrid
+    if is_dense_hybrid:
+        metrics["dense_initialization"] = "expanded_cps2_absolute_field_detach_clone"
+        metrics["dense_initialization_audit"] = dense_initialization_audit
+        metrics["dense_stage_uses_cps1"] = False
+        metrics["dense_stage_uses_analytic_bspline_be"] = False
+        metrics["prefix_param_count"] = (
+            int(prefix_final_control.numel()) if prefix_final_control is not None else None
+        )
     return metrics
 
 
@@ -2924,7 +3292,10 @@ def write_outputs(
     if "generator" in metrics:
         state["generator_state_dict"] = metrics["generator"].state_dict()  # type: ignore[union-attr]
         state["control_shape"] = metrics["control_shape"]
-    if args.method == "direct_dvf_sampled_ncc_fd_be" and "dense_disp" in metrics:
+    if args.method in {
+        "direct_dvf_sampled_ncc_fd_be",
+        "direct_cp_8_4_2_then_dense_fd_be_multistage",
+    } and "dense_disp" in metrics:
         state["dense_disp_norm"] = metrics["dense_disp"].detach().cpu()  # type: ignore[union-attr]
     if args.method == "dctfield_sampled_ncc_fd_be" and "dct_coeff" in metrics:
         state["dct_coeff"] = metrics["dct_coeff"].detach().cpu()  # type: ignore[union-attr]
@@ -2944,6 +3315,7 @@ def write_outputs(
         "stage_requested_epochs",
         "stage_actual_epochs",
         "stage_lr",
+        "stage_alpha",
         "stage_early_stop_mode",
         "stage_min_epochs",
         "stage_patience",
@@ -2952,6 +3324,8 @@ def write_outputs(
         "stage_rel_delta_data",
         "stage_min_delta",
         "stage_stop_reasons",
+        "stage_representation",
+        "stage_regularizer",
         "requested_epochs",
         "actual_epochs",
         "early_stop_epoch",
@@ -2963,6 +3337,14 @@ def write_outputs(
         "multistage_strategy",
         "field_composition",
         "final_field_is_single_bspline",
+        "final_field_representation",
+        "prefix_final_cps",
+        "prefix_final_control_shape",
+        "prefix_param_count",
+        "dense_initialization",
+        "dense_initialization_audit",
+        "dense_stage_uses_cps1",
+        "dense_stage_uses_analytic_bspline_be",
     ):
         if key in metrics:
             state[key] = metrics[key]
@@ -2983,6 +3365,7 @@ def write_outputs(
                 "image_loss": "sinr_ncc",
                 "method_key": method_key(args),
                 "alpha": float(args.alpha),
+                "stage_alpha": metrics.get("stage_alpha"),
                 "grid_order": "pytorch",
                 "bspline_mode": "disp",
             },
@@ -3021,27 +3404,32 @@ def write_outputs(
     last = metrics["history"][-1]  # type: ignore[index]
     is_idir = args.method == "idir_original"
     is_direct_dvf = args.method == "direct_dvf_sampled_ncc_fd_be"
+    is_dense_hybrid = args.method == "direct_cp_8_4_2_then_dense_fd_be_multistage"
     is_dctfield = args.method == "dctfield_sampled_ncc_fd_be"
     is_mr_sinr_composed = args.method == "mr_sinr842_composed"
     is_mr_sinr_requery = args.method == "mr_sinr842_requery"
-    is_bspline = not is_idir and not is_direct_dvf and not is_dctfield
+    is_bspline = not is_idir and not is_direct_dvf and not is_dctfield and not is_dense_hybrid
     activation = (
         "dctfield_coefficients"
         if is_dctfield
+        else "direct_dense_grid_displacement_initialized_from_cps2"
+        if is_dense_hybrid
         else "direct_dense_grid_displacement"
         if is_direct_dvf
         else "direct_control_points"
         if args.method.startswith("direct_cp_")
         else "Siren"
     )
-    omega = float(args.idir_omega) if is_idir else (None if (is_direct_dvf or is_dctfield) else float(args.spline_omega))
+    omega = float(args.idir_omega) if is_idir else (
+        None if (is_direct_dvf or is_dctfield or is_dense_hybrid) else float(args.spline_omega)
+    )
     be_type = (
         "be_native_analytic"
         if is_idir
         else "dct_decoded_dense_forward_difference_be"
         if is_dctfield
         else "dense_forward_difference_be"
-        if (is_direct_dvf or is_mr_sinr_composed)
+        if (is_direct_dvf or is_dense_hybrid or is_mr_sinr_composed)
         else "be_bspline_analytic"
     )
     diffusion_type = (
@@ -3050,7 +3438,7 @@ def write_outputs(
         else "dct_decoded_dense_forward_difference"
         if is_dctfield
         else "dense_forward_difference"
-        if (is_direct_dvf or is_mr_sinr_composed)
+        if (is_direct_dvf or is_dense_hybrid or is_mr_sinr_composed)
         else "diffusion_bspline_analytic"
     )
     native_be_formula = (
@@ -3059,7 +3447,7 @@ def write_outputs(
         else "not_used_dct_spectral_be_possible"
         if is_dctfield
         else "not_available_dense_grid_dvf"
-        if is_direct_dvf
+        if (is_direct_dvf or is_dense_hybrid)
         else "not_single_bspline_final_field; residual_stage_training_uses_bspline_analytic"
         if is_mr_sinr_composed
         else "bspline_analytic"
@@ -3070,7 +3458,7 @@ def write_outputs(
         else "not_used_dct_spectral_diffusion_possible"
         if is_dctfield
         else "not_available_dense_grid_dvf"
-        if is_direct_dvf
+        if (is_direct_dvf or is_dense_hybrid)
         else "not_single_bspline_final_field; residual_stage_controls_have_bspline_analytic_derivatives"
         if is_mr_sinr_composed
         else "bspline_analytic"
@@ -3080,13 +3468,21 @@ def write_outputs(
         if is_idir
         else "dense valid-stencil finite-difference BE over decoded DCT field and fixed image-positive mask; spatial mean plus component mean"
         if is_dctfield
+        else "dense valid-stencil finite-difference BE over the unmasked full voxel field; spatial mean plus component mean"
+        if is_dense_hybrid
         else "dense valid-stencil finite-difference BE over fixed image-positive mask; spatial mean plus component mean"
         if is_direct_dvf
         else "final composed dense field uses posthoc dense finite-difference BE; each residual SINR stage trains with analytic cubic B-spline BE"
         if is_mr_sinr_composed
         else "analytic cubic B-spline BE sampled at voxel centers; spatial mean plus component mean"
     )
-    image_loss = "idir_global_ncc_sampled" if (is_idir or is_direct_dvf or is_dctfield) else "sinr_ncc"
+    image_loss = (
+        "full_image_global_ncc"
+        if is_dense_hybrid
+        else "idir_global_ncc_sampled"
+        if (is_idir or is_direct_dvf or is_dctfield)
+        else "sinr_ncc"
+    )
     sample_domain = (
         "fixed_image_positive"
         if is_idir
@@ -3144,6 +3540,11 @@ def write_outputs(
         "omega": omega,
         "lr": float(lr),
         "alpha": float(args.alpha),
+        "gpu_requested": str(args.gpu),
+        "source_revision": str(args.source_revision) or None,
+        "cudnn_benchmark": bool(torch.backends.cudnn.benchmark),
+        "cudnn_deterministic": bool(torch.backends.cudnn.deterministic),
+        "cuda_backend": c.cuda_backend_metadata(),
         "be_type": be_type,
         "diffusion_type": diffusion_type,
         "regularizer": be_type,
@@ -3170,6 +3571,7 @@ def write_outputs(
         "stage_requested_epochs": metrics.get("stage_requested_epochs"),
         "stage_actual_epochs": metrics.get("stage_actual_epochs"),
         "stage_lr": metrics.get("stage_lr"),
+        "stage_alpha": metrics.get("stage_alpha"),
         "stage_early_stop_mode": metrics.get("stage_early_stop_mode"),
         "stage_min_epochs": metrics.get("stage_min_epochs"),
         "stage_patience": metrics.get("stage_patience"),
@@ -3178,6 +3580,8 @@ def write_outputs(
         "stage_rel_delta_data": metrics.get("stage_rel_delta_data"),
         "stage_min_delta": metrics.get("stage_min_delta"),
         "stage_stop_reasons": metrics.get("stage_stop_reasons"),
+        "stage_representation": metrics.get("stage_representation"),
+        "stage_regularizer": metrics.get("stage_regularizer"),
         "early_stop_epoch": metrics.get("early_stop_epoch"),
         "early_stop_reason": metrics.get("early_stop_reason"),
         "best_loss": metrics.get("best_loss"),
@@ -3195,6 +3599,14 @@ def write_outputs(
         "multistage_strategy": metrics.get("multistage_strategy"),
         "field_composition": metrics.get("field_composition"),
         "final_field_is_single_bspline": metrics.get("final_field_is_single_bspline"),
+        "final_field_representation": metrics.get("final_field_representation"),
+        "prefix_final_cps": metrics.get("prefix_final_cps"),
+        "prefix_final_control_shape": metrics.get("prefix_final_control_shape"),
+        "prefix_param_count": metrics.get("prefix_param_count"),
+        "dense_initialization": metrics.get("dense_initialization"),
+        "dense_initialization_audit": metrics.get("dense_initialization_audit"),
+        "dense_stage_uses_cps1": metrics.get("dense_stage_uses_cps1"),
+        "dense_stage_uses_analytic_bspline_be": metrics.get("dense_stage_uses_analytic_bspline_be"),
         "mr_sinr_variant": (
             "composed_residual" if is_mr_sinr_composed else "continued_requery_absolute" if is_mr_sinr_requery else None
         ),
@@ -3333,6 +3745,8 @@ def write_dvf_only_metadata(
         "eval_interval": int(args.eval_interval),
         "lr": float(lr),
         "alpha": float(args.alpha),
+        "gpu_requested": str(args.gpu),
+        "source_revision": str(args.source_revision) or None,
         "seed": int(args.seed),
         "cps": metrics.get("cps"),
         "bspline_order": 3,
@@ -3344,6 +3758,7 @@ def write_dvf_only_metadata(
         "stage_requested_epochs": metrics.get("stage_requested_epochs"),
         "stage_actual_epochs": metrics.get("stage_actual_epochs"),
         "stage_lr": metrics.get("stage_lr"),
+        "stage_alpha": metrics.get("stage_alpha"),
         "stage_early_stop_mode": metrics.get("stage_early_stop_mode"),
         "stage_min_epochs": metrics.get("stage_min_epochs"),
         "stage_patience": metrics.get("stage_patience"),
@@ -3411,6 +3826,7 @@ def _main(args: argparse.Namespace) -> None:
     if str(args.output_mode) == "dvf_only":
         supported_dvf_only = {
             "direct_cp_8_4_2_be_bspline_analytic_multistage",
+            "direct_cp_8_4_2_1_be_bspline_analytic_multistage",
             "direct_cp_cps4_be_bspline_analytic",
             "direct_cp_cps2_be_bspline_analytic",
             "sinr_cps4_be_bspline_analytic",
@@ -3490,6 +3906,17 @@ def _main(args: argparse.Namespace) -> None:
                     "moving_id": batch["moving_id"],
                     "mask_audit": batch["mask_audit"],
                     "alpha": args.alpha,
+                    "stage_alpha": str(args.stage_alpha) or None,
+                    "dense_stage_alpha": (
+                        float(args.alpha)
+                        if args.dense_stage_alpha is None
+                        else float(args.dense_stage_alpha)
+                    ) if args.method == "direct_cp_8_4_2_then_dense_fd_be_multistage" else None,
+                    "dense_stage_lr": (
+                        float(args.dense_stage_lr)
+                        if args.method == "direct_cp_8_4_2_then_dense_fd_be_multistage"
+                        else None
+                    ),
                     "lr": lr,
                     "epochs": args.epochs,
                     "stage_early_stop_mode": args.stage_early_stop_mode,
@@ -3519,7 +3946,11 @@ def _main(args: argparse.Namespace) -> None:
         metrics = train_direct_dvf(args, batch, device, lr, sampler=sampler)
     elif args.method == "dctfield_sampled_ncc_fd_be":
         metrics = train_dctfield(args, batch, device, lr, sampler=sampler)
-    elif args.method == "direct_cp_8_4_2_be_bspline_analytic_multistage":
+    elif args.method in {
+        "direct_cp_8_4_2_be_bspline_analytic_multistage",
+        "direct_cp_8_4_2_1_be_bspline_analytic_multistage",
+        "direct_cp_8_4_2_then_dense_fd_be_multistage",
+    }:
         metrics = train_multistage_direct_cp(
             args,
             batch,
