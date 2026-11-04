@@ -158,3 +158,19 @@ generalization claims. Across-case SD is not training-seed uncertainty.
 
 The planning log records the audited working-tree source hashes. Historical
 sources and accepted experiment outputs must remain unchanged.
+## Checkpoint recovery and subsequent squared-GNCC SITReg sweep
+
+The approved 2026-10-13 recovery leaves the loss definitions below unchanged.
+SITReg's new `sitreg_gncc2_training` adapter differs from the signed adapter
+only in loss identity and `mean(1-rho²)` replacing `mean(1-rho)`. The native
+joint bidirectional reduction, total voxel-field diffusion, optimizer, data
+pairing and validation checkpoint selection are retained.
+
+Native training keeps a shuffled DataLoader iterator across epochs. Restoring
+only a checkpoint RNG and making a fresh loader is not equivalent: a partially
+consumed sampler permutation would be lost. Recovery replays the native
+metadata-only pairing dataset and validation seed draws from the seed42 model
+initialization, verifies every completed epoch's pair hash and exact CPU/
+Python/NumPy RNG states, then retains the live iterator and restores saved
+CUDA RNG and Adam/AMSGrad state. The historical CUDA backend remains non-bitwise
+reproducible. See P59 for frozen-source provenance and failed-artifact retention.
