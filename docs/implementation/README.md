@@ -18,6 +18,24 @@ definitions in `docs/03_methods.md`; keep run ledgers in
 
 ## Files
 
+- [Matched-prefix cps8421 extension](bspline8421_matched_prefix.md): retained
+  accepted842 prefixes, newcps1 optimization, scoped roundoff proof and paired-depth reports.
+- [First100 three-family B-spline842 extension](bspline842_first100.md):
+  exact-protocol reuse, immutable numerical adapters, eight-slot fault isolation,
+  complete-cohort accuracy/regularity and resource reporting.
+- [Symmetric SVF Phase B](symmetric_bspline_svf_phase_b.md): native-mm amplitude
+  and global RMS-balance ablation, full-objective histories and matched-GPU checks.
+- [Symmetric B-spline SVF Phase A](symmetric_bspline_svf.md): two independently
+  refined total velocities, two-gradient midpoint NCC, explicit equal-split
+  diffusion/LR scaling, inverse construction and branch-energy diagnostics.
+- [Bounded two-map lambda sweep](bounded_two_map_lambda_sweep.md): explicit
+  global stage weights, retained six-map composition, unchanged bound capacity,
+  replay/reproduction semantics and memory/runtime reporting.
+- [B-spline SVFs](bspline_svf.md): native scaling/squaring, refined versus
+  composed velocities, velocity/displacement diffusion and numerical audits.
+- [First10 refined-SVF sweep](bspline_svf_sweep.md): global stage-lambda sweep,
+  complete-cohort reporting, independent replay and process time/memory semantics.
+
 - [NCC loss definitions and normalization](ncc_loss_normalization.md):
   current local squared, global signed, and global squared formulas; compatible
   population moments but unequal loss-to-diffusion balance at equal lambda;

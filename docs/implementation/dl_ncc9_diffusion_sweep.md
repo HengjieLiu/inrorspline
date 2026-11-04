@@ -94,6 +94,148 @@ not the learned model, bidirectional training or network prior. All ten cases
 are exploratory tuning. Pipeline compute budgets differ, and competing GPU
 workloads make runtime diagnostic rather than a controlled speed comparison.
 
+## Fixed-prefix final-stage lambda extension (P60)
+
+The isolated `fixed_prefix_dense.py` runner retains the historical objective,
+stage optimizer and canonical evaluation functions. Unlike P43's tied lambda,
+it validates a fixed `[1,1,1]` prefix independently of dense lambda and names
+each candidate with `[1,1,1,dense_alpha]`. Every final-stage fit is fresh,
+including lambda1, and starts from the same saved per-case normalized dense
+field with exact cloning. Historical FitSpec validation and sources remain
+unchanged. The dense-stage alpha changes only the total-field diffusion weight;
+image preprocessing, local NCC9, parameter units, LR and stopping stay frozen.
+See [P60 spec](../../experiments/2026-10-13_oasis_fixed_prefix_dense/codex_execution_spec.md).
+
+## Fixed cps8/cps4 prefix to cps2 lambda extension (P61)
+
+P61's isolated `fixed_prefix_cps2.py` branches earlier than P60: it loads
+the saved lambda1 cps4 best controls, prolongs to cps2, and freshly optimizes
+only cps2 at lambda0.1/0.2/0.5/1/2/5. Stage weights are [1,1,cps2_alpha];
+there is no dense stage. Cps2 retains LR0.003, 1300/130 epochs, patience50
+and no LR reductions. Historical842 lambda1 is a reproducibility/reference
+row, not the initialization. See
+[P61 spec](../../experiments/2026-10-13_oasis_fixed_prefix_cps2/codex_execution_spec.md).
+
+## Cps2 lambda5 prefix to dense extension (P62)
+
+P62's `cps2lambda5_dense.py` initializes dense refinement from P61's accepted
+cps2lambda5 outputs, preserving stage vectors[1,1,5,dense_alpha]. Its dense
+objective and schedule are identical to P60, with an additional requested
+lambda10. It validates P61's separate-weight metadata directly, rather than
+using the legacy tied-lambda loader. Previous[1,1,1] dense results are read-only
+paired initialization comparisons, not reproduction targets. See
+[P62 spec](../../experiments/2026-10-13_oasis_cps2lambda5_dense/codex_execution_spec.md).
+
+## Rank0 cps1 comparison after [1,1,5] prefix (P63)
+
+P63's `cps2lambda5_cps1.py` prolongs the identical accepted P61 cps2 controls
+to cps1 instead of cloning the dense field as in P62. It retains the exact
+full-resolution NCC9 and finite-difference diffusion objective, final lambda1,
+normalized LR0.001, fresh Adam and2000/300 adaptive schedule. The regularizer
+is evaluated on the expanded total field; it is not analytic B-spline diffusion.
+Native-grid prolongation is verified against the saved prefix before training.
+
+The rank0 comparison matches dense accuracy but does not reduce folding.
+Equal nominal optimizer settings do not imply identical field-space updates,
+and a cps1 cubic representation is not a positive-Jacobian constraint. See
+[P63 spec](../../experiments/2026-10-13_oasis_cps2lambda5_cps1/codex_execution_spec.md).
+
+## Bounded retained composition (P64)
+
+`bounded_composed_bspline.py` defines one identity-initialized bounded
+increment per cps8/4/2/1. `run_oasis_bounded_composed.py` is the isolated
+rank0 worker/launcher. Historical runners and outputs are unchanged.
+
+Each bounded control grid expands once per objective evaluation to native
+samples; the elementary map uses their border-trilinear interpolant. Earlier
+elementary samples are frozen, but grid sampling still propagates coordinate
+gradients. With maps stored oldest-first, evaluation applies them in reverse:
+Phi_new=Phi_previous o delta_new. The accumulated map is not repeatedly
+resampled. Stage metrics/exports are samples only, never initialization caches.
+There is no interstage knot insertion or single final cps1 representation.
+
+For unit control-grid coefficients, the FP64 Lipschitz constant is the maximum
+over all native sampling phases, eight cell corners and eight derivative sign
+patterns of the L1 norm of the signed sum of derivative stencils. Its inverse
+is the coefficient bound. Endpoint-aligned sampling yields control-unit bounds
+0.400880185/0.392638037/0.36/0.36 for cps8/4/2/1, distinct from SITReg's
+even-stride half-voxel sampling bounds. The independent calculation reproduces
+the native SITReg algorithm/lookup when its own phases are used.
+
+Let a=0.99*cps*bound/native_voxel_scale_xyz. Optimize normalized latent p,
+with bounded coefficients c=a*tanh(p/a). The derivative dc/dp is1 at zero;
+directly applying historical normalized LRs to dimensionless tanh logits would
+not preserve this convention. Coefficient saturation and derivative bounds are
+recorded, and previous maps are never added as raw displacement increments.
+
+The unchanged loss formula uses the total composed displacement in the current
+evaluation grid's voxel units. This changes the deformation representation and
+coarse-grid field sampling, not the image pyramid or NCC9/diffusion formula.
+Full native-cell corner audits verify elementary contraction.100k same-point
+FP64 probes separately evaluate the retained chain and reinterpolated export.
+Zero canonical folding or zero sampled off-grid failures is not a universal
+claim about every downstream interpolant. See
+[P64 spec](../../experiments/2026-10-13_oasis_bounded_composed/codex_execution_spec.md).
+
+## Bounded cps16 extension (P65)
+
+`bounded_composed_cps16.py` and `run_oasis_bounded_composed_cps16.py` add a
+separate cps16/8/4/2/1 retained chain. The P64 numerical sources remain
+unchanged; the new adapter reuses their composition, scaled tanh, optimizer
+and topology helpers. Explicit five-stage metadata fixes final LR reductions
+to cps1 rather than historical index3. Weights are[1,1,1,5,1], pyramid factors
+8/4/2/1/1, normalized LRs0.03/0.03/0.01/0.003/0.001. New cps16 controls are
+14x18x16x3; downstream shapes and schedules retain P64's values.
+
+Endpoint-aligned cps16 coefficient bound is approximately0.4019072194 in
+control-grid units, or6.366210355 native voxels/component after0.99 margin.
+SITReg's half-voxel counterpart0.4017532975 is tested independently, not
+substituted. The loose cumulative per-axis motion ceiling rises5.7990 to
+12.1652 voxels. This adds motion capacity, optimizer work and coarser NCC
+support, so any improvement is not a causal isolation of saturation.
+See [P65 spec](../../experiments/2026-10-13_oasis_bounded_composed_cps16/codex_execution_spec.md).
+
+## Selective bounding (P66)
+
+`selective_bounded_composed.py` and `run_oasis_selective_bounded.py` retain
+P64's4-stage composition, schedule and NCC9/diffusion, but bound only the last
+1,2 or3 increments. Unbounded controls are exactly the normalized parameter
+c=p; bounded controls retain c=a*tanh(p/a). Serialization uses the same
+stage-specific transform as optimization. Unbounded applied bounds and
+saturation metadata are null rather than implying an unused cap was enforced.
+
+Each fit starts independently at identity; stages are NOT the historical
+prolonged-prefix scheme. Fully bounded P64 is the controlled reference;
+historical prolonged unbounded/dense are contextual. Bound checks gate only
+bounded elementary maps; folded earlier maps or total compositions are
+measured and retained, not rejected or repaired. See
+[P66 spec](../../experiments/2026-10-13_oasis_selective_bounded/codex_execution_spec.md).
+
+P67 extends these same four bounding masks (including P64 all4) to seed3
+first10 without changing the numerical core. The separate first-ten adapter
+reuses four immutable rank0 outputs and runs36 identity-initialized fits.
+All four variants of a new case share a physical GPU, not an optimized prefix.
+Case-level sample SD uses ddof1, with ranks1–9 separated from exploratory
+rank0. See [P67 spec](../../experiments/2026-10-13_oasis_selective_bounded_first10/codex_execution_spec.md).
+
+P68 compares two bounded increments per level against two optimizer blocks on
+one bounded map. Both use eight blocks over four levels, with the same
+per-level lambda/LR/stopping schedule repeated independently. The new-map arm
+appends a zero-initialized map; continuation restores the selected same-map
+latent, resets Adam/LR/stopping history and replaces that map. Thus the final
+retained checkpoint indices are[0..7] versus[1,3,5,7]. Bounds and total-field
+diffusion are unchanged, not doubled or divided by two. The new optimizer
+only adds explicit initial-latent support; historical source modules remain
+immutable. See [P68 spec](../../experiments/2026-10-13_oasis_bounded_two_blocks/codex_execution_spec.md).
+
+P69 extends only the two-increment arm to first10 at stage weights[1,1,5,1]
+and[1,1,1,1]. Each level's weight applies unchanged to both increments and
+regularizes the total composed field, not the increment. Only cps2 changes;
+the first four optimization blocks must agree across vectors. Two pilot
+outputs are reused read-only, with18 fresh registrations. A scoped cohort
+adapter reuses P68's immutable numerical worker and audit; it does not alter
+historical constants on disk. See [P69 spec](../../experiments/2026-10-13_oasis_two_increments_first10/codex_execution_spec.md).
+
 ## Rank4 cps16 extension (P47)
 
 The isolated `cps16_ncc.py` protocol and rank004 worker reuse the unchanged

@@ -5,7 +5,715 @@ status: active
 
 # Experiment Registry
 
+### P80: First100 Matched-Prefix B-spline8421 NCC9/Diffusion Sweep
+
+- Main release accepted2026-10-18 05:11:42UTC:2100/2100 independent outputs,
+  zero deferred production failures;52 complete comparison groups and1178
+  serialized statistic checks. Original ARC/report release remains immutable.
+- Foreground-diffusion companion accepted2026-10-18 20:46:37UTC:5200 finite
+  checksum-verified fields,52 complete groups, two new2x3 figures with common
+  axes. Ten new/six legacy tests,52-cell smoke,520 source-statistic and728
+  independent NumPy checks passed. Max full-volume parity error1.68613e-7;
+  all12 earlier figure export hashes unchanged. External key:
+  `oasis_seed3_first100_bspline842_8421_foreground_diffusion_arc_v1/release_v1`.
+- Foreground-diffusion ARC companion requested2026-10-18: two additional2x3
+  figures for842/8421, CPU-only analysis of5200 saved final-displacement fields.
+  Both-endpoint fixed raw-positive edges; no lambda weighting; not identical to
+  unmasked training diffusion or SVF velocity penalty. Existing outputs immutable.
+  Spec/log:`experiments/2026-10-18_oasis_matched_depth_diffusion_arc/`.
+- Approved:2100 fresh cps1 extensions of the accepted P79 prefixes,700 each
+  displacement / bounded2 / refinedSVF-velocity. Seven global lambdas unchanged;
+  bounded2 adds two full-schedule maps,2800 optimizerblocks total.
+- Same saved prefix per case/family/lambda; older8421 finals appendix-only.
+  Explicit v4 cps2->1 proof gate, original FP32 numerics and sources unchanged.
+- Nine native rank0 smokes and independent replay gate production. Eight slots,
+  two/GPU0–3, same-prefixGPU affinity,1009:1020, fresh memory admission.
+- Case-local errors deferred; oneOOM tail retry; shared infrastructure pauses
+  only admissions. Full acceptance requires2100 verified outputs.
+- Report paired842/8421 accuracy/regularity, separate new/prefix time/memory,
+  full SITReg/VFA curves, two dual-axis2x3 ARC and matched-axis842 companions.
+- Spec/log:`experiments/2026-10-16_oasis_bspline8421_matched_prefix/`.
+- Artifact key:
+  `oasis_seed3_first100_bspline8421_matched_prefix_displacement_bounded2_svf_velocity_ncc9_lambda_sweep_v1`.
+- Production launched2026-10-17 05:35:31UTC (Oct16 22:35PDT), execution_v2,
+  eight workers/two perGPU. All53 tests, both roundoff witnesses, allnine
+  corrected native smokes/audits and all2100 prefix hash/finite checks passed.
+- First native smoke batch exposed bounded offgrid-autograd context error after
+  optimization. execution_v1 preserved6accepted/3failed smokes; isolatedv2
+  enables coordinate gradients only for that diagnostic. No objective change.
+- Smoke reserved peaks2.277/4.627/3.922GiB (displacement/bounded2/SVF);
+  admission8GiB per child. Storage projection2.192e12bytes including30%margin.
+
+### P79: First100 Three-Family B-spline842 NCC9/Diffusion Sweep
+
+- Accepted2026-10-17 04:15:43UTC (Oct16 21:15PDT): all2100 registrations,
+  700 per family; both scoped continuations and independent replays passed.
+  All2098 earlier results,29 failed-attempt files and prior reports preserved.
+  Final69 complete cohort groups (10/90/100 cases),345 statistic checks and
+  13 output checksums verified. Continuation suite89 tests:88 passed/one skipped.
+  New optimizer431.39/383.72s; peak reserved3.297/3.262GiB for ranks29/44.
+  Accepted report: `transition_continuation_v3/release_1792210489765127750`.
+  `readable_arc_v2` is a separately validated title-wrap-only figure companion.
+- Five-family ARC companion adds complete SITReg/VFA NCC9 sweeps:31 settings
+  on100 paired cases,3100 rows. Two2x3 figures use FGSDlogJ and log10 FGfolding
+  ratio, zoomed mean-only tops/full-SD bottoms. All310 source statistics and
+  six presentation tests pass. Exact-zero means have a labeled display-only
+  floor; no data changes. Key `oasis_seed3_first100_five_family_ncc9_arc_stdlogj_folding_v1`.
+- Queue drained2026-10-17 02:47:53UTC:1528 new fits accepted plus570 reused;
+  two velocity-SVF lambda.01 failures, ranks29(cps8->4)/44(cps4->2). Partial
+  report2098/2100 preserved. One rank91 audit OOM recovered under the existing
+  one-retry policy. Both outstanding failures are numerical transition gates.
+- Approved scoped continuation after read-only native replay: rank29 retains
+  cps8; rank44 retains cps8/4. Only missing stages optimized. Validationv3
+  FP32 max.002/RMS1e-5 voxel plus exact prescribed controls and mandatory
+  FP64 fallback proof; ideal velocity/field1e-9/1e-8 unchanged, actual-rounded
+  field max2e-4/RMS1e-6. No optimizer/objective/integration change. Separate
+  transition_continuation_v3 artifacts, originalGPU3/rank29 andGPU2/rank44,
+  full remaining-stage one-update smokes and independent replay before fits.
+  Preserve2098 accepted results, failure attempts and published reports.
+- Approved2026-10-16: seven global lambdas.01/.1/.3/1/3/10/100 on ranks0–99;
+  prolonged displacement, bounded-two-map composition and refined single-SVF
+  velocity diffusion. All8/4/2, no final dense/cps1 or symmetric stage.
+- Reuse430 accepted P43/P48 standalone prefixes plus70 P76 and70 P74 fits;
+  run270/630/630 missing registrations,1530 new and2100 final cells total.
+- Isolated first100 adapters preserve historical objectives/optimizers.
+  Six extreme-lambda native smokes and independent replay gate production;
+  every new fit needs independent field/loss/metric verification.
+- GPUs0–3, two workers/auditors each,1009:1020; fresh8GiB-or-smoke+2 admission,
+  same-GPU audits, durable continue-on-error/OOM-tail-retry queue. Prior outputs
+  immutable. Original preflight validated570/570 reuses and200 references;
+  four of six smoke/replays passed. Both SVF smokes failed before optimization:
+  mixed controller settings were sent to the legacy path-only setup. Production
+  never launched. Original manifests, four successes and failure logs retained.
+- User approved repair/resume2026-10-16. New `metadata_recovery_v2` execution
+  filters worker settings to four explicit paths and validates their types.
+  Numerical sources remain unchanged; prior hash receipts are reused only
+  after unchanged scientific-contract/source and artifact-stat checks. All six
+  smokes will be rerun under the corrected source manifest before1530 new fits.
+  Regression suite72 tests,71 passed/one skipped. Recovery revalidated570 reuses
+  and200 reference hashes; all six smoke/replays passed in62.1s (maximum measured
+  peak3.371GiB, admission8GiB). Production started2026-10-16 17:24:12UTC;
+  eight active workers confirmed, two/GPU, no initial failures at that launch.
+- Complete-only five-metric tables/2x3 ARC, separate10/90/100 summaries,
+  originalVFA/SITReg, paired/label/stage diagnostics and time/memory provenance.
+- Key:oasis_seed3_first100_bspline842_displacement_bounded2_svf_velocity_ncc9_lambda_sweep_v1.
+  Spec/log:experiments/2026-10-16_oasis_bspline842_first100_sweep/.
+
+### P78: Rank-0 Symmetric SVF Amplitude/Balance Phase B
+
+- Approved 28 fresh cps8->4->2 registrations on rank0: baseline, seven
+  amplitude weights, seven balance weights, nine combined selected neighbors,
+  three matched-GPU input swaps and one matched-GPU same-order winner repeat.
+- Preserve A1 midpoint NCC9 plus 2*(R1+R2), half-scaled actual velocities,
+  exact independent SVF refinement and historical schedules. Add native full-
+  volume mm-squared amplitude and squared RMS imbalance, no other loss change.
+- Four full-size smokes and independent replay gates; all28 complete and
+  independently replayed outputs required. Preserve Phase-A sources/results.
+  One worker/GPU0-3,1009:1020, live admission8GiB or smoke peak+2GiB.
+- Alpha1e-5/3e-5/1e-4/3e-4/1e-3/3e-3/1e-2; beta.01/.03/.1/.3/1/3/10.
+  Dice/ASD/HD95 selects tested neighbors; no grid expansion or first-ten runs.
+- Accepted2026-10-16 07:27:41UTC: all28 fits/replays and four smokes/replays
+  passed,45 tests, no failures/retries. Production queue40.28min, maximum
+  allocated/reserved peak across runs/replays4.918GiB; timings diagnostic only.
+- Amplitude-only alpha.001 wins: Dice.796250,HD951.980043mm,ASD.430644mm,
+  FGSDlogJ.555949,FGfold0%. Shared RMS27.316->2.915mm versus fresh A1.
+  Best balance beta1 Dice.795014; combined alpha.001/beta1 Dice.793762.
+  Balancing RMS more exactly did not improve the best tested accuracy.
+- Same-order winner repeat Dice.796218, swapped reverse export Dice.796538,
+  but geometric differences remain: repeat FG EPE p95/max.287850/11.501729mm;
+  swap p95/max.289065/4.883435mm. No exact symmetry/retraining claim.
+- Selected candidate uses125/150/250 updates,61.44s optimizer,121.37s worker,
+  61.06s replay,4.568/4.859GiB allocated/reserved. Full report has all24 primary
+  settings, four diagnostics, per-label/stage records and integration sensitivity.
+- Key:oasis_seed3_rank000_bspline_two_total_svf_midpoint_ablation_v1/phase_b_v1.
+  Spec/log:experiments/2026-10-15_oasis_symmetric_svf_phase_b/.
+
+### P77: Rank-0 Symmetric Refined-SVF Phase A
+
+- Approved four fresh 8->4->2 fits: independent two-SVF midpoint NCC9 with
+  diffusion coefficient 2 (equal-split-effective lambda 1), coefficient 1
+  scaling control, tied +/-w/2 single-SVF midpoint control, and swapped-input
+  coefficient-2 check. No amplitude/balance sweep until the Phase-A review.
+- Both total SVFs use exact knot refinement, native seven-step integration,
+  twice-branch normalized parameters and historical 0.03/0.01/0.003 Adam LR.
+  Separate two-input NCC supplies both gradients; no pyramid-map composition.
+- Require four native smokes and four independent production replays, full
+  forward/reverse canonical metrics, 8/10-step sensitivity, energy/common-drift
+  audit and input-swap check. One new worker/GPU 0-3, UID:GID 1009:1020,
+  live memory admission, preserve existing jobs and historical outputs.
+- Completed and report accepted 2026-10-16 06:02 UTC (local October 15):
+  four smokes/replays and four production fits/replays passed, 31 tests,
+  no failures or retries. Production/replay queue wall time 386.02 s;
+  peak allocated/reserved memory approximately 4.41/4.73 GiB per worker.
+- A1/A2/A3 Dice is 0.785973/0.788333/0.790653, below historical bounded-two
+  0.801036 and refined-SVF 0.797502. A1 has zero measured foreground folding,
+  not an unconditional topology guarantee. Results are single-case only.
+- A1/A2 branch RMS magnitudes are close (2.15%/1.19% relative gaps), but
+  common-mode RMS is 27.19/35.92 mm. Midpoint foreground coverage grows from
+  approximately 31% to 72-73%/84-86%. This is consistent with a shared-motion
+  incentive in unmasked midpoint NCC9; balance alone cannot remove it.
+- Input exchange is not numerically identical: original-direction A1 versus
+  swapped-A1 reverse export has foreground endpoint difference mean/p95/max
+  0.272/0.964/14.785 mm. Symmetric loss/gradient tests pass; the optimization
+  discrepancy remains a reported limitation, not a proven GPU-only effect.
+  Phase B was left approval-gated at Phase-A completion, then approved as P78.
+- Key: oasis_seed3_rank000_bspline_two_total_svf_midpoint_ablation_v1/phase_a.
+  Spec/log: experiments/2026-10-15_oasis_symmetric_svf_phase_a/.
+
+### P76: First10 Bounded Two-Map 842 Lambda Sweep
+
+- Approved70 fresh registrations: seed3 shuffled ranks0–9, cps8→4→2, two
+  independent bounded maps per level, lambda0.01/0.1/0.3/1/3/10/100 at every
+  level/map. Rerunlambda1; accepted P70 is read-only reproduction evidence.
+- Preserve P70 NCC9, total-composed-field evaluation-grid voxel diffusion,
+  normalized latent LR0.03/0.01/0.003,0.99 tanh bounds, full schedule per map,
+  identity initialization and fresh Adam. No cps1/dense/SVF stage or tuning.
+- Up to two workers per physical GPU0–3,1009:1020, live memory admission and
+  existing jobs unchanged. Three endpoint/center smokes gate production.
+  Individual failures are deferred without stopping unrelated tasks; shared
+  storage/source failures pause admissions. One deferred OOM retry maximum.
+- Require70 independent replays, six maps per fit, canonical five metrics,
+  bound/off-grid diagnostics, checkpoint/history consistency, time/memory.
+  Update ARC C/F; G retains its four-levellambda1 bounded point. Versioned
+  artifacts; no historical source/output replacements.
+- Accepted 2026-10-16 03:58:29 UTC (local October 15): all 70 registrations,
+  70 independent replays and three full-size smokes/replays passed; no failed
+  candidates or retries. Queue wall time 1344.36 s. All 420 map records,
+  2450 label records and 101920 history rows verified; 51 regression tests.
+- Lambda 1 has the best mean Dice/HD95/ASD: 0.819183/1.764939/0.364375 mm;
+  FG SD(log J) 0.603642 and folding 0.000037%. Lambda 3/10/100 have zero
+  measured foreground folding, with reduced accuracy. This is exploratory.
+- C/F figure update accepted 2026-10-16 04:02:08 UTC: 55 displayed settings,
+  550 case rows, 550 independent mean/SD checks and 18 axes verified. G keeps
+  its historical four-level point. PNG/PDF/SVG and two-/seven-page PDF books
+  saved under arc_panels_v1; source hashes and unchanged A/B/D/E pages checked.
+- Key:oasis_seed3_first10_bspline_bounded2_842_ncc9_lambda_sweep_v1.
+  Spec/log:experiments/2026-10-15_oasis_bounded2_842_lambda_sweep/.
+
+### P75: First10 NCC9 Method-Family ARC Figures
+
+- Approved aggregation-only presentation: five2×3 figures, mean-only top and
+  marginal sample-SD ellipses below, Dice/HD95/symmetric ASD versus foreground
+  SD(log J). Shared ranges/ticks/labels and large typography across all figures.
+- A: SITReg/VFA/FeDDA NCC9 sweeps. B: P43 pyramid842/8421/dense sweeps.
+  C/D: P70 matched unbounded-one/bounded-one/bounded-two composition at842/8421,
+  all lambda1, marker-only. E: four P74 refined-SVF sweeps, continuation_v2.
+-70 operating points/700 first10 case rows; same seed3 ranks0–9. DL historical
+  lambda1 uses uniform visual styling, with provenance disclosed separately.
+  No registration, inference, GPU job changes, or metric reevaluation.
+- Accepted2026-10-15 20:35UTC: ten tests, all700 independently recomputed
+  mean/SD values,70 cohorts,30 axes, source/output hashes, embedded fonts and
+  five-page PDF checks passed. All five PNGs visually reviewed without clipping.
+  Source artifacts remain unchanged; no GPU work or metric reevaluation.
+- Key:oasis_seed3_first10_ncc9_method_family_arc_panels_v1.
+  Spec/log:experiments/2026-10-15_oasis_first10_family_arc/.
+- Approved lambda1 appendix accepted:11 ordered method/depth rows,110 cases,
+  five mean/sample-SD metrics; three tests and110 independent statistic checks
+  passed. New lambda1_table_v1 subdirectory; existing figures/reports unchanged.
+- Approved F/G extension: three DL sweeps plus displacement/bounded-two/
+  velocity-regularized SVF at842 (F) or8421 (G). Six methods,30 points per
+  figure; bounded islambda1 only. Same axes/fonts/ellipses; no GPU work.
+  Separate panels_FG_v1 release accepted2026-10-15 21:06:45UTC. Four new tests,
+  independent600-statistic/12-axis checks, source hashes and visual review pass.
+  Two-/seven-page PDF books verified; A–E and lambda1 table remain unchanged.
+- Requested F/G revision: remove VFA/FeDDA only, keep SITReg plus displacement,
+  bounded-two and velocity-SVF. Separate panels_FG_sitreg_v2 accepted
+  2026-10-15 21:28:53UTC. Improved four-method styles; requested tighter top-row
+  y scales shared by F/G, unchanged x axes and full-range ellipse rows.
+  All40 settings/400 displayed records (350 unique) and400 statistics verified;
+  all points visible,21 regression tests passed. Prior artifacts unchanged.
+
+### P74: First10 Refined B-Spline SVF Lambda Sweep
+
+- **Accepted2026-10-15 19:21:02UTC:**280/280 independently validated, all28
+  first10 configurations complete. The continuation_v2 report has980 stage
+  records,840 integration evaluations,9800 label rows and1400 paired rows;
+  all output hashes and11619 preserved preexisting files verified. Ranks2/5
+  completed only cps1;278 prior results and failed attempts remain unchanged.
+- Queue finished278 accepted/two deferred. Approved continuation_v2 completes
+  only cps1 for ranks2/5,8421/displacement/lambda0.01, from their verified own
+  cps2 checkpoints. No numerical optimizer/source changes or prefix reruns.
+  Proof-gated FP32 max0.002/RMS1e-5 voxel requires ideal and actual-rounded-
+  control FP64 checks. Preserve278 results and failures; two native fixtures,
+  independent replay and a new complete280-fit report gate acceptance.
+- Continuation revision1:62 tests and both native-size one-update fixtures
+  passed;11619 files preserved by inventory. Two cps1 workers launched
+  2026-10-15 19:11:36UTC onGPU3/rank2 andGPU1/rank5. Final audits/report
+  pending. Initial adapter metadata smoke failure is preserved separately.
+- Both cps1 continuations independently passed by2026-10-15 19:18:53UTC:
+  rank2 stopped1800 updates,rank5 stopped1850. All280 fits are validated;
+  full artifact-preservation verification and final report publication pending.
+- Latest approved amendment: preserve35 accepted fits and one unresolved
+  rank2/cps8421/displacement/lambda0.01 failure, resume244 unattempted fits
+  with two processes/GPU0–3. New continue-on-error controller isolates failures,
+  persists retry/admission state, watches stalls and reports incomplete coverage.
+  Numerical checks remain unchanged. Failed cases are reviewed after the queue;
+  no incomplete ten-case means or full-cohort acceptance. See P74 spec/log.
+- Continue-on-error resumption verified2026-10-15 13:28UTC:50 regression
+  tests passed;1425 existing files inventoried;35 accepted/one deferred/eight
+  active/236 waiting. Exactly two new workers on eachGPU0–3; numerical sources
+  unchanged. This is live execution status, not final experiment acceptance.
+- Approved2026-10-15:280 fresh registrations, two penalties (total velocity or
+  integrated total displacement), two schedules842/8421, seven lambdas
+  0.01/0.1/0.3/1/3/10/100 and shuffled seed3 ranks0–9. One lambda at every
+  active stage; no reuse of accepted pilot fits or cross-cell prefixes.
+- Preserve P73 NCC9, native seven-step SVF integration, normalized controls,
+  pyramid/adaptive Adam schedule. Separate generalized sources; P73 immutable.
+- Four full-size extreme-lambda smokes and unit parity gates before production.
+  Independent replay,8/10-step sensitivity and inverse/corner diagnostics for
+  all fits.280 outputs/980 stages/840 integration evaluations required.
+- All available GPUs0–3, one new process/GPU, UID:GID1009:1020, fresh memory
+  admission max(8GiB,smoke peak+2GiB). Concurrent jobs remain untouched.
+  Record optimizer/worker/audit time and process peak allocated/reserved memory,
+  stage diagnostics and concurrent device load; report mean/SD/min/max.
+- Four tables, per-case/per-label companions, original VFA/SITReg references,
+  paired comparisons and line-only2x3 accuracy/regularity curves. Exploratory.
+- Key:oasis_seed3_first10_bspline_svf_refine_842_8421_ncc9_lambda_sweep_v1.
+  Spec/log:experiments/2026-10-15_oasis_bspline_svf_first10_sweep/.
+- Status:17 numerical/CLI/report unit tests, four full-size extreme-lambda
+  smokes and four independent audits passed. Smoke peak reserved3.995GiB;
+  admission8GiB. Persistent280-fit controller launched onGPUs0–3 with
+  automatic complete-cohort reporting and separate resource measurements.
+- Recovery approved after17 accepted fits: rank3/lambda0.01 velocity arm
+  stopped on FP32 knot-transition allclose despite FP64 agreement1.031e-12
+  voxel and identical accuracy/folding metrics. Isolated validation-only
+  adapter uses voxel-unit limits plus FP64 confirmation; preserves all17
+  successes and failure logs, restarts that cell from identity in attempt1,
+  and resumes262 unlaunched cells after regression/smoke gates. See P74 log.
+- Recovery gates passed:24 tests, fresh four-stage native-size smoke and
+  independent replay. All691 preserved files hashed. Four recovery workers
+  started2026-10-15 12:30:48UTC;8GiB admission retained. Production/reporting
+  remains pending; no completed results are inferred from this launch status.
+- User-approved concurrency amendment: two workers/auditors perGPU0–3, eight
+  total. Scheduler-only adapter adopts active children, preserves completed
+  fits/failures, keeps numerical sources hash-frozen, and enforces per-process
+  memory admission and per-GPU slots. Mixed-concurrency timings are diagnostic.
+- Eight-job handover confirmed2026-10-15 12:42:30UTC:21/280 accepted, four
+  existing workers adopted without interruption and four added, exactly two
+  perGPU. Six scheduler tests/live preflight passed; no failures at handover.
+
+### P73: Rank-0 B-Spline SVF Eight-Run Pilot
+
+- User-approved2026-10-14: eight fresh rank0 registrations, refined single SVF
+  versus composed stage SVFs, velocity versus total-displacement diffusion,
+  cps842 versus8421. NCC9/lambda1, normalized LR and established adaptive Adam.
+- Native-grid seven-step scaling/squaring; explicit v/128, endpoint-aligned
+  border sampling, unbounded velocity coefficients. Composed velocity penalty
+  applies only to the active SVF. No historical numerical sources changed.
+- Eight full-size smokes, one worker/GPU0–3, UID:GID1009:1020; independent
+  replay,8/10-step sensitivity, inverse and topology diagnostics gate acceptance.
+- External key:oasis_seed3_rank000_bspline_svf_842_8421_ncc9_lambda1_v1.
+  Spec/log:experiments/2026-10-14_oasis_bspline_svf_rank0/.
+- Status: accepted2026-10-15 06:59:57UTC; eight native-size smokes and eight
+  fresh registrations, each independently replayed, passed. No OOM/retries or
+  numerical failures. Peak reserved5.114GiB; admission8GiB. All28 saved stage
+  states and24 integration evaluations verified; six final report hashes pass.
+  Initial aggregation failed only on historical runtime strings `n/a`; a
+  separately tested report adapter preserved partial outputs and numerical
+  source hashes, normalized unavailable timings, and completed without reruns.
+- Refined velocity-regularized8421 gives Dice/HD95/ASD
+  0.804515/1.990093/0.417839 with foreground folding0.001394%.
+  Displacement-regularized8421 improves accuracy but folds0.914–1.407%.
+  One scaled initial-map derivative bound exceeds1; this is a reported outcome,
+  not a numerical rejection or a diffeomorphism guarantee.
+
+### P72: Test100 Label-Wise Accuracy–Regularity Curves
+
+- Approved aggregation-only release: main19 NCC9 settings (MR-D-BSCP dense,
+  VFA, SITReg, FeDDA) plus four saved MR-D-BSCP prefix-only settings.
+- Reuse canonical35-label accuracy and whole fixed-foreground SD(log J)/folding;
+  no registration, inference or metric reevaluation. Common valid cases per
+  label; Right-Vessel currently98, other labels100. Historical DL1 flagged.
+- Produce35 label-specific2x3 pages per comparison, PDF books, overview atlases,
+  per-case/per-label CSV/JSON, descriptive trend and paired prefix/dense tables.
+- Append-only artifact key `oasis_seed3_test100_label_arc`, release `v001`;
+  source provenance registry supports future sweeps without overwriting releases.
+- Spec/log: `experiments/2026-10-14_oasis_test100_label_arc/`.
+- Status: accepted `releases/v001/`. Ten tests and full-cohort scalar smoke
+  passed;2300 case rows,80500 label slots,805 summaries. All original19 ARC
+  case means/SDs reproduced. Independent8050 summary-value checks match exactly;
+  70 PNG/SVG label figures, two35-page PDF books and six PNG/PDF/SVG atlases
+  verified; all180 output hashes and versioned registry linkage passed.
+
+### P71: First10 B-Spline Depth Comparison with Bounded Three-Map Composition
+
+- Add one fresh bounded-three-map composition arm to each accepted P70 depth:
+  cps8,8→4,8→4→2,and8→4→2→1. Forty new registrations cover seed-3 shuffled
+  OASIS ranks0–9; P70's accepted160 cells remain read-only comparison rows.
+- Three independent bounded identity increments are retained/composed per
+  active CPS level. Each receives the full existing stage schedule and fresh
+  Adam. All active diffusion weights remain1; preserve NCC9, total-field
+  voxel diffusion, preprocessing, bound, learning rates, and adaptive stopping.
+  This adds representational capacity and optimization updates; it is not an
+  equal-compute comparison.
+- Four one-update native-grid smokes gate production. Run as1009:1020 on
+  available GPUs0–3, one worker/GPU, case-centric sequential queues, live
+  memory admission of8GiB or measured smoke peak+2GiB. Do not modify existing
+  GPU jobs. Preserve failures/logs.
+- New runner/auditor adapter and isolated artifact key:
+  `oasis_seed3_first10_mrdbscp8421_bspline_bounded3_depth_extension_v1`.
+  Produce a separate combined report with four tables, each containing the
+  original four P70 settings, the new bounded-three-map setting, VFA, and
+  SITReg. Include per-case and paired tables, stopping/runtime, and
+  shared-prefix diagnostics. Never rewrite P70 accepted artifacts.
+- Spec/log:
+  `experiments/2026-10-14_oasis_bspline_bounded3_extension_first10/`.
+- Status: accepted after four native-grid smokes,40 fresh registrations, and
+  40 independent replay audits; no production failures or OOMs. All300 map
+  blocks reconstructed and passed their bounded elementary-map checks. The
+  combined report contains four tables with five optimized settings plus VFA
+  and SITReg references; report hashes/counts passed and P70 accepted hashes
+  remain unchanged. Prefix diagnostics include180 comparisons; report observed
+  cross-depth numerical variation rather than rejecting independent cells.
+- New artifact key:
+  `oasis_seed3_first10_mrdbscp8421_bspline_bounded3_depth_extension_v1`.
+  Bounded-three-map mean Dice by schedule is0.7169/0.7941/0.8244/0.8322;
+  corresponding HD95 is2.4593/1.9280/1.7698/1.7013mm and ASD is
+  0.6667/0.4314/0.3542/0.3330mm. Full-depth foreground SD(logJ)/folding is
+  0.7047/0.0209%, versus bounded-two-map0.6509/0.0031%. Three maps modestly
+  improve full-depth accuracy over two maps, but increase log-Jacobian spread
+  and folding; this is not an equal-compute comparison. First10 remains
+  exploratory due prior tuning.
+- Combined report:
+  `${ARTIFACT_ROOT}/repo_experiments/oasis_seed3_first10_mrdbscp8421_bspline_bounded3_depth_extension_v1/`.
+
+### P70: First10 B-Spline Pyramid Depth × Constraint Factorial
+
+- Fresh 4×4 comparison on seed3 shuffled OASIS ranks0–9: schedules8,8→4,
+  8→4→2,8→4→2→1 crossed with unbounded/bounded single-map and two-map
+  composition. All active diffusion weights are1. Every cell starts fresh
+  from identity; the full16 settings per case run sequentially on one GPU.
+- Two-map settings give each independent map the full stage schedule and fresh
+  Adam. Keep P68/P69 NCC9, total-field evaluation-grid diffusion, bound,
+  composition, normalized LR and adaptive optimizer behavior. There are160
+  new registrations; accepted P69 is read-only and only a reproduction check.
+- Separate runner/auditor and artifact key:
+  `oasis_seed3_first10_mrdbscp8421_bspline_depth_bound_steps_lambda1_v3`.
+- User approved available GPUs0–3. One worker/GPU, live memory checks,
+  UID:GID1009:1020; no existing job is altered.
+- Four full-size one-update smokes gate production. Require160 complete fields,
+  160 independent replays, same-setting shared-prefix checks, and four depth
+  tables with VFA/SITReg references before acceptance.
+- Spec/log: `experiments/2026-10-14_oasis_two_increments_842_first10/`.
+- Status: accepted v3 run. Four one-update smokes, all160 fresh registrations,
+  and all160 independent replay audits passed with zero failed cells. Report
+  contains four depth tables and verified hashes. The first integrated report
+  attempt exposed an over-strict requirement for bitwise-equal cps2 prefixes;
+  the artifact-only aggregator preserves all run outputs and reports this
+  CUDA repeatability difference instead of rejecting cells. Across300 cps8/
+  cps4 prefix checks, all were byte-identical. Across60 cps2 checks, max RMS
+  difference was0.04335 voxel, maximum local difference6.3676 voxels, and max
+  objective-component delta3.50e-5; this is not bitwise reproducibility.
+- Accepted report:
+  `/database/inrorspline/repo_experiments/oasis_seed3_first10_mrdbscp8421_bspline_depth_bound_steps_lambda1_v3/`
+  (`report.md`, `summary.csv`, `per_case.csv`, `paired_reference_differences.csv`,
+  `stage_diagnostics.csv`, and `shared_prefix_checks.csv`). Full-depth rank0–9
+  exploratory means: unbounded one/two-map Dice0.834680/0.833919 and folding
+  2.207595/2.174567%; bounded one/two-map Dice0.809085/0.828813 and folding
+  0/0.003094%; VFA/SITReg Dice0.819772/0.821546 and folding0.218560/0.000423%.
+
+### P69: First10 Two Bounded Increments, Lambda1151 Versus1111
+
+- User-approved first10 extension of P68's two-map method, cps8/4/2/1,
+  lambda[1,1,5,1] versus[1,1,1,1]. Reuse2 accepted rank0/4 lambda1151 outputs;
+  run18 fresh identity registrations. No continuation-control reruns/tuning.
+- Preserve8 retained bounded maps, NCC9/evaluation-grid total-field diffusion,
+  bounds, normalized LR and adaptive schedules. Separate adapter; immutable
+  numerical sources and historical outputs. Explicit finite-difference override.
+- GPU0/1/2/3 one worker each,1009:1020,8GiB or smoke peak+2GiB admission;
+  existing jobs untouched. Keep paired configurations on the same GPU.
+- Tests/two rank1 full-size smokes,18 independent eight-block audits,
+  common four-block prefix checks,20 finite complete fields before acceptance.
+- Report five metrics per case and mean/sampleSD, paired lambda differences,
+  original VFA/SITReg and P67 references. Separate8 nonpilot cases; exploratory.
+- Artifact key: `oasis_seed3_first10_mrdbscp8421_tanh_two_increments_lambda1151_1111_v1`.
+- Spec/log: `experiments/2026-10-13_oasis_two_increments_first10/`.
+- Status:47 tests passed (optional native parity rerun with explicit roots),
+  both full-size rank1 smokes passed. All18 fresh registrations completed
+  acrossGPU0/1/2/3, plus2 reused pilot fits; no failures/retries. All20 audits
+  passed, including160 block checkpoints. Accepted2026-10-14 06:55:43UTC.
+- All40 common-prefix comparisons are byte-identical. Lambda1151/1111
+  mean Dice0.821953/0.828756, HD951.724650/1.678458mm, ASD0.358358/
+  0.338309mm; FG SDlogJ0.581739/0.650974 and folding0.000381/0.003143%.
+- Lambda1111 wins paired Dice9/10, HD959/10 and ASD10/10, but raises both
+  regularity metrics10/10. All retained-chain100k probes have0 nonpositive
+  Jacobians; exported interpolants do not. Full means/sampleSD and nonpilot8
+  comparisons are reported; all source/reference/acceptance hashes verified.
+
+### P68: Two Bounded Increments Versus Same-Map Two-Block Control
+
+- User-approved four-run pilot: ranks0/4, two bounded increments per cps8/4/2/1
+  versus one bounded map per level continued for a second fresh-Adam block.
+- Retain8 versus4 maps; both use8 optimization blocks. Frozen lambda[1,1,5,1],
+  NCC9/total-field evaluation-grid diffusion, bounds, LR and adaptive schedules.
+- Separate adapter and source/hash guards; no prior output modifications.
+  Two full-size eight-block smokes gate production onGPU0/1/2/3,1009:1020,
+  one worker/GPU, memory8GiB or measured peak+2GiB. Existing jobs unchanged.
+- Require32 block checkpoint/loss/field/metric/topology audits and same100k
+  off-grid probes. Complete-only per-case CSV/JSON/Markdown, matched historical
+  all-bounded/selective/VFA/SITReg references. No tuning or first-ten expansion.
+- Artifact key: `oasis_seed3_rank000_004_mrdbscp8421_tanh_two_blocks_lambda1151_v1`.
+- Spec/log: `experiments/2026-10-13_oasis_bounded_two_blocks/`.
+- Status:43 tests passed/1 skipped; both full-size eight-block smokes passed,
+  peak3.458GiB. All4 fresh fits and32 independent block replays passed;
+  accepted2026-10-14 06:09:54UTC (Oct13 PDT). No failures/retries/tuning.
+- Two increments versus same-map continuation Dice: rank0 0.798510 versus
+  0.780452; rank4 0.728966 versus0.687008. Historical one-block all-bounded
+  Dice0.774069/0.684704. Extra maps improve all three accuracy metrics on
+  both cases beyond the continuation control, but rank4 remains below DL.
+- Two-map-arm FG folding0.000743/0.000300%; controls0%. All atomic bounds
+  pass and retained-chain probes have0/100000 nonpositive determinants;
+  exported interpolants have4/100000 and3/100000. Do not claim zero folding
+  for the export. Reports preserve all selective and DL comparisons.
+
+### P67: First10 Last1/Last2/Last3/All4 Bounded Composition
+
+- User-approved first-ten extension of frozen P64/P66: reuse4 accepted rank0
+  outputs, run36 fresh identity registrations on ranks1–9; no tuning.
+- Same cps8/4/2/1 retained composition, weights[1,1,5,1], NCC9/diffusion,
+  normalized latent LR0.03/0.01/0.003/0.001 and adaptive schedules.
+- One new worker per available GPU0/1/2/3 approved;1009:1020; current8GiB
+  admission or smoke peak+2GiB. Existing jobs and historical sources unchanged.
+- Separate adapter, complete-cohort tests and rank1 extreme-bound smokes;
+  checkpoint/field/loss/corner/off-grid checks, common-prefix agreement.
+- Complete-only40-fit per-case and mean/sampleSD report, plus same-ten
+  original VFA/SITReg references; ranks1–9 separate from exploratory rank0.
+- Artifact key: `oasis_seed3_first10_mrdbscp8421_selective_tanh_lambda1151_v1`.
+- Spec/log: `experiments/2026-10-13_oasis_selective_bounded_first10/`.
+- Status:38 tests passed/1 skipped; both full-size rank1 smokes passed.
+  All36 fresh fits completed across four GPUs, plus4 reused rank0; no failures.
+  Complete40-fit reports passed acceptance and all40 common-prefix field
+  comparisons are byte-identical. Independent replay passed for all160 stage
+  checkpoints and all40 final per-label/accuracy/regularity results.
+
+### P66: Rank0 Last1/Last2/Last3 Bounded B-Spline Composition
+
+- User requests three8/4/2/1 variants: bound cps1 only, cps2/1, or cps4/2/1.
+  Fresh identity increments at every stage, weights[1,1,5,1], unchanged P64
+  NCC9/diffusion/normalized-LR/pyramid/adaptive schedule and retained composition.
+- Unbounded earlier controls use c=p, bounded controls use scaled tanh with
+  validated0.99 cap. Save accurate stage-specific metadata/checkpoints; do not
+  apply the bound when serializing unbounded controls or reject expected folds.
+- Separate adapter, three one-step smoke fits then three production fits,
+  GPU3 sequential1009:1020, memory8GiB or smoke peak+2GiB. Existing jobs and
+  prior sources/outputs unchanged. No extra sweeps, cps16 or cohort expansion.
+- Compare P64 all-bounded, historical prolonged unbounded/dense, VFA/SITReg;
+  same five metrics and100k off-grid points, stage folding/bounds/saturation,
+  independent checkpoint/metric audit. Single exploratory case only.
+- Artifact key: `oasis_seed3_rank000_mrdbscp8421_selective_tanh_lambda1151_v1`.
+- Spec/log: `experiments/2026-10-13_oasis_selective_bounded/`.
+- Status: all29 unit/regression tests passed, including unbounded checkpoint
+  preservation and native loss parity. All three full-size four-stage smokes
+  passed; peak2.678GiB, admission8GiB. Production cleared sequentially onGPU3.
+- All three fresh registrations completed without failures/retries; report
+  accepted after common-prefix checks. Independent replay passed2026-10-14
+  00:08:23UTC: all12 stage reconstructions/losses/35-label metrics/corner audits,
+  same100k off-grid probes, unchanged source/reference/report hashes. Common
+  prefixes are byte-identical;128-point gradient checks max error<2.789e-9.
+  Optimization66.47/64.50/64.73s; worker124.71/125.38/117.30s.
+- Last1/last2/last3 Dice0.789160/0.801810/0.792172; HD952.113888/1.975920/
+  2.023935mm; ASD0.466397/0.422405/0.448346mm. Foreground SDlogJ0.610573/
+  0.668009/0.562964, folding1.021628/1.621929/0.378766%.
+- Last2 improves all three rank0 accuracy metrics versus VFA/SITReg but not
+  folding. Last3 improves all five metrics versus last1 on this case. More
+  final bounded stages do not monotonically reduce measured folding; early
+  unbounded maps are already folded. P64 all-bounded retains0% at lower Dice.
+
+### P65: Rank0 Cps16 Extension of Bounded Compositional B-Splines
+
+- Approved one fresh cps16/8/4/2/1 identity-initialized registration, one
+  bounded increment each, lambda[1,1,1,5,1]. Preserve P64's downstream stages.
+- Loss pyramid8/4/2/1/1, normalized latent LR0.03/0.03/0.01/0.003/0.001;
+  NCC9 and evaluation-grid total-field diffusion unchanged. Only final cps1
+  permits two LR halvings; no reused prefix or accumulated-map resampling.
+- Separate numerical adapter, actual-kernel FP64 cps16 bound,0.99 margin,
+  unit initial tanh derivative; five saved constituent maps and final DVF.
+- GPU3 sequential smoke/production, UID:GID1009:1020, memory8GiB or
+  smoke peak+2GiB. Preserve failures and other jobs; no scope expansion.
+- Compare P64 bounded8421, P63 unbounded, P62 dense, original VFA/SITReg;
+  five metrics plus stage saturation, bounds, epochs, runtime and shared100k
+  off-grid probes. Single-case capacity/pyramid pilot, not a causal guarantee.
+- Artifact key: `oasis_seed3_rank000_mrdbscp168421_tanh_composed_lambda11151_v1`.
+- Spec/log: `experiments/2026-10-13_oasis_bounded_composed_cps16/`.
+- Status: all29 unit/regression tests passed including native loss parity.
+  Full-size five-stage smoke passed, peak2.832GiB and71.69s including metrics;
+  exact initialization,35 valid labels/stage and all topology checks passed.
+  One production fit completed without failures/retries, optimization66.85s,
+  complete worker123.18s, peak2.833GiB. Stop275/300/175/150/500, best final495.
+  Report accepted and independent replay passed2026-10-13 23:45:32UTC:
+  exact five-stage reconstruction, losses,35-label metrics, corner checks,
+  same100k off-grid probes and reference/source/report hashes; additional
+  128-point FP64 finite-difference gradient max error2.426e-9.
+- Rank0 Dice/HD95/ASD0.770576/2.379341/0.532366, FG SDlogJ0.506026,
+  folding0%. Relative to bounded P64, Dice-0.003493, HD95+0.154360mm,
+  ASD+0.035322mm: adding cps16 did not improve this case. Cps8 saturation
+  drops40.726% to35.302%, without an accuracy benefit. All atomic bounds<1;
+  retained/export shared100k probes both have zero nonpositive determinants.
+
+### P64: Rank0 Tanh-Bounded Compositional B-Splines
+
+- Approved one fresh identity-initialized cps8/4/2/1 run, one bounded increment
+  per stage, lambda[1,1,5,1]. No reuse of folded prefixes or extra sweep.
+- Sampling-aware FP64 bounds for native endpoint-aligned cubic samples,
+  multiplier0.99; scaled tanh retains normalized latent LR convention.
+  Retained pull composition Phi_previous o delta_new, not additive updates.
+- Existing NCC9/evaluation-grid total-field diffusion and adaptive schedules;
+  source/output isolation, full-cell-corner atomic checks and100k shared
+  off-grid probes for retained chain versus interpolated export.
+- GPU3, UID:GID1009:1020; tests and one-step-four-stage smoke gate production.
+  Existing jobs untouched; at least8GiB free or smoke peak+2GiB.
+- Artifact key: `oasis_seed3_rank000_mrdbscp8421_tanh_composed_lambda1151_v1`.
+- Spec/log: `experiments/2026-10-13_oasis_bounded_composed/`.
+- Status:23 unit/regression tests passed, native SITReg bounds independently
+  reproduced. Native-voxel component caps3.174971/1.554847/0.7128/0.3564 for
+  cps8/4/2/1. Full-size smoke passed all35 labels/stage, exact identity/native
+  loss parity, atomic contraction and100k off-grid checks. Peak2.678GiB,
+  memory gate8GiB. Production completed without failures/retries and passed
+  independent audit2026-10-13 16:26PDT, including exact four-stage checkpoint
+  reconstruction, losses, labels, topology, report hashes and off-grid replay.
+- Rank0 Dice/HD95/ASD0.774069/2.224981/0.497044; FG SDlogJ/folding
+  0.493470/0%. Folding falls from unbounded P63's3.718802%, but Dice
+  drops0.031294, HD95/ASD worsen0.241106/0.085058mm. Accuracy is not matched.
+- No nonpositive off-grid probes for either retained chain or interpolated
+  export; minimum determinants0.045250/0.045843. Atomic max derivative row
+  sums0.977792/0.984813/0.988912/0.989734. No general export guarantee.
+- Stop epochs400/200/150/500, best400/200/150/496, optimization63.29s,
+  worker109.82s. High coarse coefficient saturation is diagnostic, not proof
+  of the cause of accuracy loss. No additional capacity or tuning was run.
+
+### P63: Rank0 Cps1 B-Spline versus Dense after [1,1,5] Prefix
+
+- User requested one all-B-spline8→4→2→1 fit with stage weights[1,1,5,1],
+  compared against accepted P62 dense refinement on the same rank0 pair.
+- Reuse accepted P61 prefix, exact dyadic cps2→cps1 prolongation; change only
+  final representation. Preserve local squared NCC9, full-volume total-field
+  voxel finite-difference diffusion, normalized LR0.001 and adaptive2000/300
+  schedule. Explicitly no analytic B-spline regularizer or label supervision.
+- GPU3, UID:GID1009:1020, seed1/FP32/cuDNN F/T/TF32off. Existing jobs untouched.
+  Tests and one-step serialization/metric smoke gate production.
+- Same-case five-metric comparison plus prefix and original DL references;
+  exploratory n=1, no topology guarantee or across-case SD.
+- Artifact key: `oasis_seed3_rank000_mrdbscp8421_lambda1151_vs_dense_v1`.
+- Spec/log: `experiments/2026-10-13_oasis_cps2lambda5_cps1/`.
+- Status:19 tests passed; full-size one-step smoke passed canonical metrics
+  and native loss/gradient parity. Cps2 reconstruction is exact; prolongation
+  max/RMS error3.323e-6/1.664e-7 voxel. Initial total loss matches dense exactly.
+  Peak1.986GiB, free-memory gate4GiB. Production complete and independently
+  audited2026-10-13 15:42PDT: saved controls reconstruct the field exactly,
+  both variants' five metrics and35 per-label values reproduce, lowest-loss
+  checkpoint selection and all report hashes pass. No failures/retries.
+- Cps1 Dice/HD95/ASD0.805363/1.983874/0.411986 versus dense
+  0.804582/1.995025/0.411972. Accuracy is close, but folding rises from
+  3.695896% to3.718802% and FG SDlogJ from0.799019 to0.802908.
+  Cps1 stopped725/best719, optimization58.78s. No folding benefit on this case.
+
+### P62: Cps2 Lambda5 Prefix to Dense Diffusion Sweep
+
+- User requested70 fresh dense refinements on seed3 first10, dense lambda
+  0.1/0.2/0.5/1/2/5/10 after accepted P61 prefixes with weights[1,1,5].
+- Preserve native local squared NCC9, total-field voxel diffusion, raw inputs,
+  normalized dense LR0.001 and2000/300 adaptive schedule with two LR halvings.
+  Fresh Adam, seed1, FP32, cuDNN F/T, TF32off; no cps1 controls or label loss.
+- Separate runner validates P61 stage weights/checksums and exact dense cloning;
+  tests and rank0 one-step0.1/10 smokes gate production. GPUs0/1/3 one worker
+  each, memory gated, UID:GID1009:1020;GPU2/existing jobs untouched.
+- Report seven weights, unrefined[1,1,5], original VFA/SITReg/FeDDA, five
+  accuracy/regularity metrics and sample SD, plus paired differences against
+  the previous[1,1,1] dense sweep at six shared weights. Exploratory tuning.
+- Artifact key: `oasis_seed3_first10_mrdbscp842_prefix115_dense_lambda_sweep_v1`.
+- Spec/log: `experiments/2026-10-13_oasis_cps2lambda5_dense/`.
+- Status: all70 fits accepted2026-10-13 15:15:01PDT; no failures/retries.
+  All20 unit/legacy tests and both smokes passed, exact reconstruction/clone
+  and native loss/gradient parity. Peak1.638GiB; free-memory gate4GiB.
+- Dense lambda0.5 wins all three mean accuracy metrics:
+  Dice/HD95/ASD0.834955/1.681926/0.331114, FG SDlogJ/folding0.819045/3.879464%.
+  Compared with P60 at the same dense weight, Dice changes-0.000817 while
+  HD95/ASD improve0.056620/0.003405mm and folding drops0.583381 percentage
+  points. All six shared weights reduce folding, but DL regularity is not
+  matched at the accuracy-selected point. Independent110-row report and
+  60 paired-comparison checks passed. Mean optimization/worker52.38/68.91s.
+
+### P61: Fixed cps8/cps4 Lambda1 to Cps2 Diffusion Sweep
+
+- User approved 60 fresh cps2 fits: seed3 shuffled first10 × lambda
+  0.1/0.2/0.5/1/2/5. Reuse identical saved lambda1 cps8/cps4 stages only;
+  initialize cps2 by exact dyadic knot insertion from stage1/best.pt.
+- No dense/cps1 refinement. Unchanged local squared NCC9, unmasked
+  evaluation-grid voxel diffusion; normalized cps2 LR0.003, max/min1300/130,
+  patience50, median/check25, no LR halving, lowest-total-loss checkpoint.
+- Separate runner preserves all historical sources and outputs. Four new
+  unit tests passed; rank0 one-step0.1/5 smokes gate production. GPUs0/1/3,
+  one worker each with memory gate; UID:GID1009:1020, GPU2 untouched.
+- Report six settings versus original842lambda1 and original VFA/SITReg/
+  FeDDA: five accuracy/regularity metrics, mean/sample SD, paired deltas,
+  historical lambda1 reproducibility, stopping/runtime and full provenance.
+- Artifact key: `oasis_seed3_first10_mrdbscp84_prefixlambda1_cps2_lambda_sweep_v1`.
+- Spec/log: `experiments/2026-10-13_oasis_fixed_prefix_cps2/`.
+- Status: all60 fits accepted 2026-10-13 14:31:07 PDT; no failures/retries.
+  All20 unit/legacy tests and both rank0 smokes passed. Prolongation error
+  <5e-6 voxel; native loss/gradient parity exact. Peak1.461GiB; gate4GiB.
+- Cps2lambda0.5 wins mean Dice/ASD (0.829577/0.350710 mm); lambda1 wins
+  HD95 (1.787126 mm). Lambda0.5 folding is5.217171%, versuslambda1 3.676989%.
+  All ten freshlambda1 field hashes and metrics reproduce original842 exactly.
+  Mean cps2 optimization/total worker time25.88/39.56s; independent report,
+  per-label, sample-SD, paired-delta and fixed-prefix checks passed.
+
+### P60: Fixed Lambda1 MR-D-BSCP Prefix to Dense Diffusion Sweep
+
+- User approved60 fresh dense fits: seed3 shuffled first10 × dense lambda
+  0.1/0.2/0.5/1/2/5. Each reuses its identical accepted pyramid cps8/4/2
+  prefix withlambda1 at every prefix stage. Historical dense lambda1 is a
+  reproducibility reference only, not reused as a new result.
+- Retain local squared NCC9, unmasked total-field voxel diffusion, normalized
+  LR0.001, seed1, FP32, cuDNN F/T and TF32off; dense2000/300, window/check25,
+  patience100, two LR halvings, lowest-total-loss state including initialization.
+- Separate runner preserves historical source/output hashes. Tests and rank0
+  one-step0.1/5 smokes gate production. GPUs0/1/3, one new worker each, memory
+  gated; existing jobs andGPU2 untouched. UID:GID1009:1020.
+- Report six weights, prefix and original VFA/SITReg/FeDDA on the same10 cases:
+  Dice/HD95/symmetric ASD and foreground SDlogJ/folding, mean/sample SD,
+  paired changes, stage/runtime diagnostics and old/newlambda1 differences.
+- Status: all 60 fresh fits accepted 2026-10-13 13:23:32 PDT, with zero
+  failures/retries. All 21 CPU tests and both native-geometry smokes passed;
+  exact prefix reconstruction/clone and NCC/diffusion value/gradient parity.
+  Peak tensor allocation was 1.638 GiB; the admission gate remained 4 GiB.
+- Dense lambda0.5 wins mean Dice/ASD (0.835772/0.334519 mm); lambda1 wins
+  mean HD95 (1.734039 mm) among the dense weights. Lambda5 reduces foreground
+  folding to 0.682494%, still above original VFA/SITReg, with lower Dice.
+  All ten fresh lambda1 DVF hashes and five metrics match historical outputs.
+  Independent report-hash, sample-SD, label-mean, and paired-difference checks
+  passed. Mean dense optimization/total worker time was 43.97/61.35 seconds.
+- Artifact key:`oasis_seed3_first10_mrdbscp842_prefixlambda1_dense_lambda_sweep_v1`.
+- Spec/log:`experiments/2026-10-13_oasis_fixed_prefix_dense/`.
+
+### P59: SITReg squared GNCC after checkpoint-faithful FeDDA recovery
+
+- Status: recovery launched 2026-10-13 01:43:10 PDT (08:43:10 UTC).
+  Persistent queue PID 102712; FeDDA controller PID 102802 and workers
+  102805/102810/102813/102816 on GPUs 0/1/2/3. All four exact checkpoint/RNG/
+  iterator gates passed; finite resumed updates and historical pair IDs verified.
+  Automatic SITReg launch requires all four P58 recovered trainings and
+  first100 evaluations plus the final report.
+- Recover P58 from epochs 103/120/118/120 on GPUs 0/1/2/3 into distinct
+  `_recovery_v1` directories; preserve failed sources/artifacts. Freeze repo
+  runtime sources and recover an exact historical trailing newline. Validate
+  saved Adam/RNG state and persistent shuffled iterator before continuing.
+- New SITReg GNCC² at 0.1/exact 1over3/1/3 on GPUs 0/1/2/3, seed42,
+  200 epochs, 10,000 joint bidirectional AMSGrad updates, LR1e-4 and native
+  diffusion. Only signed GNCC becomes squared GNCC. Native backend retained.
+- Full strict native/reference preflight, automatic 400-case detailed evaluation,
+  14,000 label records and three-loss comparison/2x3 ARC. No test-based checkpoint
+  selection, no reference retraining, no changes to other GPU jobs.
+- Spec/log: `experiments/2026-10-13_gncc2_recovery_and_sitreg/`.
+- Queue key: `oasis_gncc2_recovery_then_sitreg_v1`.
+- SITReg run/report key: `oasis_sitreg_gncc2_diffusion_training_lambda_sweep_v1`.
+
 ### P58: FeDDA squared global NCC training lambda sweep
+
+- Recovery note 2026-10-13: original jobs stopped on a hash guard after one
+  trailing blank line was removed from the evaluator during a source commit.
+  Checkpoints are intact. User approved isolated-source recovery and subsequent
+  SITReg GNCC²; see P59. Original failed artifacts remain immutable.
 
 - Status: production launched 2026-10-12 17:05:11 PDT
   (2026-10-13 00:05:11 UTC); controller PID 96452, workers on GPUs 0/1/2/3.
