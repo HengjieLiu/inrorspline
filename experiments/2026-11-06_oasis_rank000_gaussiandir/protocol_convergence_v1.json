@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "base_protocol": "experiments/2026-11-06_oasis_rank000_gaussiandir/protocol_v1.json",
+  "experiment": "oasis_rank000_gaussiandir_convergence_v1",
+  "budgets": [200, 500, 2000],
+  "timing_repeats": 3,
+  "registration_seconds_limit": 1200,
+  "checkpoint_steps": [0, 25, 50, 100, 200, 500, 1000, 2000],
+  "refinement": {
+    "lr_factor": 0.1,
+    "warmup_steps": 50,
+    "monitor_interval": 100,
+    "window_steps": 500,
+    "checkpoint_interval": 500,
+    "relative_tolerance": 0.0001,
+    "field_rms_tolerance_mm": 0.01,
+    "max_reductions": 4,
+    "minimum_reductions": 2,
+    "monitor_batches": 16,
+    "monitor_seed": 602001,
+    "probe_points": 8192,
+    "probe_seed": 602002,
+    "population": "frozen",
+    "optimizer": "fresh_Adam_joint_all_scales"
+  },
+  "memory_sampling_seconds": 0.1,
+  "export_reserve_multiplier": 1.25,
+  "minimum_free_gpu_mib": 8192,
+  "status": "user_approved_paper_loss_first_LNCC_deferred"
+}
