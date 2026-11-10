@@ -16,3 +16,6 @@
 [submodule "external/ptvreg-python"]
 	path = external/ptvreg-python
 	url = https://github.com/oazeybekoglu/ptvreg-python
+[submodule "external/GaussianDIR"]
+	path = external/GaussianDIR
+	url = https://github.com/MedAPT-group/GaussianDIR
