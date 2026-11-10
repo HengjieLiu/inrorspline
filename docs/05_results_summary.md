@@ -7,6 +7,108 @@ status: active_draft
 
 This repo carries audited generated results together with planning reports.
 
+## GaussianDIR rank-0 fitting and registration (P83, 2026-11-06)
+
+All four independent endpoints completed2,000 steps on fixed0333/moving0115,
+with no timeout/failure. The saved original SITReg lambda1 reference was replayed
+with identical full-box evaluation; all35 labels are eligible in all six rows.
+
+| Endpoint | Dice | HD95 mm | ASD mm | FG folds % | FG SDlogJ |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Saved SITReg |0.798719|2.061319|0.423064|0.000696944|0.625268|
+| Released control, field fit |0.763342|2.123592|0.525050|0.106958|0.534635|
+| Corrected paper reconstruction, field fit |0.780445|2.133154|0.477155|0.151887|0.584721|
+| Released control, image registration |0.749593|2.572788|0.619833|4.092272|0.747576|
+| Corrected paper reconstruction, image registration |0.767602|2.201555|0.554596|1.745195|0.572438|
+
+- Fixed-population full-box MSE fitting achieves vector RMSE0.372129mm for
+  the control and0.240210mm for the corrected model; foreground RMSE is
+  0.655807/0.420567mm. Stored per-pair parameter counts are82,593/1,914,438.
+  Better field agreement does not preserve source Dice or folding. No
+  regularizer or anatomical loss was used in fitting; these are achieved fits.
+- Independent image registration uses native signed NCC/TV at lambda8, with
+  variant-specific reductions/adaptation and no SITReg/label optimization.
+  Corrected Dice/HD95/ASD and folding improve over the released control, but
+  remain worse than SITReg. Corrected positive-J SDlogJ is lower than SITReg,
+  while its folding is much higher; no single regularity metric is sufficient.
+  Corrected whole-box NDV fraction/BE are also higher than the release despite
+  better foreground NDV/BE; do not claim uniform regularity improvement.
+- The corrected model uses anisotropic/local-rigid primitives and an explicitly
+  reconstructed frozen-coarse/fine residual scheme. Capacity, loss normalization
+  and adaptive optimization differ from the control. These results do not isolate
+  the effect of any one feature or establish a population-level advantage.
+- Thirteen numerical/native/continuation tests, four native-volume smokes,
+  historical metric replay, exact scale-transition preservation and zero
+  checkpoint replay discrepancies passed. All generated metrics/figures/reports
+  remain external under
+  `${ARTIFACT_ROOT}/repo_experiments/oasis_rank000_gaussiandir_v1/pilot_20261106_v1/review_v2/`.
+  The complete scalar/per-label tables include image metrics, full/foreground
+  diffusion/BE/NDV/Jacobian metrics and field/Jacobian fidelity. Source/protocol:
+  [P83 experiment](../experiments/2026-11-06_oasis_rank000_gaussiandir/README.md).
+
+### GaussianDIR paper-loss convergence and resource follow-up
+
+The follow-up used sampled signed NCC + TV at journal lambda 8 on the same
+fixed0333/moving0115 pair. It compared the unchanged released control with the
+corrected two-scale paper reconstruction. Three same-seed fresh runs per short
+schedule measured runtime variation; they are not independent scientific
+replicates. Both extended trajectories reached the 20-minute ceiling without
+meeting the prespecified operational-plateau rule.
+
+| Variant | 200-step latency s | 500-step latency s | 2,000-step latency s | 20-min selected checkpoint |
+| --- | ---: | ---: | ---: | ---: |
+| Released control | 4.206 ± 1.318 | 7.220 ± 1.035 | 24.049 ± 0.618 | step 110,300; Dice 0.767119 |
+| Corrected reconstruction | 10.519 ± 1.418 | 17.647 ± 1.488 | 53.841 ± 1.342 | step 31,400; Dice 0.785612 |
+
+The selected trajectory Dice changes from the respective 2,000-step anchors
+(0.749593 control; 0.767602 corrected) are +0.017527 and +0.018009. Both
+outcomes are `convergence_unresolved_at_time_limit` after 1,199.177 s and
+1,198.516 s, with zero operation-level overshoot. These results show useful
+improvement during the charged trajectories, but do not establish convergence
+or a global optimum. SITReg Dice is 0.798719; no SITReg inference timing was
+measured.
+
+| Variant | Optimization Torch peak alloc/reserved MiB | Output Torch peak alloc/reserved MiB | Process GPU peak MiB |
+| --- | ---: | ---: | ---: |
+| Released control trajectory | 217.4 / 272.0 | 144.4 / 272.0 | 786 |
+| Corrected reconstruction trajectory | 260.7 / 292.0 | 184.1 / 292.0 | 804 |
+
+Runtime and memory boundaries, startup latency, all35-label accuracy, full and
+foreground Jacobian/diffusion/BE/NDV metrics, per-run traces, exact-field aliases
+and posthoc PID-attribution limits are documented in the external report:
+`${ARTIFACT_ROOT}/repo_experiments/oasis_rank000_gaussiandir_convergence_v1/execution_20261106_v1/report_v1/report.md`.
+It includes312 distinct scoring outputs plus14 byte-identical field aliases,
+11,480 per-label rows and an executed external notebook with four inline plots.
+Registration memory attribution is intact; concurrent posthoc NVML peaks could
+not be separated by PID in the container namespace, while per-evaluation Torch
+memory remains available. LNCC²/diffusion stays deferred.
+
+## OASIS adaptive local-affine field fitting (P81, 2026-11-05)
+
+- Compute execution finished08:50:14PST:1680/1680 jobs,2640 endpoint records,
+  no runtime failures/OOM retries;7.53hours elapsed. Numerical protocolv1.3.
+  The external first review is under
+  `runs/oasis_seed3_first10_adaptive_local_affine_fieldfit_v1/execution_20261105_v3/reports/completed_review_v1/`.
+  Its source is in `experiments/2026-11-05_oasis_adaptive_local_affine_fieldfit/`.
+- Under the3072-parameter cap, achieved mean foreground vector RMSE is1.7087mm
+  for adaptive-affine D0 and1.7147mm for adaptive-translation D0; uniform
+  counterparts are1.9058/1.9787mm. Both adaptive families improve on all40
+  source/pair fields. Those fields are four sources on ten repeatedly explored
+  pairs, not40 independent samples. Slightly different actual dictionary
+  parameter counts are retained in the report.
+- Zero-start SVF adaptive translation achieves1.8558mm versus2.0430mm for
+  adaptive affine; both have zero sampled foreground folding in these40 fields.
+  Mean paired-label Dice is0.7212 for adaptive-translation SVF,0.6971 for its
+  D0 counterpart and0.6757 for adaptive-affine D0, versus0.8218 for the source
+  fields. Current compressed fits do not preserve source registration accuracy.
+- These are achieved fixed-budget fits.575/840 main D0 solves remain unresolved,
+  including every largest-budget D0 row; all1680 main SVF final stages reached
+  iteration limits. Do not interpret the errors as certified capacity optima or
+  attribute differences exclusively to affine structure or flow constraints.
+  All1696 SVF main/replay fields pass the existing foreground integration check;
+  no whole-box guarantee follows. The scientific study remains incomplete
+  pending convergence disposition, spatial diagnostics and final figures/notebook.
+
 ## First100 three-family B-spline842 sweep (2026-10-16 local, P79)
 
 - Accepted2100 registrations:700 each for prolonged displacement, bounded

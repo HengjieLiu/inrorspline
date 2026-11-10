@@ -5,6 +5,181 @@ status: active
 
 # Experiment Registry
 
+### P83: OASIS Rank0 GaussianDIR Paper/Code Audit, Pilot and Convergence Study
+
+- Completed paper-loss follow-up: sampled signed NCC+TV lambda8, fresh200/500/2000
+  schedules with three same-seed timing repeats, one startup measurement and one
+  joint convergence trajectory per variant. Maximum1200s including monitoring
+  and usable outputs. Phase wall/CUDA timing and Torch/NVML memory on one idle
+  GPU. Spec: `experiments/2026-11-06_oasis_rank000_gaussiandir/convergence_spec.md`.
+  Artifact key: `oasis_rank000_gaussiandir_convergence_v1`, execution
+  `execution_20261106_v1`; 312 distinct exports/checkpoints and14 exact-field
+  aliases scored, all35 labels eligible. Full report, tables, figures and executed
+  notebook are under `${ARTIFACT_ROOT}/repo_experiments/oasis_rank000_gaussiandir_convergence_v1/execution_20261106_v1/report_v1/`.
+- Both trajectories stopped at the1200s ceiling with
+  `convergence_unresolved_at_time_limit`, zero operation overshoot and four LR
+  reductions. Control:111,500 updates, selected step110,300, Dice0.767119
+  (+0.017527 vs the2,000-step anchor). Corrected reconstruction:31,500 updates,
+  selected step31,400, Dice0.785612 (+0.018009). Neither met the plateau rule.
+- Mean usable-output latencies (± sample SD) for200/500/2,000-step schedules:
+  control4.206±1.318 /7.220±1.035 /24.049±0.618s; corrected reconstruction
+  10.519±1.418 /17.647±1.488 /53.841±1.342s. The1200-second trajectories
+  improve selected Dice over anchors but do not establish convergence. The
+  saved SITReg reference is accuracy-only; no SITReg inference time is claimed.
+- Convergence peak GPU memory (Torch allocated/reserved; sampled NVML process):
+  control217.4/272.0MiB optimization,144.4/272.0MiB output,786MiB process;
+  corrected260.7/292.0MiB optimization,184.1/292.0MiB output,804MiB process.
+  Posthoc scorer PID peaks are unavailable under the container PID namespace;
+  per-evaluation Torch peaks remain reported. Registration ran sequentially on
+  an otherwise idle RTX6000 Ada with benchmarkFalse/deterministicTrue/TF32False.
+- Deferred by user2026-11-06: two fresh identity-start unsupervised variants
+  using P43-style1-LNCC9² plus unmasked total-voxel forward-valid diffusion,
+  lambda1.128 uniformly sampled complete windows and5,000 valid edges per axis
+  estimate the full-volume loss; exact final dense loss is separately evaluated.
+  Existing geometry/population rules,2,000-step budgets and1,200-second watchdog
+  remain. Prototype loss/gradient tests and two native smokes passed; no full
+  standardized-loss runs. Source spec:
+  `experiments/2026-11-06_oasis_rank000_gaussiandir/lncc_diffusion_spec.md`;
+  new external artifact key `oasis_rank000_gaussiandir_lncc9_diffusion_v1`.
+
+- Status2026-11-06: user selected released control plus corrected paper model,
+  1,000-step coarse/frozen-coarse+1,000-step fine residual with literal total
+  domain/8 then domain/4 caps, and full-box MSE with fixed populations for fitting.
+  Four independent anchors completed2026-11-06T20:35:53Z in
+  `pilot_20261106_v1`, sequential GPU0, supervised before image registration.
+  All reached2,000 steps; no failures/timeouts,35 eligible labels per row,
+  zero checkpoint-replay error and exact paper-stage transition preservation.
+  Registration uses adaptive density and journal lambda8; all endpoints use
+  2,000 total steps with a1,200-second active watchdog and explicit timeout status.
+- Seed3 shuffled rank0, fixed0333/moving0115. Supervised target is the original
+  historical SITReg lambda1 field already used by P81/P82; original and canonical
+  field hashes reverified. Full-box physical-mm fit, followed by
+  independent image-only registration from identity and common accuracy/regularity.
+- Upstream submodule `external/GaussianDIR` pinned at
+  `b19987b81d1f3d172d882f1375a27d3b2ade307e`, unchanged. Released defaults are
+  single-scale isotropic/translation; full paper and released model differ.
+  Optional rigid forward/gradient discrepancies and adaptation defects documented.
+- Eleven initial characterization checks and13 mathematical/native/continuation
+  tests passed. All four full-volume resource smokes passed, including adaptive
+  population events and exact coarse/fine and checkpoint field preservation.
+  SITReg historical Dice/HD95/ASD/folds replay exactly; SDlogJ error<8e-11.
+  Isolated Python3.10/PyTorch2.4.1+cu118/PyTorch3D0.7.8; base environment unchanged.
+- Spec/log: `experiments/2026-11-06_oasis_rank000_gaussiandir/`.
+  Durable reference: `docs/implementation/gaussiandir_paper_code_audit.md`.
+  Audit source: `scripts/experiments/gaussiandir/audit_upstream.py`.
+  External run/review key: `oasis_rank000_gaussiandir_v1`.
+- Requested/effective backend: cuDNN benchmarkFalse/deterministicTrue, TF32False;
+  source/config/input/runtime snapshots and all artifacts external. Single-case
+  exploratory interpretation.
+- Fit full-box RMSE: control0.372129mm, corrected0.240210mm. Image-registration
+  Dice:0.749593/0.767602 versus SITReg0.798719; FG folds4.09227%/1.74520%
+  versus0.000696944%. All accuracy/regularity fields and exclusions are in the
+  external `repo_experiments/oasis_rank000_gaussiandir_v1/pilot_20261106_v1/review_v2/`.
+  The corrected model improves this registration anchor over the release, but
+  does not match SITReg accuracy/folding. Capacity/loss/optimization differ.
+
+### P82: OASIS Rank0 Full-Box Parameter Scaling, Native vs Multiresolution
+
+- Launched2026-11-05 22:43:11PST (2026-11-06T06:43:11Z), execution
+  `execution_20261106T0644Z`. Initial queue20running/148pending on GPUs0/1/2/3
+  with8/4/4/4workers respectively, independently admitted by available memory.
+  All14 unit contracts,10 native operator profiles (including dense-sized
+  fixed grids), two native worker smokes and external notebook execution passed.
+  Original cps2 replay has exactly zero normalized-field discrepancy and
+  physical vector RMSE7.0018e-16mm. This is a reconstruction control only.
+  Source/configuration receipts are frozen; full168-point results remain pending.
+- Seed3 rank0 fixed0333/moving0115; immutable original SITReg and unbounded842
+  lambda1 saved endpoint fields. Full-box physical-mm supervised direct-DVF
+  fitting only; no image registration, SVF, labels or regularizer in the loss.
+- Seven P81 mathematical families x six caps3072/24576/196608/1572864/
+  12582912/20643840 x two targets x two independent execution arms =168 points.
+  Native versus joint quarter/half/native model-and-target refinement; matched
+  final grid dictionaries and tree leaf counts, actual-parameter curve abscissa.
+-1200-second active cap includes growth, conditioning and transfer. Joint
+  stages use cumulative120/360/1200seconds. Exact B-spline knot insertion,
+  <=60-second Gaussian projection, field-preserving tree splits. No borrowed
+  lower-budget work. Full-box float64 LSQR, exact operators, no tail pruning.
+- Resource/convergence limits are explicit endpoint outcomes. GPU0/1 max16,
+  GPU2/3 max4; memory admission,60-second polling, cross-GPU OOM requeue with
+  cumulative timing. Native cps2 replay and mathematical/native smoke gates.
+- Spec/config/log/notebook: `experiments/2026-11-05_oasis_rank000_fieldfit_parameter_scaling/`.
+  Source: `scripts/experiments/oasis_fieldfit_scaling/`.
+  External artifact key:`oasis_rank000_fieldfit_parameter_scaling_v1`.
+
+### P81: OASIS Seed-3 First10 Adaptive Local-Affine Field Fitting
+
+- Execution completed2026-11-05T16:50:14Z (08:50:14PST):1680/1680 jobs,
+  2640 endpoint records, no runtime failures/OOM retries,7.53hours elapsed.
+  First metadata/coverage/paired-error review: external
+  `execution_20261105_v3/reports/completed_review_v1/`; source in experiment folder.
+  Scientific completion remains open:575/840 main D0 solves unresolved;
+  all1680 main SVF final stages reached their fixed iteration budgets.
+  Achieved cap3072 mean foreground RMSE: adaptive-affine D0 1.7087mm,
+  adaptive-translation D0 1.7147mm; adaptive-translation zero-init SVF1.8558mm.
+  Four source fields per each of ten repeated pairs; no independent-n40 claim.
+  All1696 SVF main/replay endpoints pass the existing foreground integration
+  sensitivity check; full-box accuracy is not implied. All32 D1 certificates
+  satisfy0.9. Final mechanism analyses/convergence disposition remain pending.
+
+- Runtime continuation authorized2026-11-05: GPU0/1 max16 each, GPU2/3 max4
+  each; one shared queue, independent memory tiers16/8/4/2/1,60-second polling,
+  and automatic CUDA OOM requeue with increased reservation/cooldown.
+  Scientific protocolv1.3 and completed results remain unchanged. See
+  `experiments/2026-11-05_oasis_adaptive_local_affine_fieldfit/scheduler_v1.md`.
+  This supersedes the GPU0-only/max8/no-retry runtime policy below.
+  Activated around10:26:55UTC/02:26:55PST after94 CPU tests and four native GPU
+  smokes passed. Preserved93 completed jobs and adopted eight active workers;
+  no worker was stopped. New controller immediately used GPUs2/3 while GPU1
+  was externally occupied. Original scientific-source hashes remain unchanged.
+
+- Launch history: v3 started2026-11-05T09:18:25Z (01:18:25PST), physicalGPU0.
+  Initial verified snapshot8live workers/1672pending/0failures/no warning;
+  source hashes match.76CPU tests,17native profiles and3worker smokes
+  (7endpoints) passed, plus independent foreground-scoped multistep review.
+  v2 stopped after conditioning failure with artifacts retained; original,
+  v1.1/v1.2 plans preserved. Protocolv1.3; completion status and results are
+  summarized in the preceding bullets.
+- User-confirmed targets: same shuffled seed3 ranks0–9, original SITReg and
+  8→4→2 lambda1 prolonged unbounded DVF, bounded-two-per-level (six retained
+  maps), refined single-SVF with velocity diffusion.40 existing fields located.
+- Main study: seven D0 basis/adaptation families × three motion-parameter caps
+  768/1536/3072 ×40 targets =840 endpoints; fixed-geometry LS references.
+  Raw fixed-image-positive ROI, physical pullback endpoint loss, no labels or
+  image loss in fitting, no deformation regularizer. Source lambda is separate.
+- SVF: same840 target/family/budget configurations as D0, with zero/global_affine_ls initial
+  trials retained separately (1680 trial endpoints). D1:24 pilot configurations;
+  adaptive bidirectional topology replay adds24 configurations/32 trials.
+  Tree paths share budget checkpoints; total1680 queued worker jobs including
+  40 global-affine anchors and24 frozen-geometry solver diagnostics.
+  Supplementary same-K checkpoints cost separately.
+- Preconditions: immutable hash/coordinate/warp audit, mathematical checks,
+  native resource profiles and actual production-limit LS/multistep SVF pilot,
+  frozen resource/numerical settings. v1.3 shares32³ full-box feature RMS scales
+  with0.01 floor across LSQR and optimizers, retaining the foreground objective.
+  This changes numerical solution selection in ill-conditioned systems; it
+  neither adds regularization nor guarantees stable extrapolation. Divergent
+  nonlinear checkpoints fail explicitly and independent work continues.
+  All SVF families/replays share the same ROI-fitted12-parameter affine start,
+  embedded as velocity without a matrix logarithm. D0/D1 local LS is unchanged.
+  Corrected-scaling pilot still shows extreme ROI-exterior extrapolation and
+  unresolved higher-budget LS; no global magnitude or stability bound is claimed.
+  Both130-step SVF pilots improve fit but fail an exploratory full-box7/8
+  sensitivity threshold; frozen-coefficient review under the existing
+  foreground criterion passed, with exterior errors/raw failure retained.
+  Smooth OASIS fields are a hypothesis; saved reference folding and fitting
+  fidelity stay distinct.
+- PhysicalGPU0 only, memory-based admission, max8 concurrentjobs; per-job failure
+  ledger and continue-on-error, bounded watchdog/admission deadlines. Default
+  configured container identity; cuDNN benchmarkFalse/deterministicTrue, TF32off.
+  Runtime paths private, all generated outputs external. No historical
+  registration or training reruns. Repeatedly explored first10, not held-out.
+- Spec/log: `experiments/2026-11-05_oasis_adaptive_local_affine_fieldfit/`.
+- Analysis status: full fitting matrix defined; Taylor/derivative-variation,
+  transition maps, final paired statistics/figures/notebook remain explicit
+  pending work in `analysis_completion_ledger.md`. Queue completion is not
+  scientific completion; source-velocity replay remains conditional/unresolved.
+- Artifact key: `oasis_seed3_first10_adaptive_local_affine_fieldfit_v1`.
+
 ### P80: First100 Matched-Prefix B-spline8421 NCC9/Diffusion Sweep
 
 - Main release accepted2026-10-18 05:11:42UTC:2100/2100 independent outputs,

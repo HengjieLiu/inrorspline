@@ -18,6 +18,18 @@ definitions in `docs/03_methods.md`; keep run ledgers in
 
 ## Files
 
+- [GaussianDIR paper and code audit](gaussiandir_paper_code_audit.md): pinned
+  source, paper-revision differences, Gaussian blending, released defaults,
+  verified discrepancies, corrected two-scale adapter, SITReg geometry/metrics
+  and selected rank-0 fitting/registration protocols.
+
+- [OASIS rank0 parameter scaling](oasis_fieldfit_parameter_scaling.md): full-box
+  direct-DVF reconstruction, native versus joint multiresolution, exact scalable
+  operators and independent20-minute endpoint budgets.
+
+- [OASIS adaptive local-affine field fitting](oasis_polyaffine_fieldfit.md):
+  physical-coordinate dictionaries, tensor-separable native rendering, matched
+  D0/SVF capacity matrices, bounded-DVF diagnostics and GPU0 failure-tolerant queue.
 - [Matched-prefix cps8421 extension](bspline8421_matched_prefix.md): retained
   accepted842 prefixes, newcps1 optimization, scoped roundoff proof and paired-depth reports.
 - [First100 three-family B-spline842 extension](bspline842_first100.md):

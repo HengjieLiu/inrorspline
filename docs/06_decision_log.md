@@ -5,6 +5,36 @@ status: active
 
 # Decision Log
 
+## 2026-11-06: GaussianDIR Paper Loss First, Explicit Convergence and Latency
+
+The user approved sampled signed NCC/TV lambda8 before standardized LNCC²/diffusion.
+Retain2000-step anchors, three same-seed timing repeats of200/500/2000 schedules,
+one startup run and one1200-second continuation per variant. Continuation freezes
+populations, jointly unfreezes both corrected scales, and uses two fixed loss banks
+plus physical field-change checks for operational stopping. Unresolved time limits
+remain explicit. Separate optimization, monitoring, usable-output, setup and
+analysis/storage clocks; record phase Torch and sampled process GPU memory.
+The deferred loss prototype and all earlier results remain preserved. See
+[the execution specification](../experiments/2026-11-06_oasis_rank000_gaussiandir/convergence_spec.md).
+
+## 2026-11-06: Separate GaussianDIR Release Control From Paper Reconstruction
+
+Use both an unchanged-upstream isotropic/translation control with an explicitly
+documented stable-arithmetic adapter, and a local corrected anisotropic/rigid
+paper reconstruction. Do not call released defaults the complete paper model.
+The user selected1,000 coarse steps, frozen coarse plus1,000 fine residual steps,
+s8→s4 initialization, and literal TOTAL population caps domain/8→domain/4.
+The two-scale transition is an explicit reconstruction of unspecified details.
+
+Supervised fitting uses full-box physical-mm vector MSE, no regularizer and
+fixed populations with learnable geometry/motion. NCC-calibrated clone/prune
+thresholds are not transferred to MSE. Image registration independently starts
+from identity, uses images only and adaptive density, and is evaluated against
+the same original saved SITReg field with a shared full-box metric pipeline.
+Variant-specific loss reductions and adaptation rules remain visible; no isolated
+representation-effect claim follows from their comparison. Exact configuration
+and provenance are in [P83](../experiments/2026-11-06_oasis_rank000_gaussiandir/README.md).
+
 ## 2026-06-25: Promote `inrorspline` To Real Repo Root
 
 Decision:
