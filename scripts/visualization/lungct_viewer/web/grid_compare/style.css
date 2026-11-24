@@ -1,0 +1,42 @@
+.matrix {
+  grid-template-columns: 9.4rem repeat(5, minmax(0, 1fr));
+}
+.row-head {
+  font-size: 0.875rem;
+  display: block;
+  align-self: center;
+}
+.row-head small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.75rem;
+  margin-top: 0.35rem;
+}
+#spacing-mm,
+#cache-note {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+#grid-spacing {
+  width: 4.4rem;
+}
+#landmarks-panel {
+  min-height: 50vh;
+}
+.view {
+  aspect-ratio: 1.4;
+}
+.slice-control input {
+  min-width: 160px;
+}
+button:disabled,
+input:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+@media (max-width: 1100px) {
+  .matrix {
+    grid-template-columns: 8rem repeat(5, minmax(150px, 1fr));
+    min-width: 1000px;
+  }
+}

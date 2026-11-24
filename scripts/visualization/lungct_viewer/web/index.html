@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>DIR-Lab · Registration viewer</title>
+    <link rel="icon" href="data:," />
+    <script>
+      try {
+        document.documentElement.dataset.theme =
+          localStorage.getItem("dirlab-theme") === "light" ? "light" : "dark";
+      } catch {
+        document.documentElement.dataset.theme = "dark";
+      }
+    </script>
+    <link rel="stylesheet" href="/style.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/vendor/three.module.js",
+          "three/addons/controls/OrbitControls.js": "/vendor/OrbitControls.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <canvas id="renderer" aria-hidden="true"></canvas>
+    <header>
+      <div class="title">
+        <span class="mark">DIR</span>
+        <div>
+          <h1>Registration viewer</h1>
+          <p>DIR-Lab · paired lung CT</p>
+        </div>
+      </div>
+      <div class="case-controls">
+        <label
+          >Dataset<select id="dataset">
+            <option value="4dct">4DCT</option>
+            <option value="copd">COPD</option>
+          </select></label
+        >
+        <label>Case<select id="case"></select></label>
+        <button id="reload-case">Reload case</button>
+        <button id="theme-toggle" type="button" aria-pressed="false">
+          Light mode
+        </button>
+        <span id="status" role="status" aria-live="polite"
+          >Opening catalog…</span
+        >
+      </div>
+    </header>
+    <main>
+      <div id="loading" class="loading">
+        <span id="load-stage">Preparing viewer</span
+        ><progress id="progress" max="1" value="0"></progress>
+      </div>
+      <section class="toolbar shared">
+        <nav aria-label="Viewer panels">
+          <button id="tab-images" class="tab active">
+            Images & deformation</button
+          ><button id="tab-landmarks" class="tab">
+            Landmark correspondence
+          </button>
+        </nav>
+        <div class="method-controls">
+          <span class="control-caption">Method order</span>
+          <div id="methods"></div>
+        </div>
+        <div class="display-controls">
+          <label
+            >Level <input id="level" type="number" value="-600" step="50"
+          /></label>
+          <label
+            >Width
+            <input id="width" type="number" value="1500" min="1" step="100"
+          /></label>
+          <label class="check"
+            ><input id="anatomy" type="checkbox" checked /><i class="cyan"></i
+            >Anatomy</label
+          >
+          <label class="check"
+            ><input id="target" type="checkbox" checked /><i class="yellow"></i
+            >Fixed contour</label
+          >
+        </div>
+      </section>
+      <p id="case-note" class="case-note">
+        Select a case to begin. All views use physical millimetres.
+      </p>
+      <section id="images-panel" aria-label="Images and deformation">
+        <div class="toolbar image-tools">
+          <label class="slice-control"
+            >Coronal position
+            <input
+              id="slice"
+              type="range"
+              min="0"
+              max="100"
+              value="50" /><output id="slice-value"></output
+          ></label>
+          <label
+            >Difference ±HU
+            <input
+              id="diff-range"
+              type="number"
+              min="1"
+              value="1000"
+              step="100"
+          /></label>
+          <label
+            >Displacement ±mm
+            <input id="map-range" type="number" min=".1" value="50" step="5"
+          /></label>
+          <label
+            >Grid mm
+            <input id="grid-spacing" type="number" min="1" value="10" step="5"
+          /></label>
+        </div>
+        <div class="scales">
+          <span
+            ><i class="diverging"></i
+            ><span id="diff-legend">Signed difference</span></span
+          ><span
+            ><i class="diverging"></i
+            ><span id="map-legend"
+              >Magnitude and signed SI · shared scale</span
+            ></span
+          >
+        </div>
+        <div id="comparison" class="matrix"></div>
+        <p class="hint">
+          Scroll over an image to move every coronal view together. R = patient
+          right · L = patient left · S = superior · I = inferior. Signed SI
+          shows the fixed-to-moving pull offset, positive toward superior.
+        </p>
+      </section>
+      <section id="landmarks-panel" hidden aria-label="Landmark correspondence">
+        <div class="toolbar landmark-tools">
+          <label
+            >Lungs<select id="lung">
+              <option value="both">Both lungs</option>
+              <option value="left">Patient left</option>
+              <option value="right">Patient right</option>
+            </select></label
+          >
+          <label
+            >Order<select id="order">
+              <option value="superior">Superior position</option>
+              <option value="initial">Initial TRE</option>
+              <option value="mrdbscp">MR-D-BSCP TRE</option>
+              <option value="ptvreg">pTVReg TRE</option>
+              <option value="corrfield">CorrField TRE</option>
+              <option value="random">Random</option>
+            </select></label
+          >
+          <label
+            >Direction<select id="direction">
+              <option value="descending">Largest / most superior first</option>
+              <option value="ascending">Smallest / most inferior first</option>
+            </select></label
+          >
+          <button id="shuffle">Reshuffle</button>
+          <label
+            >View extent<select id="zoom">
+              <option value="0">Full crop</option>
+              <option value="10">10 × 10 × 10 mm</option>
+              <option value="20">20 × 20 × 20 mm</option>
+              <option value="50">50 × 50 × 50 mm</option>
+            </select></label
+          >
+          <label class="check"
+            ><input id="crosshair" type="checkbox" checked />Selected landmark
+            crosshair</label
+          >
+          <label class="check"
+            ><input id="targetPoint" type="checkbox" checked />Fixed target
+            marker</label
+          >
+        </div>
+        <div class="landmark-nav">
+          <button id="previous">Previous</button
+          ><input
+            id="landmark-slider"
+            aria-label="Landmark position"
+            type="range"
+            min="0"
+            max="299"
+            value="0"
+          /><button id="next">Next</button><output id="landmark-label"></output>
+        </div>
+        <p id="marker-legend" class="marker-legend">
+          <span
+            ><i class="crosshair-key" aria-hidden="true"></i>Cyan crosshair:
+            selected moving / transformed landmark.</span
+          >
+          <span
+            ><i class="yellow" aria-hidden="true"></i>Yellow ring: fixed target
+            projected onto the slice.</span
+          >
+          They coincide in the Fixed column. Elsewhere, the offset compares the
+          two positions.
+        </p>
+        <div class="cloud-tools">
+          <label class="check"
+            ><input id="link-cameras" type="checkbox" checked />Link 3D
+            cameras</label
+          ><button id="reset-cameras">Reset 3D views</button
+          ><span
+            >Drag to rotate · scroll to zoom · click a point to select</span
+          >
+        </div>
+        <div class="clouds">
+          <div id="cloud-moving" class="cloud">
+            <strong>Moving · 300 correspondences</strong>
+          </div>
+          <div id="cloud-fixed" class="cloud">
+            <strong>Fixed · 300 correspondences</strong>
+          </div>
+          <section id="tre-cdf" class="tre-cdf" aria-label="TRE cumulative distribution">
+            <strong>TRE cumulative distribution</strong>
+            <div class="cdf-controls">
+              <button class="cdf-full" aria-pressed="true">Full range</button>
+              <button class="cdf-zoom" aria-pressed="false">0–6 mm</button>
+              <label>Max mm <input type="number" min="0.01" step="any" value="1" aria-label="TRE plot maximum in mm" /></label>
+            </div>
+            <div class="cdf-legend" aria-label="TRE method colors"></div>
+            <svg viewBox="0 0 640 252" role="img" aria-label="Percentage of selected landmarks with TRE at or below each distance tolerance"></svg>
+            <output class="cdf-readout"></output>
+          </section>
+        </div>
+        <div id="mpr" class="matrix"></div>
+        <div
+          id="landmark-controls-bottom"
+          class="landmark-controls-bottom"
+          role="group"
+          aria-label="Landmark controls below images"
+        >
+          <div class="landmark-nav">
+            <button id="previous-bottom">Previous</button>
+            <input
+              id="landmark-slider-bottom"
+              aria-label="Landmark position below images"
+              type="range"
+              min="0"
+              max="299"
+              value="0"
+            />
+            <button id="next-bottom">Next</button>
+            <output id="landmark-label-bottom"></output>
+          </div>
+        </div>
+        <p class="hint">
+          Crosshairs locate the selected landmark; the yellow ring is a separate
+          fixed target. TRE values and sorting use the audited native snap
+          endpoint. Marker gaps use continuous inverse coordinates and need not
+          equal the reported TRE.
+        </p>
+      </section>
+      <footer>
+        <span id="memory">No case loaded</span
+        ><span>One case · two panels · common physical geometry</span>
+      </footer>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
