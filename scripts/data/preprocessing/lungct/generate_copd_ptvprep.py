@@ -40,6 +40,8 @@ from generate_4dct_ptvprep import (  # noqa: E402
     resize_image_trilinear_zyx,
     resize_mask_nearest_zyx,
     save_case_arrays,
+    select_crop_bounds,
+    require_fresh_case,
     task4_legacy_crop_bounds_zyx_from_landmarks_xyz,
     transform_landmarks_crop_to_registration,
     transform_landmarks_native0_to_crop,
@@ -54,6 +56,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--case-ids", type=str, default="1-10")
     parser.add_argument("--modelname", type=str, default="R231")
     parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
+    parser.add_argument("--crop-convention", choices=["corrected", "legacy"], default="legacy")
+    parser.add_argument("--save-hu", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
 
@@ -66,6 +70,8 @@ def load_binary_mask(mask_root: Path, case_id: int, phase: str, modelname: str) 
 
 
 def process_case(case_id: int, args: argparse.Namespace, device: torch.device) -> Dict[str, object]:
+    case_dir = args.out_root / "COPD" / f"case{case_id:02d}"
+    require_fresh_case(case_dir)
     case = resolve_copd_case(case_id, args.data_root)
     if case.status != "complete":
         raise RuntimeError(f"COPD case {case_id} is {case.status}; notes={case.notes}")
@@ -77,7 +83,8 @@ def process_case(case_id: int, args: argparse.Namespace, device: torch.device) -
 
     ptvreg_formula_bounds = ptvreg_crop_bounds_zyx_from_landmarks_xyz(fixed_xyz, moving_xyz, case.shape_zyx)
     legacy_bounds = task4_legacy_crop_bounds_zyx_from_landmarks_xyz(fixed_xyz, moving_xyz, case.shape_zyx)
-    crop_bounds = legacy_bounds
+    convention = getattr(args, "crop_convention", "legacy")
+    crop_bounds = select_crop_bounds(ptvreg_formula_bounds, legacy_bounds, convention)
     crop_shape = tuple((crop_bounds[:, 1] - crop_bounds[:, 0] + 1).astype(int).tolist())
     spacing = tuple(float(v) for v in case.spacing_zyx)
     reg_shape = tuple(np.rint(np.asarray(crop_shape, dtype=np.float64) * np.asarray(spacing)).astype(int).tolist())
@@ -132,6 +139,11 @@ def process_case(case_id: int, args: argparse.Namespace, device: torch.device) -
         },
         args.overwrite,
     )
+    if getattr(args, "save_hu", False):
+        paths.update(save_case_arrays(case_dir, {
+            "fixed_iBH_reg1mm_hu_zyx": resize_image_trilinear_zyx(crop_zyx(fixed_raw, crop_bounds) - 1024.0, reg_shape, device),
+            "moving_eBH_reg1mm_hu_zyx": resize_image_trilinear_zyx(crop_zyx(moving_raw, crop_bounds) - 1024.0, reg_shape, device),
+        }, False))
 
     verification = {
         "fixed_crop_landmarks_inside": points_inside_shape(fixed_crop_zyx, crop_shape),
@@ -157,7 +169,8 @@ def process_case(case_id: int, args: argparse.Namespace, device: torch.device) -
     )
 
     row: Dict[str, object] = {
-        "protocol_name": PROTOCOL_NAME,
+        "protocol_name": f"{PROTOCOL_NAME}_{convention}",
+        "hu_rule": "raw_CT - 1024; no clipping; same crop and endpoint-aligned resize" if getattr(args, "save_hu", False) else None,
         "dataset": "copd",
         "case_id": case_id,
         "fixed_phase": "iBH",
@@ -168,13 +181,13 @@ def process_case(case_id: int, args: argparse.Namespace, device: torch.device) -
         "landmark_source_order": "xyz, pTVReg/MATLAB 1-based voxel coordinates",
         "landmark_saved_order": "zyx, Python 0-based voxel coordinates",
         "image_resampling": "PyTorch trilinear, align_corners=True",
-        "mask_resampling": "corrected pTVReg crop, PyTorch nearest-neighbor",
+        "mask_resampling": f"{convention} crop, PyTorch nearest-neighbor",
         "intensity_rule": "clip [80, 900], subtract 80, divide by 820",
         "crop_rule": (
-            "landmark bbox margin xyz [10,10,5] using the plan-compatible legacy Python zyx bounds; "
+            f"landmark bbox margin xyz [10,10,5] using explicit {convention} bounds; "
             "exact pTVReg/MATLAB 1-based formula bounds are retained for audit"
         ),
-        "crop_convention": "plan_expected_legacy_python_bounds",
+        "crop_convention": convention,
         "crop_margin_xyz": [int(v) for v in MARGIN_XYZ],
         "crop_margin_zyx": [int(v) for v in MARGIN_ZYX],
         "raw_shape_zyx": [int(v) for v in case.shape_zyx],
@@ -187,6 +200,7 @@ def process_case(case_id: int, args: argparse.Namespace, device: torch.device) -
         "crop_shape_zyx": [int(v) for v in crop_shape],
         "registration_shape_zyx": [int(v) for v in reg_shape],
         "registration_spacing_zyx_mm": [1.0, 1.0, 1.0],
+        "registration_to_native_scale_zyx": ((np.asarray(crop_shape)-1)/(np.asarray(reg_shape)-1)).tolist(),
         "image_paths": {
             "fixed_ibh": case.image_ibh,
             "moving_ebh": case.image_ebh,

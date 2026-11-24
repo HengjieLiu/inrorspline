@@ -55,6 +55,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--case-ids", type=str, default="1-10")
     parser.add_argument("--modelname", type=str, default="R231")
     parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
+    parser.add_argument("--crop-convention", choices=["corrected", "legacy"], default="corrected")
+    parser.add_argument("--save-hu", action="store_true", help="Also save unclipped raw-minus-1024 HU on the registration grid.")
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
 
@@ -64,6 +66,17 @@ def img_thr(vol: np.ndarray, min_val: float = 80.0, max_val: float = 900.0, norm
     out = out - min_val
     out = out * (norm / (max_val - min_val))
     return out.astype(np.float32, copy=False)
+
+
+def select_crop_bounds(corrected: np.ndarray, legacy: np.ndarray, convention: str) -> np.ndarray:
+    if convention not in {"corrected", "legacy"}:
+        raise ValueError(f"Unknown crop convention: {convention}")
+    return (corrected if convention == "corrected" else legacy).copy()
+
+
+def require_fresh_case(case_dir: Path) -> None:
+    if case_dir.exists():
+        raise FileExistsError(f"Preserve existing data; select a new versioned output root: {case_dir}")
 
 
 def landmarks_xyz_one_based_to_zyx_zero_based(landmarks_xyz: np.ndarray) -> np.ndarray:
@@ -192,6 +205,8 @@ def audit_landmark_mask_fraction(mask: np.ndarray, landmarks_zyx: np.ndarray) ->
 
 
 def process_case(case_id: int, args: argparse.Namespace, device: torch.device) -> Dict[str, object]:
+    case_dir = args.out_root / "4DCT" / f"case{case_id:02d}"
+    require_fresh_case(case_dir)
     case = resolve_4dct_case(case_id, args.data_root)
     if case.status != "complete":
         raise RuntimeError(f"4DCT case {case_id} is {case.status}; notes={case.notes}")
@@ -201,8 +216,10 @@ def process_case(case_id: int, args: argparse.Namespace, device: torch.device) -
     fixed_native0_zyx = landmarks_xyz_one_based_to_zyx_zero_based(fixed_xyz)
     moving_native0_zyx = landmarks_xyz_one_based_to_zyx_zero_based(moving_xyz)
 
-    crop_bounds = ptvreg_crop_bounds_zyx_from_landmarks_xyz(fixed_xyz, moving_xyz, case.shape_zyx)
+    corrected_bounds = ptvreg_crop_bounds_zyx_from_landmarks_xyz(fixed_xyz, moving_xyz, case.shape_zyx)
     legacy_bounds = task4_legacy_crop_bounds_zyx_from_landmarks_xyz(fixed_xyz, moving_xyz, case.shape_zyx)
+    convention = getattr(args, "crop_convention", "corrected")
+    crop_bounds = select_crop_bounds(corrected_bounds, legacy_bounds, convention)
     crop_shape = tuple((crop_bounds[:, 1] - crop_bounds[:, 0] + 1).astype(int).tolist())
     spacing = tuple(float(v) for v in case.spacing_zyx)
     reg_shape = tuple(np.rint(np.asarray(crop_shape, dtype=np.float64) * np.asarray(spacing)).astype(int).tolist())
@@ -257,6 +274,11 @@ def process_case(case_id: int, args: argparse.Namespace, device: torch.device) -
         },
         args.overwrite,
     )
+    if getattr(args, "save_hu", False):
+        paths.update(save_case_arrays(case_dir, {
+            "fixed_T00_reg1mm_hu_zyx": resize_image_trilinear_zyx(crop_zyx(fixed_raw, crop_bounds) - 1024.0, reg_shape, device),
+            "moving_T50_reg1mm_hu_zyx": resize_image_trilinear_zyx(crop_zyx(moving_raw, crop_bounds) - 1024.0, reg_shape, device),
+        }, False))
 
     verification = {
         "fixed_crop_landmarks_inside": points_inside_shape(fixed_crop_zyx, crop_shape),
@@ -282,7 +304,9 @@ def process_case(case_id: int, args: argparse.Namespace, device: torch.device) -
     )
 
     row: Dict[str, object] = {
-        "protocol_name": PROTOCOL_NAME,
+        "protocol_name": f"{PROTOCOL_NAME}_{convention}",
+        "crop_convention": convention,
+        "hu_rule": "raw_CT - 1024; no clipping; same crop and endpoint-aligned resize" if getattr(args, "save_hu", False) else None,
         "dataset": "4dct",
         "case_id": case_id,
         "fixed_phase": "T00",
@@ -292,16 +316,18 @@ def process_case(case_id: int, args: argparse.Namespace, device: torch.device) -
         "landmark_source_order": "xyz, pTVReg/MATLAB 1-based voxel coordinates",
         "landmark_saved_order": "zyx, Python 0-based voxel coordinates",
         "image_resampling": "PyTorch trilinear, align_corners=True",
-        "mask_resampling": "corrected pTVReg crop, PyTorch nearest-neighbor",
+        "mask_resampling": f"{convention} crop, PyTorch nearest-neighbor",
         "intensity_rule": "clip [80, 900], subtract 80, divide by 820",
-        "crop_rule": "pTVReg landmark bbox margin xyz [10,10,5], converted from MATLAB 1-based xyz to Python 0-based zyx",
+        "crop_rule": f"landmark union bbox margin xyz [10,10,5]; explicit {convention} origin",
         "crop_margin_xyz": [int(v) for v in MARGIN_XYZ],
         "crop_margin_zyx": [int(v) for v in MARGIN_ZYX],
         "raw_shape_zyx": [int(v) for v in case.shape_zyx],
         "native_spacing_zyx_mm": [float(v) for v in case.spacing_zyx],
         "crop_bounds_zyx_inclusive": crop_bounds.tolist(),
+        "ptvreg_formula_crop_bounds_zyx_inclusive": corrected_bounds.tolist(),
         "legacy_task4_crop_bounds_zyx_inclusive": legacy_bounds.tolist(),
-        "legacy_minus_ptvreg_bounds_zyx": (legacy_bounds - crop_bounds).tolist(),
+        "legacy_minus_ptvreg_bounds_zyx": (legacy_bounds - corrected_bounds).tolist(),
+        "registration_to_native_scale_zyx": ((np.asarray(crop_shape)-1)/(np.asarray(reg_shape)-1)).tolist(),
         "crop_shape_zyx": [int(v) for v in crop_shape],
         "registration_shape_zyx": [int(v) for v in reg_shape],
         "registration_spacing_zyx_mm": [1.0, 1.0, 1.0],
