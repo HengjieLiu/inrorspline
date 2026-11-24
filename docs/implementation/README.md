@@ -18,6 +18,34 @@ definitions in `docs/03_methods.md`; keep run ledgers in
 
 ## Files
 
+- [LungCT HU/crop/lambda ablation](lungct_hu_crop_lambda.md): unchanged MR solver,
+  common intensity scale, physical mask crops, independent bounded searches and
+  provisional anatomy evaluation.
+
+- [Three coronal grids](lungct_grid_compare.md): analytic and raster pull grids,
+  projected mapped mesh, common voxel-grid phase and complete GPU cache lifecycle.
+
+- [DIR-Lab case viewer](lungct_case_viewer.md): physical LPS display, original
+  field adapters, inverse landmark locations, compact case bundles and the
+  request-free browser pipeline.
+
+- [Corrected 1 mm LungCT and CorrField](lungct_corrected_1mm_corrfield.md):
+  versioned crop contracts, unchanged MR solver, raw-HU CorrField adapter,
+  native TRE replay and ordered historical/new casewise comparisons.
+
+- [Diffusion plus analytic KL-C1](oasis_diffusion_plus_kl_c1.md): fixed
+  diffusion lambda1, rank0 gamma pilot and separately authorized first10
+  extension, exact gamma0 compatibility/reference reuse, loss components,
+  paired geometry and separate resource reporting.
+
+- [Jacobian SD(logJ), folding and NDV explained](jacobian_sdlogj_folding_and_ndv.md):
+  canonical versus spline-analytic derivatives, positive-J reductions, folding
+  counts versus negative-volume measures, exact code conventions and limitations.
+
+- [OASIS FD/analytic regularizer sweep](oasis_regularizer_fd_analytic_sweep.md):
+  matched NCC9 diffusion/BE/KL-C1 arms, continuous pyramid derivatives, six-arm
+  bracketing and per-setting cold/warm time and memory measurements.
+
 - [GaussianDIR paper and code audit](gaussiandir_paper_code_audit.md): pinned
   source, paper-revision differences, Gaussian blending, released defaults,
   verified discrepancies, corrected two-scale adapter, SITReg geometry/metrics

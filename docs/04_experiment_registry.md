@@ -5,6 +5,287 @@ status: active
 
 # Experiment Registry
 
+### P90: MR-D-BSCP HU/crop and per-case lambda ablation
+
+- Approved2026-11-19: H0[-944,-124], H1[-1000,1000], H2[-1000,2000]HU;
+  common (clippedHU+944)/820 scale. C0 corrected landmark crop; C1 paired R231
+  lung-union box plus XYZ20/20/10mm; C2 full acquired FOV. All20 cases.
+- First batch4DCT01/08,COPD01/08:36 independent sweeps; write its report then
+  automatically continue the other16 cases without an approval pause.
+- Lambda0.055*2^k, k=-8..8. Independent directions stop after two successive
+  native-snap mean-TRE increases (>1e-6mm); ties reset. Fresh2500-step seed1
+  registrations, LR1e-3, controls64/32/16/8/4, cuDNN benchmarkF/deterministicT.
+- All memory-qualified GPUs allowed, one campaign registration/GPU, admission
+  free>=1.2*predicted_peak+2GiB. Preserve other processes. Failures retained,
+  no automatic retries or resolution changes; reset branch streak and move on.
+- Execution key `lungct_hu_crop_lambda_20261120T075001Z`; all prepared/run/review
+  material external under ARTIFACT_ROOT. Frozen source and pinned runtime;
+  fixed0.055 and per-case best-tested reports, with tuning/coverage disclosures.
+- Specification/log in `experiments/2026-11-19_lungct_hu_crop_lambda/`.
+  Eighteen tests and36 first-batch preparations passed; H0/C0 inputs match
+  accepted corrected arrays exactly. Frozen85-file source and configuration
+  released in pinned, restartable containers; original-CLI CUDA repeatability
+  limitation recorded. First-batch report preceded automatic continuation.
+- Completed2026-11-20:180/180 searches reached stopping or cap,1245 accepted
+  registrations and one retained CUDA OOM (COPD06,H1/C0,k=-2; no retry).
+  All60 memory profiles passed. Three lower branches reached-8;357 branches
+  stopped after two increases. No missing casewise fixed/tuned TRE endpoints.
+  Final and anatomy-supplement reports are sealed externally;40 automatic
+  anatomy volumes and1245 metric files completed. Visual label QC remains
+  pending; per-case lambda selection is in-sample, and caps do not prove optima.
+- Component reporting supplement: combined-bone plus grouped ribs/vertebrae/
+  sternum Dice, casewise and ten-case mean/sample SD for fixed and selected
+  lambda. New external `anatomy_components_v1/` and
+  `hu_crop_anatomy_tradeoff_v3/` retain original sealed reports. Validation
+  checked4980 Dice values across1245 accepted candidates,360 selected rows and
+  144 component cohort endpoints; existing metrics are unchanged. Nine tests pass.
+
+### P89: DIR-Lab three-grid comparison viewer
+
+- Approved2026-11-19: separate private read-only1102 service, existing20 P88
+  bundles, five rows (CT, difference, analytic pull, raster pull, mapped mesh).
+- Spacing8 display voxels, shared index origin; mapped fixed mesh projected
+  into moving L/S coordinates. No row5 contours, empty second panel.
+- Precompute all nine grid caches before Ready/after Apply; cancel obsolete
+  jobs, bound memory, and require request-free >=30fps/p95<100ms scrolling.
+- Existing standard viewer1101 and retained8765 containers unchanged. Specs/log
+  in `experiments/2026-11-19_lungct_grid_compare/`; generated evidence external
+  under `${ARTIFACT_ROOT}/prepared/lungct_grid_compare/v1_20261119/`.
+- Completed:12 Python/three Node tests and five synthetic GPU fields passed;
+  all20 manifests/260 assets unchanged. Four-case Chromium141/RTX6000Ada checks
+  passed at56.1--60.0fps/p95<=21.6ms, no post-Ready requests, stable24 textures
+  and repeated-case backing storage. Nine-cache builds0.17--0.43s,62.7--125.8MiB.
+  Main1101 both-tab regression passed; retained failed attempts and spacing fix
+  documented. Separate CPU-only read-only1102 service running; no commit/push.
+
+### P88: DIR-Lab private case viewer
+
+- User approved2026-11-19:20 accepted P87 cases, one case loaded, two tabs,
+  coronal5x5 image/deformation layout and3x5 landmark MPR with two3D clouds.
+- Posthoc preparation only: corrected MR, historical pTV, accepted CorrField;
+  explicit guarded4DCT04–06 tags. Raw-HU common display, R231 anatomy/target
+  contours, pair-local LPS geometry, endpoint-aligned field adapters.
+- All generated assets, dependency pins and validation under
+  `${ARTIFACT_ROOT}/prepared/lungct_viewer/<version>/`; source in
+  `scripts/visualization/lungct_viewer/`. Read-only loopback server default1101.
+- Loading must prepare both tabs before Ready; request-free interaction,
+  case disposal, native TRE replay and inverse-location status required.
+  See `experiments/2026-11-19_lungct_viewer/` for specification and log.
+- Completed2026-11-19:20 accepted bundles/260 binary assets,6000 paired
+  landmarks and18000 unchanged native TRE method/landmark values. Independent
+  raw-CT/field/label/landmark audit passed all20 cases;9 synthetic/HTTP tests pass.
+- Hardware Chromium141/NVIDIA RTX6000Ada,1920x1080:49.0–60.0fps across
+  4DCT01/02,COPD01/10, p95interaction18.2–19.1ms. Zero post-Ready requests,
+  no console errors,14 retained GPU textures/current-case-only ArrayBuffers.
+  Camera linking/picking, reorder persistence, cancellation/disposal and both
+  panels exercised. Earlier below-target SwiftShader results remain separate.
+- Inverse display locations:17967 resolved,29 ambiguous,4 unresolved;
+  all300 correspondences retained. Failed strict-summation/label-report attempts
+  preserved. Bundle key `v1_20261119`; final report/receipt/snapshot under its
+  external `validation/` directory. CPU-only loopback8765 service; no public
+  deployment, staging, commit or push. Historical inputs/fields unchanged.
+- UI revisionR2: every difference cell now subtracts fixed, including moving
+  and the fixed-minus-fixed zero reference. Added a separate projected-target
+  marker toggle/legend, two-decimal TRE labels and persistent light/dark mode.
+  Four-case browser checks passed with GPU zero-reference/color invariance,
+  no post-Ready requests, unchanged260 asset checksums and59.4–60.0fps.
+  New revision provenance is external under `validation/ui_r2_fixed_theme/`;
+  the original validation and source archive remain historical records.
+- UI revisionR3 duplicates synchronized landmark navigation and TRE readouts
+  below the MPR grid, sharing selection/filter/wrap state with the upper controls.
+  Revision evidence is external under `validation/ui_r3_bottom_navigation/`.
+- UI revisionR4 adds a third overview panel with Initial/three-method native
+  snap TRE step CDFs, lung-filtered denominators, full/0–6mm/manual ranges and
+  a tie-inclusive selected-TRE sweep cursor. Source and scientific bundles are
+  separate; no preparation or registration rerun. New services use1101 with
+  the existing pinned image/read-only mounts. Evidence is external under
+  `validation/ui_r4_tre_cdf_port1101/`. Four-case hardware checks passed:
+  scrolling57.5–60.0fps, landmark navigation58.0–60.0fps, p95response19.7–22.0ms,
+  zero post-Ready requests, stable14 textures and released previous-case buffers.
+  Three CDF unit tests and nine geometry/HTTP tests passed; all20 manifests,
+  260 assets and24000 TRE values including Initial remain unchanged. Both1101
+  services are active; previous8765 containers are stopped and retained.
+- UI revisionR5 moves Initial/method TRE into a second line beneath the Moving
+  and three DIR landmark-column titles, removing both standalone value strips.
+  Both navigation bars, graph-guard provenance and two-decimal precision remain.
+  Browser checks passed on guarded4DCT04 andCOPD01, including method reorder,
+  selection from either navigation bar/cloud, both themes and no post-Ready
+  requests. Revision evidence is external under `validation/ui_r5_header_tre/`.
+
+### P87: Corrected 1 mm COPD MR-D-BSCP and CorrField 4DCT/COPD
+
+- Approved2026-11-18; completed2026-11-19UTC,30/30 accepted after the
+  user-approved component-wise recovery of only4DCT04/05/06. Three original
+  CorrField graph failures and the earlier partial reports remain retained.
+  Execution key
+  `lungct_corrected_1mm_20261119T073622Z`.
+- Thirty new production registrations: corrected COPD MR10, CorrField4DCT10
+  and COPD10. Historical legacy COPD w0.055, corrected4DCT MR w0.055 and
+  pTVReg fields reused, never overwritten. All cases01–10,300 landmarks each.
+- Corrected one-based-to-zero-based landmark crop, marginXYZ10/10/5;
+  np.rint shape rounding, trilinear align_corners=True, nearest masks.
+  Corrected COPD01 target272 slices. New prepared/run/review roots external
+  under ARTIFACT_ROOT with the execution key.
+- MR:64/32/16/8/4, downsample16/8/4/2/1, epochs400/400/400/400/900,
+  Adam1e-3 seed1 FP32, pTV-LCCsigma2.1 + control isoTV0.055/csqrt0.005,
+  border5 and exact knots. Explicit historical cuDNN override T/F in command,
+  manifest and report. CorrField rawHU/fixedR231/default parameters, cuDNN F/T.
+- Preflight: geometry, historical replay, COPD01/02 reduced MR smokes and
+  full largest-case CorrField smokes; one worker per idle GPU.
+- Caveats: historical-reference crop comparison, separate intensity/mask
+  protocols, no tuning, no assumed TRE equivalence. See approved spec/log
+  in `experiments/2026-11-18_lungct_corrected_1mm/`.
+- All20 corrected products and exact historical4DCT parity accepted;40
+  historical field/TRE replays and21 regression tests passed. Both reduced
+  MR and full largest-case CorrField preflights passed. Retained fields:
+  corrected COPD MR10, original CorrField4DCT7/COPD10; no parameter changes.
+- COPD MR native snap: legacy1.0501+/-0.7331 versus corrected1.0436+/-0.7462mm;
+  paired corrected-minus-legacy -0.0065+/-0.0542mm. Five cases improve/five
+  worsen; largest absolute change is case10 -0.1187mm. COPD CorrField is
+  2.1808+/-1.3359mm on the rawHU/fixedR2311mm protocol.
+- Original CorrField4DCT04/05/06 failed on disconnected spanning-tree graphs.
+  The approved component-wise MST/TBP guard adds no edges or parameters;
+  3 tests pass, including bitwise connected-graph equivalence. Frozen wrapper
+  recovery completed all3: native snap1.3768,1.1545,1.0456mm. Tag
+  `corrfield_componentwise_forest_v1`;9/12 graph calls used component-wise
+  processing. Complete4DCT CorrField mean1.0423+/-0.1577mm, with disclosure.
+- Independent raw-landmark audit accepted all27 completed cases/8100 pairs:
+  native snap/subvoxel errors agree exactly, independent resize differs by
+  less than2e-4 native voxels, all prepared/raw/source hashes unchanged.
+  That partial audit/report is retained. The final independent audit accepted
+  all30 cases/9000 pairs with exact native snap/subvoxel agreement, source and
+  input hash preservation, and unchanged67 previously accepted evaluations.
+  Complete reports retain70 method/case records and21000 landmark errors,
+  ordered crop comparison,4DCT(with guard disclosure),COPD. No commit/push.
+
+### P86: First10 Diffusion Lambda1 plus Analytic KL-C1 Gamma Sweep
+
+- User authorized2026-11-10: seed-3 shuffled first10, gamma0/1e-4/1e-3/
+  1e-2/0.1/1, retaining FD and analytic diffusion lambda1 with analytic KL-C1.
+  Execution `oasis_first10_diff1_kl_20261110T213230Z_v1`; preflight accepted
+  2026-11-10 21:33:35UTC and full cohort accepted21:58:57UTC. Report complete
+  22:00:09UTC after independent posthoc audit including the P85 pilot replay.
+- Preserve P84/P85 numerical sources, NCC9, prolonged cps8/4/2, pyramid4/2/1,
+  stage rates0.03/0.01/0.003, plateau stopping and best total-loss checkpoints.
+  Seed1/FP32, cuDNN benchmarkFalse/deterministicTrue, TF32off; fixed raw FG>0.
+- Audit/reuse both complete gamma0 P84 cohorts (22 cold/warm observations).
+  Ten positive-gamma fresh workers each run cold0 then warm0..9,110 new outputs,
+  yielding120 primary warm case endpoints. Four native-volume endpoint smokes.
+- All available GPUs, one job/GPU, separate same-GPU scoring, PID-attributed
+  time/memory/RSS. Full35-label accuracy, both Jacobian conventions, full/FG
+  FD/analytic energies/KL/NDV, loss components and all cold/warm resource scopes.
+- All26 preflight tests, both11-observation baseline audits and four native
+  smokes with independent replay/scoring passed. Smoke reserved peak2.535GiB;
+  projected new retained artifacts19.61GB including30% margin. Same pinned
+  image and healthy experiment runtime as P84/P85; all four GPUs admitted.
+- Accepted14 fresh blocks (4 smokes,10 cohorts):110 new production observations
+  plus22 historical gamma0 references and4 smokes,136 fully scored records.
+  All120 primary warm cases retain35 labels; zero capped stages/failures.
+  Posthoc:26 source hashes,53554 component states, all field/model/input
+  receipts,12 exact cold/warm rank0 field pairs and10 exact P85 pilot
+  rank0 field matches passed.
+- Best tested mean Dice:FD gamma1e-4 0.826404 versus gamma0 0.826296,
+  +0.0108pp paired (5/10 improved; exploratory95% CI[-0.0819,+0.1042]pp),
+  with worse HD95/ASD; analytic diffusion best remains gamma0 0.826191.
+  No robust accuracy gain from adding KL-C1 on this first10 subset.
+- Gamma0.01 versus matching gamma0:FD/analytic mean Dice -0.110/-0.120pp;
+  mean NDV -79.9/-79.6%, analytic SDlogJ -3.85/-3.82%, analytic sampled
+  folding4.709→2.042% /4.568→2.004%. HD95 improves0.026/0.041mm;
+  ASD is essentially unchanged. Gamma0.1 lowers NDV about98%, analytic
+  SDlogJ about36%, analytic folding to0.054%, at Dice losses0.814/0.884pp
+  and worse ASD. Gamma1 loses about5.87pp Dice in all10 pairs while sampled
+  folds reach0%; NDV stays positive. Interpret as exploratory test-set tuning.
+- Positive-gamma warm registration means:FD27.97-30.56s, analytic24.71-25.93s;
+  historical gamma0 means22.23/22.65s. Fresh warm Torch max allocated/
+  reserved:FD2.154/2.479GiB, analytic1.930/2.516GiB. Registration process
+  peaks2.967/3.004GiB; separate scoring peaks5.527GiB. Update counts,
+  GPU assignment and historical baseline timing limit loss-overhead claims.
+- Case-paired matching-baseline/backend changes, means/sample-SDs and exploratory
+  paired case-bootstrap intervals. No automatic gamma or case-range extension.
+- Source/spec: `scripts/experiments/oasis_diffusion_kl_first10/` and
+  `experiments/2026-11-10_oasis_first10_diffusion_kl_c1/`.
+  Artifact key: `oasis_first10_diffusion1_analytic_kl_c1_gamma_v1`.
+  Full tables, paired case deltas, resource scopes, scalar appendix and curves
+  are under that key with execution ID; posthoc source:
+  `scripts/reports/analyze_oasis_diffusion_kl_first10.py`.
+
+### P85: Rank0 Diffusion Lambda1 plus Analytic KL-C1 Gamma Sweep
+
+- User authorized rank0 only, fixed0333/moving0115; gamma0/1e-4/1e-3/1e-2/1e-1/1.
+  No first10 extension or automatic gamma expansion. Completed2026-11-10
+  20:23:19UTC, execution `oasis_rank000_diff1_kl_20261110T201710Z_v1`.
+- Preserve both FD and analytic diffusion lambda1 references; use analytic KL
+  epsilon0.05/kappa120 in both combinations based on P84's geometric consistency.
+  NCC9, prolonged cps8/4/2, pyramid4/2/1, LR0.03/0.01/0.003 and adaptive stopping,
+  initialization, best total-loss checkpoint, seed1/FP32/cuDNN F/T/TF32off unchanged.
+- Gamma0 reuses accepted P84 rank0 cold/warm records with source/input/field/
+  model hash audits; historical timing is labeled. Ten positive-gamma settings
+  produce20 new rank0 cold/warm registrations, plus four preflight observations.
+- All visible GPUs, one job/GPU, separate same-GPU verification/scoring waves.
+  All35-label accuracy and full/FG FD/analytic regularity, NDV, raw-J coverage/
+  quantiles; component histories and separate cold/warm time/GPU memory/RSS.
+- Accepted20 new cold/warm outputs,4 historical references and4 smokes;
+  all12 primary warm endpoints retain35 labels. Nineteen existing and5 new
+  numerical checks passed. Independent posthoc audit verified20 frozen source
+  hashes,10084 component-history states, field/model/input identities and
+  exact cold/warm field agreement for all12 settings; no failed blocks.
+- Best tested Dice:FD gamma1e-4=0.802083 (+0.112pp); analytic gamma0=0.802291.
+  Gamma0.01 reduces NDV78-79% and analytic folding53-54%, with Dice losses
+  0.340/0.510pp (FD/analytic). Gamma0.1 lowers analytic SDlogJ35-36%,
+  folding about99% and NDV98%, with Dice losses1.108/1.250pp. Rank0 tuning
+  only; these are accuracy/geometry trade-offs, not a population conclusion.
+- Positive-gamma warm registration29.62-32.25s FD /25.38-27.61s analytic;
+  allocated peaks2.154/1.930GiB, reserved2.479/2.516GiB. Separate scoring
+  process peaks5.527GiB. Gamma0 resource measurements remain historical;
+  different updates/GPUs prevent attributing endpoint time solely to loss cost.
+- Source: `scripts/experiments/oasis_diffusion_kl_rank0/`.
+  Spec/log: `experiments/2026-11-10_oasis_rank000_diffusion_kl_c1/`.
+  Artifact key: `oasis_rank000_diffusion1_analytic_kl_c1_gamma_v1`.
+  Complete tables/curves and `detailed_review_v1/` are external under that
+  review key and execution ID. Posthoc source:
+  `scripts/reports/analyze_oasis_diffusion_kl_rank0.py`.
+
+### P84: OASIS First10 FD/Analytic Diffusion, BE and KL-C1 Sweep
+
+- User authorized implementation and launch2026-11-10. Nineteen unit checks,
+  six native-volume smokes, same-GPU independent loss/field replay, canonical
+  SDlogJ parity and attributed time/memory telemetry passed before production.
+- Execution `oasis_reg6_20261110T0917Z_v2`; Gitb86c521 plus frozen external
+  dirty-source snapshots. Separate pinned-image runtime after default container
+  lost CUDA access; original container and failed v1 startup evidence preserved.
+- Preflight accepted2026-11-10 09:17:23UTC; peak training reserved2.344GiB,
+  projected retained artifacts127.4GB including30%margin. Coarse production
+  launched2026-11-10 09:18:11UTC (01:18PST); four active workers verified,
+  one perGPU0-3. Accepted2026-11-10 13:25:20UTC (05:25PST):116 blocks,
+  721 timed/scored outputs (6smokes+110pilot+605final), no v2 failures.
+- All55 first10 groups/550 warm cases/19250 primary label rows complete.
+  Best mean-Dice weights: diffusion1 (FD/analytic0.826296/0.826191), BE0.3
+  (0.815023/0.813606), KL0.03 (0.775375/0.776723). KL-analytic's winner is
+  penultimate in its first10 grid; no fully bracketed population-optimum claim.
+- Detailed case-paired posthoc review under external `paired_review_v3/` in
+  the execution's review root: independent source/input/statistic checks,
+  same-weight/backend/family deltas, case bootstrap CIs, label sensitivity and
+  separate cold/warm/update-count/evaluation-memory accounting. Analysis source:
+  `scripts/reports/analyze_oasis_regularizer_fd_analytic.py`.
+- Six independently tuned arms: FD/analytic diffusion, BE, and Leow-style KL-C1
+  with epsilon0.05/kappa120. KL-only, no combined diffusion term.
+- Seed3 shuffled first10; identity-initialized prolonged cps8/4/2, pyramid4/2/1,
+  raw squared local NCC9, normalized LR0.03/0.01/0.003 and unchanged adaptive
+  stopping; best stage total-loss checkpoints, seed1, FP32, cuDNN F/T, TF32off.
+- All visible GPUs, one job/GPU. Fresh setting worker: rank0 cold then ranks0-9
+  warm. Per-case/stage times, PyTorch peaks, attributed sampled NVML/RSS and
+  separate evaluation phases. Pilot blocks have rank0 cold and rank0 warm.
+- Coarse weights1e-5 through1e3 by decades; two worse weights per side, bounded
+  extensions1e-8..1e6. Frozen nine-weight first10 grid per bracketed arm.
+- Nominal110 pilot plus605 final registrations, before smokes/extensions/retries.
+  All35-label Dice/HD95/ASD and both-backend energies/KL, canonical foreground
+  positive-J SDlogJ, folding, coverage and NDV. Exploratory first10 interpretation.
+- Spec/log: `experiments/2026-11-10_oasis_regularizer_fd_analytic_sweep/`.
+  Source: `scripts/experiments/oasis_regularizer_sweep/`.
+  Artifact review key: `oasis_first10_regularizer_fd_analytic_v1`.
+- Frozen source/input/runtime/command provenance and all generated artifacts are
+  external. Prior results remain immutable; fresh resource blocks are required.
+
 ### P83: OASIS Rank0 GaussianDIR Paper/Code Audit, Pilot and Convergence Study
 
 - Completed paper-loss follow-up: sampled signed NCC+TV lambda8, fresh200/500/2000

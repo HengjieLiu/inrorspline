@@ -5,7 +5,268 @@ status: active_draft
 
 # Results Summary
 
+## MR-D-BSCP HU/crop/lambda campaign (P90, completed2026-11-20)
+
+All180 searches across20 cases/nine preparations reached their stopping rule
+or exponent cap. There are1245 accepted2500-step registrations and one retained
+CUDA OOM atCOPD06,H1/C0,k=-2; the failed candidate was not retried. All60 memory
+profiles passed. The first36 searches were reported before automatically
+continuing the remaining144. Final registration and anatomy reports are sealed.
+
+H0/C0 fresh native snap TRE is0.9160+/-0.1528mm for4DCT and1.0401+/-0.7294mm
+forCOPD. Individually tuned H0/C0 values are0.8939+/-0.1668mm and
+0.9763+/-0.6818mm, respectively (mean/sample SD of ten case means). These use
+the reported300 landmarks for tuning and are not held-out validation results.
+All18 dataset/preparation groups have10 fixed-lambda and10 best-tested values.
+Three lower branches reached-8 (4DCT08 H1/C1,COPD07 H1/C2,COPD10 H1/C1);
+the other357 branches stopped after two successive increases. Best tested does
+not establish a global optimum, including branches stopped by the heuristic.
+
+The original CUDA command also differs slightly across reduced-run repeats,
+despite the requested deterministic cuDNN settings. This is retained as a
+reproducibility limitation. The three preflight native snap TRE means matched;
+this does not establish exact field reproducibility or full-run invariance.
+All40 automatic anatomy volumes and1245 posthoc metric records completed.
+These labels remain provisional evaluation proxies pending visual QC.
+
+Independent completion replay passed all373500 accepted correspondence rows
+with exactly zero native TRE discrepancy, all field headers/optimization
+histories and sealed report hashes. Posthoc tradeoff summaries are external in
+`hu_crop_anatomy_tradeoff_v2/`; all360 selected center/tuned rows agree with the
+sealed report tables. Bone/heart/aorta labels use TotalSegmentator2.16.0; lung
+labels use R231, independently per original phase and reused for all settings.
+
+At C0, H1 versus H0 after TRE-based lambda selection increases bone Dice by
+26.31 percentage points in4DCT and27.57 inCOPD, while mean TRE increases by
+0.0750mm and0.0559mm. Bone ASSD decreases by1.457mm and1.510mm, respectively.
+Bone Dice improves in all ten cases of each dataset for every crop tested.
+H2 offers little consistent additional gain over H1. Larger crops improve bone
+matching, with case-dependent TRE changes and little consistent advantage for
+C2 over C1. In100/180 case/preparation combinations, TRE selection reduces TRE
+while reducing bone Dice relative to0.055. These counts repeat the same20 cases.
+
+These measurements cover only the common C0/C1/C2 intersection: on average
+72.8%/76.2% of fixed-image segmented bone in4DCT/COPD. They support a landmark
+versus anatomy tradeoff within this region, pending segmentation QC, rather
+than a whole-thorax or pTVReg conclusion. Loss family was held fixed; its
+independent contribution is not isolated by this preprocessing ablation.
+
+The component supplement retains combined-bone Dice and separately reports
+grouped ribs, grouped vertebrae and sternum in `anatomy_components_v1/` and
+`hu_crop_anatomy_tradeoff_v3/`. With TRE-selected lambda at C0, H0-to-H1
+improvements are37.38/20.05/3.06 percentage points for ribs/vertebrae/sternum
+in4DCT and34.14/23.28/17.23 inCOPD. All ten cases improve for each component.
+At H1, C0-to-C1 crop gains are concentrated in ribs (+4.22pp4DCT,+5.61ppCOPD),
+with much smaller vertebral gains (+0.14/+0.58pp). C2 adds little consistent
+component benefit over C1; inCOPD its mean vertebra/sternum Dice is lower.
+H2 offers little consistent gain over H1. Relative to fixed0.055, TRE-selected
+lambda yields lower TRE but lower Dice in100/101/102 of180 combinations for
+ribs/vertebrae/sternum, respectively; these are repeated settings of20 subjects.
+All original values and sealed reports remain unchanged; component labels are
+grouped unions and do not establish individual rib/vertebral correspondence.
+
+Casewise/aggregate tables, curves, fields, failures and validation remain external under
+`${ARTIFACT_ROOT}/{runs,prepared,repo_experiments}/lungct_hu_crop_lambda_20261120T075001Z/`.
+Fixed0.055 and per-case in-sample tuning are reported separately, with caps and
+failures visible. Historical results and source/configuration snapshots remain
+unchanged; no staging or commits were performed.
+
+## DIR-Lab three-grid comparison viewer (P89, 2026-11-19)
+
+The separate1102 viewer compares analytic pull grids, notebook-style raster
+pull grids and projected mapped fixed meshes beneath CT/difference rows. Default
+spacing is8 display voxels with a shared origin. All nine grids are cached before
+scrolling; the second panel is empty. No scientific data or registration changed.
+
+All20 manifest receipts/260 asset hashes match. Twelve Python, three Node and
+five synthetic GPU-field checks passed. Four-case hardware browser checks on
+4DCT01/02,COPD01/10 measured56.1--60.0fps and p95response16.4--21.6ms, zero
+post-Ready requests, stable textures and repeated-case backing storage. Main
+viewer1101 both-tab regression passed. Evidence and retained failed attempts are
+external under `${ARTIFACT_ROOT}/prepared/lungct_grid_compare/v1_20261119/`.
+
 This repo carries audited generated results together with planning reports.
+
+## DIR-Lab private case viewer (P88, 2026-11-19)
+
+The posthoc viewer now has all20 accepted 4DCT/COPD cases,260 compact binary
+assets and6000 paired landmarks, with reordered MR-D-BSCP/pTVReg/CorrField
+columns shared across image/deformation and landmark tabs. Common raw-HU
+warping preserves each field's original crop geometry and nominal displacement
+units; the physical display grid uses native endpoints in pair-local LPS.
+
+Independent validation passed all20 cases and18000 method/landmark native TRE
+values without changing scientific results. Nine synthetic/HTTP tests passed.
+Recorded Chromium141/NVIDIA RTX6000Ada browser checks at1920x1080 passed on
+4DCT01/02 andCOPD01/10:49.0–60.0fps, p95interaction18.2–19.1ms, no requests
+after Ready and no console errors. Case changes release prior textures and
+ArrayBuffers. Earlier software-rendered timing was below target and is retained
+separately, not mixed with hardware timing.
+
+Continuous inverse markers have17967 resolved,29 ambiguous and4 unresolved
+locations across the three methods. Exceptions remain labelled and do not alter
+native snap TRE or remove landmarks. CorrField's guarded4DCT04–06 variants
+remain visible. Assets, audit reports, screenshots, exception records and source
+snapshot are external under
+`${ARTIFACT_ROOT}/prepared/lungct_viewer/v1_20261119/`; implementation and usage
+are documented in `docs/implementation/lungct_case_viewer.md` and the source
+viewer README. The service is private, CPU-only and defaults to loopback1101.
+
+The R2 interface revision changes all difference cells to subtract fixed,
+adds a projected-target-marker legend/toggle and persistent light/dark mode,
+and formats TRE labels to two decimals without rounding data or sort keys.
+Four-case browser checks passed at59.4–60.0fps, including exact zero-color
+fixed-minus-fixed output and unchanged scientific colors across themes.
+All260 prepared asset checksums remain unchanged. Direct private-network access
+is provided by a companion service; interface details remain in private notes.
+
+R4 adds a third overview panel with four native-snap TRE step CDFs, filtered
+by the same lung selection. TRE-ordered navigation marks the selected metric's
+error and tie-inclusive cumulative percentage; range controls and both themes
+use only loaded records. Services now use1101, with the previous8765 containers
+stopped and retained. New four-case hardware checks passed at57.5–60.0fps for
+scrolling and58.0–60.0fps for landmark navigation, p95response19.7–22.0ms,
+with no post-Ready requests or accumulating case memory. All20 manifests,
+260 assets and24000 TRE values including Initial remain unchanged. Revision
+evidence is under the bundle's `validation/ui_r4_tre_cdf_port1101/` directory.
+
+R5 places Initial TRE below the Moving landmark-column title and each residual
+TRE below its method title, removing the standalone readout strips. Both
+navigation bars remain synchronized. Guarded4DCT04/COPD01 browser checks passed
+for two-decimal values, method identity on reorder, cloud selection, both themes
+and request-free interaction. Evidence is under `validation/ui_r5_header_tre/`.
+
+## Corrected 1 mm COPD MR-D-BSCP and CorrField (P87, 2026-11-19 UTC)
+
+All ten corrected-crop COPD MR-D-BSCP registrations completed with the
+approved w0.055,64/32/16/8/4,2500-step protocol and historical cuDNN T/F
+override. Native snap TRE is1.0436+/-0.7462mm versus the historical legacy
+1.0501+/-0.7331mm. The paired difference is -0.0065+/-0.0542mm across ten
+case means, with five improvements and five increases. The largest absolute
+change is case10 -0.1187mm; case01 changes0.7343-to0.7845mm despite the
+corrected crop depth. This supports similar aggregate observed accuracy,
+with the historical-comparison limitation retained.
+
+Raw-HU/fixed-R231 CorrField completed all ten corrected1mm COPD cases with
+mean native snap TRE2.1808+/-1.3359mm. Original CorrField completed7/10
+4DCT cases; cases04,05,06 initially failed on disconnected spanning-tree
+graphs. The user approved component-wise processing with the existing
+upstream MST/TBP and unchanged edges/costs/parameters. All three fresh
+guarded reruns completed: native snap1.3768,1.1545,1.0456mm. The complete
+4DCT cohort is1.0423+/-0.1577mm, with these three rows explicitly tagged
+`corrfield_componentwise_forest_v1`. Original failures and partial reports
+remain archived. No quality-driven tuning or retries were selected.
+
+All30 successful new fields passed independent native snap/subvoxel replay
+at9000 paired landmarks with exact error agreement. Original source and
+raw/prepared input hashes were unchanged; guard source was separately frozen
+and audited. All67 previously accepted evaluation records were unchanged.
+Forty historical method/case references were replayed. All24 unique tests
+passed (21 campaign/regression plus3 guard tests);12 relevant checks were
+rerun before recovery. Complete comparisons, implementation tags, field
+receipts and21000 landmark metric rows are external under
+`${ARTIFACT_ROOT}/repo_experiments/lungct_corrected_1mm_20261119T073622Z/`.
+Sources/spec/logs are in `experiments/2026-11-18_lungct_corrected_1mm/`.
+CorrField intensity/mask differences preclude a method-only interpretation.
+
+## OASIS first10 diffusion plus analytic KL-C1 (P86, 2026-11-10)
+
+The fixed gamma0/1e-4/1e-3/1e-2/0.1/1 extension completed for both FD and
+analytic diffusion at lambda1. Ten new cold/warm cohort blocks yielded110
+fresh observations;22 accepted gamma0 observations were reused. All120 warm
+first10 endpoints retain35 labels; all136 observations including4 smokes
+were scored. The ten rerun rank0 fields exactly match the P85 pilot.
+
+- FD diffusion has the largest tested mean Dice at gamma1e-4:0.826404 versus
+  0.826296 at gamma0, a paired +0.0108 percentage points with5/10 wins and
+  exploratory95% CI[-0.0819,+0.1042]pp. HD95/ASD worsen slightly. Analytic
+  diffusion is best at gamma0 (0.826191). Adding KL-C1 does not yield a
+  convincing accuracy gain on these ten cases.
+- Gamma0.01 offers the clearest moderate geometry/accuracy trade-off:
+  FD/analytic Dice falls0.110/0.120pp, while mean NDV falls about80%,
+  analytic SDlogJ about3.8% and analytic sampled folding about56%. HD95
+  improves0.026/0.041mm; ASD is nearly unchanged. Dice losses occur in8/10
+  cases for both backends.
+- Gamma0.1 lowers analytic SDlogJ about36%, analytic folding to0.054% and
+  NDV about98%, but loses0.814/0.884pp Dice and worsens ASD. Gamma1 loses
+  about5.87pp Dice in all10 pairs. Sampled folds reach zero while NDV remains
+  positive, reinforcing the need to report both geometric checks.
+- Positive-gamma warm registration means:FD27.97-30.56s,
+  analytic24.71-25.93s; historical gamma0 means22.23/22.65s. Fresh
+  registration process GPU peaks2.967/3.004GiB and separate scoring peaks
+  5.527GiB. GPU/update differences and historical reference timing limit
+  claims about pure loss overhead.
+
+All accuracy/regularity means and sample SD, case-paired intervals, per-label
+values, full-volume/foreground energies and Jacobian distributions, cold/warm
+resources and PNG/PDF curves are under
+`${ARTIFACT_ROOT}/repo_experiments/oasis_first10_diffusion1_analytic_kl_c1_gamma_v1/oasis_first10_diff1_kl_20261110T213230Z_v1/`.
+The [execution specification and technical log](../experiments/2026-11-10_oasis_first10_diffusion_kl_c1/)
+record the fixed protocol and caveats. This is exploratory tuning on the
+first10, not an independent held-out confirmation.
+
+## OASIS rank0 diffusion plus analytic KL-C1 (P85, 2026-11-10)
+
+Completed the fixed diffusion(lambda1) + gamma*analytic_KL_C1 pilot on
+fixed0333/moving0115 for gamma0/1e-4/1e-3/1e-2/0.1/1, retaining FD and
+analytic diffusion. Twenty new cold/warm outputs,4 historical gamma0
+references and4 smokes were accepted. All12 warm endpoints retain35 labels;
+cold/warm fields agree exactly. No first10 extension was launched.
+
+- Best tested Dice is0.802083 at gamma1e-4 for FD (+0.112pp), and0.802291
+  at gamma0 for analytic diffusion. There is no consistent accuracy gain.
+- Gamma0.01 reduces NDV about78-79% and analytic folding53-54%, for Dice
+  losses0.340/0.510pp (FD/analytic). Analytic SDlogJ improves only2.7%.
+  Gamma0.1 reduces analytic SDlogJ35-36%, folding about99% and NDV98%,
+  for Dice losses1.108/1.250pp and worse ASD. Gamma1 loses about8pp Dice;
+  zero sampled central/analytic folds coexist with positive discrete NDV.
+- Positive-gamma warm registration29.62-32.25s FD /25.38-27.61s analytic;
+  Torch allocated/reserved2.154/2.479GiB FD and1.930/2.516GiB analytic.
+  Separate scoring process peak5.527GiB. Historical gamma0 measurements,
+  GPU assignment and update counts limit pure loss-overhead comparisons.
+
+These are single-case trade-offs and exploratory gamma selections, not
+population evidence. All metrics, per-label values, cold/warm resources and
+full/FG regularity tables are external under
+`${ARTIFACT_ROOT}/repo_experiments/oasis_rank000_diffusion1_analytic_kl_c1_gamma_v1/oasis_rank000_diff1_kl_20261110T201710Z_v1/`,
+including `detailed_review_v1/`. See the
+[execution specification and technical log](../experiments/2026-11-10_oasis_rank000_diffusion_kl_c1/).
+
+## OASIS first10 FD/analytic regularizer tuning (P84, 2026-11-10)
+
+Accepted all721 timed/scored outputs:6 smokes,110 rank0 coarse observations and
+605 final observations. Primary first10 accuracy uses550 warm case outputs in
+55 complete settings. The coarse peaks were bracketed without extensions; the
+analytic-KL population winner remains penultimate in its frozen first10 grid.
+
+- Best tested mean-Dice diffusion weight1:FD0.826296, analytic0.826191;
+  BE weight0.3:0.815023/0.813606; KL-C1 weight0.03:0.775375/0.776723.
+  Diffusion beats each Dice-selected BE/KL arm on all three accuracy metrics
+  in every paired case within the corresponding backend. These are exploratory
+  first10 selections, not held-out evidence or claims about all optimizer settings.
+- KL lowers canonical foreground positive-J SDlogJ but its derivative convention
+  matters. At0.03, canonical/analytic sampled foreground folding is0.430%/4.021%
+  for FD-KL and0.507%/0.553% for analytic-KL. Analytic KL reduces analytic folding
+  and NDV in all10 pairs. NDV remains worse than diffusion at its selected point.
+  Low central folding does not establish continuous-field validity.
+- BE weight10 provides a better observed mean accuracy/regularity alternative
+  to KL0.03 within both backends: higher mean Dice, better surface metrics,
+  both SDlogJ/folding conventions and NDV. Its paired Dice advantage is5/10
+  cases with a CI spanning zero; do not claim every-case Dice superiority.
+- Selected warm registration means (FD/analytic) are22.23/22.65s for diffusion,
+  28.36/29.76s for BE,58.48/57.14s for KL. KL uses1325/1147.5 mean updates
+  versus diffusion497.5/485, so endpoint time is not per-step loss cost.
+  Selected training allocated peaks are1.36-2.05GiB; separate verification/scoring
+  sampled process GPU peaks reach about5.95GiB. Memory scopes are not interchangeable.
+- KL-FD drops one tiny warped label in rank1; canonical accuracy excludes it.
+  Identical-label sensitivity increases analytic-minus-FD KL Dice from0.135pp
+  to0.335pp. All selected diffusion/BE/analytic-KL cases retain35 labels.
+
+Full tables,25 same-weight backend comparisons, paired case deltas and exploratory
+case-bootstrap intervals, runtime/memory accounting and PNG/PDF figures are under
+`${ARTIFACT_ROOT}/repo_experiments/oasis_first10_regularizer_fd_analytic_v1/oasis_reg6_20261110T0917Z_v2/paired_review_v3/`.
+Original outputs/reports remain unchanged. See the
+[execution specification and technical log](../experiments/2026-11-10_oasis_regularizer_fd_analytic_sweep/).
 
 ## GaussianDIR rank-0 fitting and registration (P83, 2026-11-06)
 
